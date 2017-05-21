@@ -1,0 +1,10 @@
+[package]
+name = "rlua"
+version = "0.1.0"
+authors = ["kyren <kerriganw@gmail.com>"]
+
+[build-dependencies]
+gcc = "*"
+
+[dependencies]
+error-chain = "*"
