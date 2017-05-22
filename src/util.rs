@@ -140,12 +140,22 @@ pub unsafe fn pcall_with_traceback(state: *mut ffi::lua_State,
                                    nresults: c_int)
                                    -> c_int {
     unsafe extern "C" fn message_handler(state: *mut ffi::lua_State) -> c_int {
-        if !is_wrapped_error(state, 1) {
-            let s = ffi::lua_tolstring(state, -1, ptr::null_mut());
+        if is_wrapped_error(state, 1) {
+            if !is_panic_error(state, 1) {
+                let error = pop_error(state);
+                ffi::luaL_traceback(state, state, ptr::null(), 0);
+                let traceback = CStr::from_ptr(ffi::lua_tolstring(state, 1, ptr::null_mut()))
+                    .to_str()
+                    .unwrap()
+                    .to_owned();
+                push_error(state, WrappedError::Error(LuaError::with_chain(error, LuaErrorKind::CallbackError(traceback))));
+            }
+        } else {
+            let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
             if !s.is_null() {
                 ffi::luaL_traceback(state, state, s, 0);
             } else {
-                ffi::luaL_traceback(state, state, cstr!("<unprintable error>"), 0);
+                ffi::luaL_traceback(state, state, cstr!("<unprintable lua error>"), 0);
             }
         }
         1

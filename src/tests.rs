@@ -388,10 +388,8 @@ fn test_error() {
         _ => panic!("error not thrown"),
     }
     match rust_error.call::<_, ()>(()) {
-        Err(LuaError(LuaErrorKind::ExternalError(e), _)) => {
-            assert_eq!(e.description(), "test error")
-        }
-        Err(_) => panic!("error is not ExternalError kind"),
+        Err(LuaError(LuaErrorKind::CallbackError(_), _)) => {}
+        Err(_) => panic!("error is not CallbackError kind"),
         _ => panic!("error not thrown"),
     }
 

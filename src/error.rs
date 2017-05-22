@@ -30,8 +30,15 @@ error_chain! {
     }
 
     errors {
-        ScriptError(err: String)
-        IncompleteStatement(err: String)
+        ScriptError(err: String) {
+            display("Error executing lua script {}", err)
+        }
+        CallbackError(err: String) {
+            display("Error during lua callback {}", err)
+        }
+        IncompleteStatement(err: String) {
+            display("Incomplete lua statement {}", err)
+        }
     }
 
     foreign_links {
