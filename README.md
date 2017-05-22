@@ -63,7 +63,7 @@ in rustc.  For example:
       eliminate the lua multi macros in favor of simple tuples.
  
 See [this reddit discussion](http://www.reddit.com/r/rust/comments/5yujt6/) for
-details of the current lifetime problem with callback wrapping.  ## Examples
+details of the current lifetime problem with callback wrapping.
 
 ## Safety
 
