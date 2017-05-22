@@ -1,10 +1,14 @@
+#[cfg(test)]
+#[macro_use]
+extern crate hlist_macro;
+
+#[cfg(not(test))]
+extern crate hlist_macro;
+
 #[macro_use]
 extern crate error_chain;
 
-
 pub mod ffi;
-#[macro_use]
-mod macros;
 mod util;
 mod error;
 mod lua;

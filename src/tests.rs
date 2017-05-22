@@ -86,7 +86,7 @@ fn test_function() {
         .unwrap();
 
     let concat = lua.get::<_, LuaFunction>("concat").unwrap();
-    assert_eq!(concat.call::<_, String>(lua_multi!["foo", "bar"]).unwrap(),
+    assert_eq!(concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
                "foobar");
 }
 
@@ -108,8 +108,8 @@ fn test_bind() {
     let mut concat = lua.get::<_, LuaFunction>("concat").unwrap();
     concat = concat.bind("foo").unwrap();
     concat = concat.bind("bar").unwrap();
-    concat = concat.bind(lua_multi!["baz", "baf"]).unwrap();
-    assert_eq!(concat.call::<_, String>(lua_multi!["hi", "wut"]).unwrap(),
+    concat = concat.bind(hlist!["baz", "baf"]).unwrap();
+    assert_eq!(concat.call::<_, String>(hlist!["hi", "wut"]).unwrap(),
                "foobarbazbafhiwut");
 }
 
@@ -202,11 +202,11 @@ fn test_metamethods() {
         fn add_methods(methods: &mut LuaUserDataMethods<Self>) {
             methods.add_method("get", |lua, data, _| lua.pack(data.0));
             methods.add_meta_function(LuaMetaMethod::Add, |lua, args| {
-                let lua_multi_pat![lhs, rhs] = lua.unpack::<LuaMulti![UserData, UserData]>(args)?;
+                let hlist_pat![lhs, rhs] = lua.unpack::<HList![UserData, UserData]>(args)?;
                 lua.pack(UserData(lhs.0 + rhs.0))
             });
             methods.add_meta_function(LuaMetaMethod::Sub, |lua, args| {
-                let lua_multi_pat![lhs, rhs] = lua.unpack::<LuaMulti![UserData, UserData]>(args)?;
+                let hlist_pat![lhs, rhs] = lua.unpack::<HList![UserData, UserData]>(args)?;
                 lua.pack(UserData(lhs.0 - rhs.0))
             });
             methods.add_meta_method(LuaMetaMethod::Index, |lua, data, args| {
@@ -282,11 +282,11 @@ fn test_lua_multi() {
     let concat = lua.get::<_, LuaFunction>("concat").unwrap();
     let mreturn = lua.get::<_, LuaFunction>("mreturn").unwrap();
 
-    assert_eq!(concat.call::<_, String>(lua_multi!["foo", "bar"]).unwrap(),
+    assert_eq!(concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
                "foobar");
-    let lua_multi_pat![a, b] = mreturn.call::<_, LuaMulti![u64, u64]>(lua_multi![]).unwrap();
+    let hlist_pat![a, b] = mreturn.call::<_, HList![u64, u64]>(hlist![]).unwrap();
     assert_eq!((a, b), (1, 2));
-    let lua_multi_pat![a, b, LuaVariadic(v)] = mreturn.call::<_, LuaMulti![u64, u64, LuaVariadic<u64>]>(lua_multi![]).unwrap();
+    let hlist_pat![a, b, LuaVariadic(v)] = mreturn.call::<_, HList![u64, u64, LuaVariadic<u64>]>(hlist![]).unwrap();
     assert_eq!((a, b), (1, 2));
     assert_eq!(v, vec![3, 4, 5, 6]);
 }

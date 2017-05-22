@@ -65,6 +65,12 @@ in rustc.  For example:
 See [this reddit discussion](http://www.reddit.com/r/rust/comments/5yujt6/) for
 details of the current lifetime problem with callback wrapping.
 
+## API Stability or lack thereof
+
+This library is very much Work In Progress, so there may be a lot of API churn.
+I will try to follow a pre-1.0 semver (if such a thing exists), but that means
+there will just be a large number of API bumps.
+
 ## Safety
 
 My *goal* is complete safety, it should not be possible to cause undefined
@@ -85,4 +91,5 @@ The library currently attempts to handle each of these situations, but there
 are so many ways to cause unsafety with Lua that it just needs more testing.
 
 ## Examples
+
 Please look at the examples [here](examples/examples.rs).

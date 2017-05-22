@@ -1,6 +1,6 @@
 [package]
 name = "rlua"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["kyren <catherine@chucklefish.org>"]
 repository = "https://github.com/chucklefish/rlua"
 description = "High level bindings to Lua 5.3"
@@ -9,7 +9,8 @@ keywords = ["lua"]
 license = "MIT"
 
 [build-dependencies]
-gcc = "*"
+gcc = "0.3"
 
 [dependencies]
-error-chain = "*"
+hlist-macro = "0.1"
+error-chain = "0.10"

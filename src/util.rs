@@ -8,6 +8,12 @@ use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
 use ffi;
 use error::{LuaResult, LuaError, LuaErrorKind};
 
+macro_rules! cstr {
+  ($s:expr) => (
+    concat!($s, "\0") as *const str as *const [c_char] as *const c_char
+  );
+}
+
 // Run an operation on a lua_State and automatically clean up the stack before returning.  Takes
 // the lua_State, the expected stack size change, and an operation to run.  If the operation
 // results in success, then the stack is inspected to make sure the change in stack size matches
@@ -139,7 +145,7 @@ pub unsafe fn pcall_with_traceback(state: *mut ffi::lua_State,
             if !s.is_null() {
                 ffi::luaL_traceback(state, state, s, 0);
             } else {
-                ffi::luaL_traceback(state, state, lua_cstr!("<unprintable error>"), 0);
+                ffi::luaL_traceback(state, state, cstr!("<unprintable error>"), 0);
             }
         }
         1

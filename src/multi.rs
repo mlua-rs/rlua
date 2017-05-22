@@ -1,11 +1,7 @@
+use hlist_macro::{HNil, HCons};
+
 use error::*;
 use lua::*;
-
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct LNil;
-
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct LCons<H, T>(pub H, pub T);
 
 impl<'lua> ToLuaMulti<'lua> for () {
     fn to_lua_multi(self, _: &'lua Lua) -> LuaResult<LuaMultiValue> {
@@ -63,32 +59,32 @@ impl<'lua, T: FromLua<'lua>> FromLuaMulti<'lua> for LuaVariadic<T> {
     }
 }
 
-impl<'lua> ToLuaMulti<'lua> for LNil {
+impl<'lua> ToLuaMulti<'lua> for HNil {
     fn to_lua_multi(self, _: &'lua Lua) -> LuaResult<LuaMultiValue<'lua>> {
         Ok(LuaMultiValue::new())
     }
 }
 
-impl<'lua> FromLuaMulti<'lua> for LNil {
+impl<'lua> FromLuaMulti<'lua> for HNil {
     fn from_lua_multi(_: LuaMultiValue<'lua>, _: &'lua Lua) -> LuaResult<Self> {
-        Ok(LNil)
+        Ok(HNil)
     }
 }
 
-impl<'lua, T: ToLuaMulti<'lua>> ToLuaMulti<'lua> for LCons<T, LNil> {
+impl<'lua, T: ToLuaMulti<'lua>> ToLuaMulti<'lua> for HCons<T, HNil> {
     fn to_lua_multi(self, lua: &'lua Lua) -> LuaResult<LuaMultiValue<'lua>> {
         self.0.to_lua_multi(lua)
     }
 }
 
-impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for LCons<T, LNil> {
+impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for HCons<T, HNil> {
     fn from_lua_multi(values: LuaMultiValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
-        Ok(LCons(T::from_lua_multi(values, lua)?, LNil))
+        Ok(HCons(T::from_lua_multi(values, lua)?, HNil))
     }
 }
 
-impl<'lua, H: ToLua<'lua>, A, B> ToLuaMulti<'lua> for LCons<H, LCons<A, B>>
-    where LCons<A, B>: ToLuaMulti<'lua>
+impl<'lua, H: ToLua<'lua>, A, B> ToLuaMulti<'lua> for HCons<H, HCons<A, B>>
+    where HCons<A, B>: ToLuaMulti<'lua>
 {
     fn to_lua_multi(self, lua: &'lua Lua) -> LuaResult<LuaMultiValue<'lua>> {
         let mut results = self.1.to_lua_multi(lua)?;
@@ -97,12 +93,12 @@ impl<'lua, H: ToLua<'lua>, A, B> ToLuaMulti<'lua> for LCons<H, LCons<A, B>>
     }
 }
 
-impl<'lua, H: FromLua<'lua>, A, B> FromLuaMulti<'lua> for LCons<H, LCons<A, B>>
-    where LCons<A, B>: FromLuaMulti<'lua>
+impl<'lua, H: FromLua<'lua>, A, B> FromLuaMulti<'lua> for HCons<H, HCons<A, B>>
+    where HCons<A, B>: FromLuaMulti<'lua>
 {
     fn from_lua_multi(mut values: LuaMultiValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
         let val = H::from_lua(values.pop_front().unwrap_or(LuaNil), lua)?;
-        let res = LCons::<A, B>::from_lua_multi(values, lua)?;
-        Ok(LCons(val, res))
+        let res = HCons::<A, B>::from_lua_multi(values, lua)?;
+        Ok(HCons(val, res))
     }
 }

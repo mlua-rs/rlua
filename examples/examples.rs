@@ -1,4 +1,5 @@
 #[macro_use]
+extern crate hlist_macro;
 extern crate rlua;
 
 use rlua::*;
@@ -70,7 +71,7 @@ fn examples() -> LuaResult<()> {
     // is one way to call a function with multiple parameters:
 
     print
-        .call::<_, ()>(lua_multi!["hello", "again", "from", "rust"])?;
+        .call::<_, ()>(hlist!["hello", "again", "from", "rust"])?;
 
     // You can bind rust functions to lua as well
 
@@ -80,7 +81,7 @@ fn examples() -> LuaResult<()> {
         // parts.  Due to lifetime type signature limitations, this cannot be done automatically from the
         // function signature, but this will be fixed with ATCs.  Notice the use of the hlist
         // macros again.
-        let lua_multi_pat![list1, list2] = lua.unpack::<LuaMulti![Vec<String>, Vec<String>]>(args)?;
+        let hlist_pat![list1, list2] = lua.unpack::<HList![Vec<String>, Vec<String>]>(args)?;
 
         // This function just checks whether two string lists are equal, and in an inefficient way.
         // Results are returned with lua.pack, which takes any number of values and turns them back
@@ -119,14 +120,14 @@ fn examples() -> LuaResult<()> {
             });
 
             methods.add_meta_function(LuaMetaMethod::Add, |lua, params| {
-                let lua_multi_pat![vec1, vec2] = lua.unpack::<LuaMulti![Vec2, Vec2]>(params)?;
+                let hlist_pat![vec1, vec2] = lua.unpack::<HList![Vec2, Vec2]>(params)?;
                 lua.pack(Vec2(vec1.0 + vec2.0, vec1.1 + vec2.1))
             });
         }
     }
 
     let vec2_constructor = lua.create_function(|lua, args| {
-            let lua_multi_pat![x, y] = lua.unpack::<LuaMulti![f32, f32]>(args)?;
+            let hlist_pat![x, y] = lua.unpack::<HList![f32, f32]>(args)?;
             lua.pack(Vec2(x, y))
         })?;
     lua.set("vec2", vec2_constructor)?;
