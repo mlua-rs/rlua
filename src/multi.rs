@@ -106,13 +106,3 @@ impl<'lua, H: FromLua<'lua>, A, B> FromLuaMulti<'lua> for LCons<H, LCons<A, B>>
         Ok(LCons(val, res))
     }
 }
-
-pub fn lua_pack<'lua, H: ToLuaMulti<'lua>>(lua: &'lua Lua, h: H) -> LuaResult<LuaMultiValue<'lua>> {
-    h.to_lua_multi(lua)
-}
-
-pub fn lua_unpack<'lua, H: FromLuaMulti<'lua>>(lua: &'lua Lua,
-                                               a: LuaMultiValue<'lua>)
-                                               -> LuaResult<H> {
-    H::from_lua_multi(a, lua)
-}

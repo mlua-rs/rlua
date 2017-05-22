@@ -48,7 +48,7 @@ There are also some more general things that need to be done:
 
     * More fleshed out Lua API, things like custom metatables and exposing the
       registry.
-    * MUCH better API documentation, the current API documentation is basically
+    * MUCH better API documentation, the current API documentation is almost
       non-existent.
     * Performance testing.
 

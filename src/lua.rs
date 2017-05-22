@@ -18,6 +18,7 @@ use util::*;
 pub type LuaInteger = ffi::lua_Integer;
 pub type LuaNumber = ffi::lua_Number;
 
+/// A rust-side handle to an internal Lua value.
 #[derive(Debug, Clone)]
 pub enum LuaValue<'lua> {
     Nil,
@@ -31,14 +32,17 @@ pub enum LuaValue<'lua> {
 }
 pub use self::LuaValue::Nil as LuaNil;
 
+/// Trait for types convertible to LuaValue
 pub trait ToLua<'a> {
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue<'a>>;
 }
 
+/// Trait for types convertible from LuaValue
 pub trait FromLua<'a>: Sized {
     fn from_lua(lua_value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self>;
 }
 
+/// Multiple lua values used for both argument passing and also for multiple return values.
 #[derive(Debug, Clone)]
 pub struct LuaMultiValue<'lua>(VecDeque<LuaValue<'lua>>);
 
@@ -114,6 +118,7 @@ impl<'lua> Drop for LuaRef<'lua> {
     }
 }
 
+/// Handle to an an internal lua string
 #[derive(Clone, Debug)]
 pub struct LuaString<'lua>(LuaRef<'lua>);
 
@@ -133,6 +138,7 @@ impl<'lua> LuaString<'lua> {
     }
 }
 
+/// Handle to an an internal lua table
 #[derive(Clone, Debug)]
 pub struct LuaTable<'lua>(LuaRef<'lua>);
 
@@ -246,6 +252,7 @@ impl<'lua> LuaTable<'lua> {
     }
 }
 
+/// Handle to an an internal lua function
 #[derive(Clone, Debug)]
 pub struct LuaFunction<'lua>(LuaRef<'lua>);
 
@@ -316,6 +323,7 @@ impl<'lua> LuaFunction<'lua> {
     }
 }
 
+/// These are the metamethods that can be overridden using this API
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum LuaMetaMethod {
     Add,
@@ -432,6 +440,8 @@ pub trait LuaUserDataType: 'static + Sized {
     fn add_methods(_methods: &mut LuaUserDataMethods<Self>) {}
 }
 
+/// Handle to an internal instance of custom userdata.  All userdata in this API is based around
+/// RefCell, to best match the mutable semantics of the lua language.
 #[derive(Clone, Debug)]
 pub struct LuaUserData<'lua>(LuaRef<'lua>);
 
@@ -440,10 +450,12 @@ impl<'lua> LuaUserData<'lua> {
         self.inspect(|_: &RefCell<T>| Ok(())).is_ok()
     }
 
+    /// Borrow this userdata out of the internal RefCell that is held in lua.
     pub fn borrow<T: LuaUserDataType>(&self) -> LuaResult<Ref<T>> {
         self.inspect(|cell| Ok(cell.try_borrow()?))
     }
 
+    /// Borrow mutably this userdata out of the internal RefCell that is held in lua.
     pub fn borrow_mut<T: LuaUserDataType>(&self) -> LuaResult<RefMut<T>> {
         self.inspect(|cell| Ok(cell.try_borrow_mut()?))
     }
@@ -483,6 +495,7 @@ impl<'lua> LuaUserData<'lua> {
     }
 }
 
+/// Top level Lua struct which holds the lua state itself.
 pub struct Lua {
     state: *mut ffi::lua_State,
     ephemeral: bool,
