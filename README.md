@@ -46,7 +46,7 @@ that are on the roadmap:
 
 There are also some more general things that need to be done:
 
-    * More fleshed out Lua API, things like Table metatables and exposing the
+    * More fleshed out Lua API, things like custom metatables and exposing the
       registry.
     * MUCH better API documentation, the current API documentation is basically
       non-existent.
