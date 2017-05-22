@@ -66,4 +66,4 @@ See [this reddit discussion](http://www.reddit.com/r/rust/comments/5yujt6/) for
 details of the current lifetime problem with callback wrapping.  ## Examples
 
 ## Examples
-Please look at the [examples](examples/examples.rs)
+Please look at the examples [here](examples/examples.rs).
