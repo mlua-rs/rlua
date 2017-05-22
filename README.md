@@ -18,7 +18,7 @@ following differences with hlua:
 
 The key difference here is that rlua handles rust-side references to Lua values
 in a fundamentally different way than hlua, more similar to other lua bindings
-systems like (Selene)[https://github.com/jeremyong/Selene] for C++.  Values like
+systems like [Selene](https://github.com/jeremyong/Selene) for C++.  Values like
 LuaTable and LuaFunction that hold onto Lua values in the Rust stack, instead of
 pointing at values in the Lua stack, are placed into the registry with luaL_ref.
 In this way, it is possible to have an arbitrary number of handles to internal
@@ -58,11 +58,10 @@ in rustc.  For example:
     * Once ATCs land, there should be a way to wrap callbacks based on argument
       and return signature, rather than calling lua.pack / lua.unpack inside the
       callback.  Until then, it is impossible to name the type of the function
-      that would do the wrapping, see (this reddit
-      discussion)[https://www.reddit.com/r/rust/comments/5yujt6/a_very_complex_lifetime_problem_possibly_a/]
+      that would do the wrapping, see [this reddit discussion](https://www.reddit.com/r/rust/comments/5yujt6/a_very_complex_lifetime_problem_possibly_a/)
     * Once tuple based variadic generics land, the plan is to completely
       eliminate the lua multi macros in favor of simple tuples.
  
 ## Examples
 
-Please look at the (examples)[examples/examples.rs]
+Please look at the [examples](examples/examples.rs)
