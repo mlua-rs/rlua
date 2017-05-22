@@ -89,13 +89,21 @@ fn examples() -> LuaResult<()> {
         // signature limitations.
         lua.pack(list1 == list2)
     })?;
-
     lua.set("check_equal", check_equal)?;
+
+    // You can also accept variadic arguments to rust functions
+    let join = lua.create_function(|lua, args| {
+                                       let strings = lua.unpack::<LuaVariadic<String>>(args)?.0;
+                                       // (This is quadratic!, it's just an example!)
+                                       lua.pack(strings.iter().fold("".to_owned(), |a, b| a + b))
+                                   })?;
+    lua.set("join", join)?;
 
     assert_eq!(lua.eval::<bool>(r#"check_equal({"a", "b", "c"}, {"a", "b", "c"})"#)?,
                true);
     assert_eq!(lua.eval::<bool>(r#"check_equal({"a", "b", "c"}, {"d", "e", "f"})"#)?,
                false);
+    assert_eq!(lua.eval::<String>(r#"join("a", "b", "c")"#)?, "abc");
 
     // You can create userdata with methods and metamethods defined on them.  Here's a more
     // complete example that shows all of the features of this API together
