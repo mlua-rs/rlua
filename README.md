@@ -65,5 +65,24 @@ in rustc.  For example:
 See [this reddit discussion](http://www.reddit.com/r/rust/comments/5yujt6/) for
 details of the current lifetime problem with callback wrapping.  ## Examples
 
+## Safety
+
+My *goal* is complete safety, it should not be possible to cause undefined
+behavior whatsoever with the API, even in edge cases.  There is, however, QUITE
+a lot of unsafe code in this crate, and I would call the current safety level
+of the crate "Work In Progress".  The GOAL is for the crate to handle tricky
+situations such as:
+
+    * Panic safety, and carrying the panic across the lua api correctly
+    * Lua stack size checking, and correctly handling lua being out of stack
+      space
+    * Leaving the correct elements on the lua stack and in the correct order,
+      and panicking if these invariants are not met (due to internal bugs).
+    * Correctly guarding the metatables of userdata so that scripts cannot, for
+      example, swap the __gc methods around and cause UB.
+
+The library currently attempts to handle each of these situations, but there
+are so many ways to cause unsafety with Lua that it just needs more testing.
+
 ## Examples
 Please look at the examples [here](examples/examples.rs).
