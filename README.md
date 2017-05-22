@@ -60,7 +60,7 @@ in rustc.  For example:
     callback.  Until then, it is impossible to name the type of the function
     that would do the wrapping.
   * Once tuple based variadic generics land, the plan is to completely
-    eliminate the lua multi macros in favor of simple tuples.
+    eliminate the hlist macros in favor of simple tuples.
  
 See [this reddit discussion](http://www.reddit.com/r/rust/comments/5yujt6/) for
 details of the current lifetime problem with callback wrapping.
@@ -80,6 +80,8 @@ of the crate "Work In Progress".  The GOAL is for the crate to handle tricky
 situations such as:
 
   * Panic safety, and carrying the panic across the lua api correctly
+  * Passing rust panics across the lua boundary as lua errors without allowing
+    lua to catch rust panics as normal errors.
   * Lua stack size checking, and correctly handling lua being out of stack
     space
   * Leaving the correct elements on the lua stack and in the correct order,
@@ -87,7 +89,7 @@ situations such as:
   * Correctly guarding the metatables of userdata so that scripts cannot, for
     example, swap the `__gc` methods around and cause UB.
 
-The library currently attempts to handle each of these situations, but there
+The library currently *attempts* to handle each of these situations, but there
 are so many ways to cause unsafety with Lua that it just needs more testing.
 
 ## Examples
