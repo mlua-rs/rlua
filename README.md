@@ -12,7 +12,7 @@ following differences with hlua:
 
   * Handles to Lua values use the Lua registry, not the stack
   * Handles to Lua values are all internally mutable
-  * Handles to Lua values use non-mutable borrows the main Lua object, so
+  * Handles to Lua values have non-mutable borrows to the main Lua object, so
     there can be multiple handles or long lived handles
   * Targets lua 5.3
 
