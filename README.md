@@ -58,10 +58,12 @@ in rustc.  For example:
     * Once ATCs land, there should be a way to wrap callbacks based on argument
       and return signature, rather than calling lua.pack / lua.unpack inside the
       callback.  Until then, it is impossible to name the type of the function
-      that would do the wrapping, see [this reddit discussion](https://www.reddit.com/r/rust/comments/5yujt6/a_very_complex_lifetime_problem_possibly_a/)
+      that would do the wrapping.
     * Once tuple based variadic generics land, the plan is to completely
       eliminate the lua multi macros in favor of simple tuples.
  
-## Examples
+See [this reddit discussion](http://www.reddit.com/r/rust/comments/5yujt6/) for
+details of the current lifetime problem with callback wrapping.  ## Examples
 
+## Examples
 Please look at the [examples](examples/examples.rs)
