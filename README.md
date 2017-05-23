@@ -1,5 +1,7 @@
 # rlua -- High level bindings between Rust and Lua
 
+[![Build Status](https://travis-ci.org/chucklefish/rlua.svg?branch=master)](https://travis-ci.org/chucklefish/rlua)
+
 This library is a WIP high level interface between Rust and Lua.  Its major goal
 is to expose as flexible of an API between Rust and Lua as possible, while also
 being completely safe.
