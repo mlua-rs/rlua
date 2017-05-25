@@ -2,6 +2,7 @@ use std::fmt;
 use std::result::Result;
 use std::error::Error;
 use std::panic::catch_unwind;
+use std::os::raw::c_void;
 
 use super::*;
 
@@ -491,4 +492,19 @@ fn test_thread() {
         .unwrap();
     assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(()).unwrap(), Some(42));
+}
+
+#[test]
+fn test_lightuserdata() {
+    let lua = Lua::new();
+    lua.load(r#"function id(a)
+        return a
+    end"#,
+             None)
+        .unwrap();
+    let res = lua.get::<_, LuaFunction>("id")
+        .unwrap()
+        .call::<_, LightUserData>(LightUserData(42 as *mut c_void))
+        .unwrap();
+    assert_eq!(res, LightUserData(42 as *mut c_void));
 }

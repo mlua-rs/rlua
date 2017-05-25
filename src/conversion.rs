@@ -120,6 +120,21 @@ impl<'lua> FromLua<'lua> for bool {
     }
 }
 
+impl<'lua> ToLua<'lua> for LightUserData {
+    fn to_lua(self, _: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+        Ok(LuaValue::LightUserData(self))
+    }
+}
+
+impl<'lua> FromLua<'lua> for LightUserData {
+    fn from_lua(v: LuaValue, _: &'lua Lua) -> LuaResult<Self> {
+        match v {
+            LuaValue::LightUserData(ud) => Ok(ud),
+            _ => Err("cannot convert lua value to lightuserdata".into()),
+        }
+    }
+}
+
 impl<'lua> ToLua<'lua> for String {
     fn to_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
         Ok(LuaValue::String(lua.create_string(&self)?))
