@@ -330,6 +330,8 @@ impl<'lua> LuaFunction<'lua> {
     }
 }
 
+/// A LuaThread is Active before the coroutine function finishes, Dead after it finishes, and in
+/// Error state if error has been called inside the coroutine.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum LuaThreadStatus {
     Dead,
