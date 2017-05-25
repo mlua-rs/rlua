@@ -21,6 +21,7 @@ pub type lua_KFunction = unsafe extern "C" fn(state: *mut lua_State,
 pub type lua_CFunction = unsafe extern "C" fn(state: *mut lua_State) -> c_int;
 
 pub const LUA_OK: c_int = 0;
+pub const LUA_YIELD: c_int = 1;
 pub const LUA_ERRRUN: c_int = 2;
 pub const LUA_ERRSYNTAX: c_int = 3;
 pub const LUA_ERRMEM: c_int = 4;
@@ -58,6 +59,8 @@ extern "C" {
                       ctx: lua_KContext,
                       k: Option<lua_KFunction>)
                       -> c_int;
+    pub fn lua_resume(state: *mut lua_State, from: *mut lua_State, nargs: c_int) -> c_int;
+    pub fn lua_status(state: *mut lua_State) -> c_int;
 
     pub fn lua_pushnil(state: *mut lua_State);
     pub fn lua_pushvalue(state: *mut lua_State, index: c_int);
@@ -73,6 +76,7 @@ extern "C" {
     pub fn lua_toboolean(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_tonumberx(state: *mut lua_State, index: c_int, isnum: *mut c_int) -> lua_Number;
     pub fn lua_touserdata(state: *mut lua_State, index: c_int) -> *mut c_void;
+    pub fn lua_tothread(state: *mut lua_State, index: c_int) -> *mut lua_State;
 
     pub fn lua_gettop(state: *const lua_State) -> c_int;
     pub fn lua_settop(state: *mut lua_State, n: c_int);
@@ -95,6 +99,7 @@ extern "C" {
 
     pub fn lua_createtable(state: *mut lua_State, narr: c_int, nrec: c_int);
     pub fn lua_newuserdata(state: *mut lua_State, size: usize) -> *mut c_void;
+    pub fn lua_newthread(state: *mut lua_State) -> *mut lua_State;
 
     pub fn lua_settable(state: *mut lua_State, index: c_int);
     pub fn lua_setmetatable(state: *mut lua_State, index: c_int);
@@ -116,8 +121,8 @@ extern "C" {
     pub fn luaL_ref(state: *mut lua_State, table: c_int) -> c_int;
     pub fn luaL_unref(state: *mut lua_State, table: c_int, lref: c_int);
     pub fn luaL_checkstack(state: *mut lua_State, size: c_int, msg: *const c_char);
-    pub fn luaL_traceback(state: *mut lua_State,
-                          push_state: *mut lua_State,
+    pub fn luaL_traceback(push_state: *mut lua_State,
+                          state: *mut lua_State,
                           msg: *const c_char,
                           level: c_int);
 }

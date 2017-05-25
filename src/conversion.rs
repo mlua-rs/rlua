@@ -74,6 +74,21 @@ impl<'lua> FromLua<'lua> for LuaUserData<'lua> {
     }
 }
 
+impl<'lua> ToLua<'lua> for LuaThread<'lua> {
+    fn to_lua(self, _: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+        Ok(LuaValue::Thread(self))
+    }
+}
+
+impl<'lua> FromLua<'lua> for LuaThread<'lua> {
+    fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<LuaThread<'lua>> {
+        match value {
+            LuaValue::Thread(t) => Ok(t),
+            _ => Err("cannot convert lua value to thread".into()),
+        }
+    }
+}
+
 impl<'lua, T: LuaUserDataType> ToLua<'lua> for T {
     fn to_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
         lua.create_userdata(self).map(LuaValue::UserData)

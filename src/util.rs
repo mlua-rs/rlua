@@ -129,7 +129,8 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State) -> LuaError {
 
     } else {
         ffi::lua_pop(state, 1);
-        LuaErrorKind::ScriptError("<unprintable error>".to_owned()).into()
+        LuaErrorKind::ScriptError("<unprintable error>".to_owned())
+            .into()
     }
 }
 
@@ -167,6 +168,34 @@ pub unsafe fn pcall_with_traceback(state: *mut ffi::lua_State,
     let ret = ffi::lua_pcall(state, nargs, nresults, msgh_position);
     ffi::lua_remove(state, msgh_position);
     ret
+}
+
+pub unsafe fn resume_with_traceback(state: *mut ffi::lua_State,
+                                    from: *mut ffi::lua_State,
+                                    nargs: c_int)
+                                    -> c_int {
+    let res = ffi::lua_resume(state, from, nargs);
+    if res != ffi::LUA_OK && res != ffi::LUA_YIELD {
+        if is_wrapped_error(state, 1) {
+            if !is_panic_error(state, 1) {
+                let error = pop_error(state);
+                ffi::luaL_traceback(from, state, ptr::null(), 0);
+                let traceback = CStr::from_ptr(ffi::lua_tolstring(from, 1, ptr::null_mut()))
+                    .to_str()
+                    .unwrap()
+                    .to_owned();
+                push_error(from, WrappedError::Error(LuaError::with_chain(error, LuaErrorKind::CallbackError(traceback))));
+            }
+        } else {
+            let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
+            if !s.is_null() {
+                ffi::luaL_traceback(from, state, s, 0);
+            } else {
+                ffi::luaL_traceback(from, state, cstr!("<unprintable lua error>"), 0);
+            }
+        }
+    }
+    res
 }
 
 // A variant of pcall that does not allow lua to catch panic errors from callback_error

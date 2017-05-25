@@ -20,7 +20,7 @@ fn test_load() {
     lua.load(r#"
             res = 'foo'..'bar'
         "#,
-              None)
+             None)
         .unwrap();
     assert_eq!(lua.get::<_, String>("res").unwrap(), "foobar");
 }
@@ -56,7 +56,7 @@ fn test_table() {
             table2 = {}
             table3 = {1, 2, nil, 4, 5}
         "#,
-              None)
+             None)
         .unwrap();
 
     let table1 = lua.get::<_, LuaTable>("table1").unwrap();
@@ -82,7 +82,7 @@ fn test_function() {
                 return arg1 .. arg2
             end
         "#,
-              None)
+             None)
         .unwrap();
 
     let concat = lua.get::<_, LuaFunction>("concat").unwrap();
@@ -102,7 +102,7 @@ fn test_bind() {
                 return res
             end
         "#,
-              None)
+             None)
         .unwrap();
 
     let mut concat = lua.get::<_, LuaFunction>("concat").unwrap();
@@ -124,7 +124,7 @@ fn test_rust_function() {
             -- Test to make sure chunk return is ignored
             return 1
         "#,
-              None)
+             None)
         .unwrap();
 
     let lua_function = lua.get::<_, LuaFunction>("lua_function").unwrap();
@@ -182,7 +182,7 @@ fn test_methods() {
                 return userdata:set_value(i)
             end
         "#,
-              None)
+             None)
         .unwrap();
     let get = lua.get::<_, LuaFunction>("get_it").unwrap();
     let set = lua.get::<_, LuaFunction>("set_it").unwrap();
@@ -238,7 +238,7 @@ fn test_scope() {
                 tin = {1, 2, 3}
             }
         "#,
-              None)
+             None)
         .unwrap();
 
     // Make sure that table gets do not borrow the table, but instead just borrow lua.
@@ -276,7 +276,7 @@ fn test_lua_multi() {
                 return 1, 2, 3, 4, 5, 6
             end
         "#,
-              None)
+             None)
         .unwrap();
 
     let concat = lua.get::<_, LuaFunction>("concat").unwrap();
@@ -299,7 +299,7 @@ fn test_coercion() {
             str = "123"
             num = 123.0
         "#,
-              None)
+             None)
         .unwrap();
 
     assert_eq!(lua.get::<_, String>("int").unwrap(), "123");
@@ -367,7 +367,7 @@ fn test_error() {
                 understand_recursion()
             end
         "#,
-              None)
+             None)
         .unwrap();
 
     let rust_error_function =
@@ -404,7 +404,7 @@ fn test_error() {
                     pcall(function () rust_panic_function() end)
                 end
             "#,
-                  None)?;
+                 None)?;
         let rust_panic_function = lua.create_function(|_, _| {
             panic!("expected panic, this panic should be caught in rust")
         })?;
@@ -426,7 +426,7 @@ fn test_error() {
                     xpcall(function() rust_panic_function() end, function() end)
                 end
             "#,
-                  None)?;
+                 None)?;
         let rust_panic_function = lua.create_function(|_, _| {
             panic!("expected panic, this panic should be caught in rust")
         })?;
@@ -440,4 +440,55 @@ fn test_error() {
         Ok(Err(e)) => panic!("error during panic test {:?}", e),
         Err(_) => {}
     };
+}
+
+#[test]
+fn test_thread() {
+    let lua = Lua::new();
+    let thread = lua.create_thread(lua.eval::<LuaFunction>(r#"function (s)
+        local sum = s
+        for i = 1,4 do
+            sum = sum + coroutine.yield(sum)
+        end
+        return sum
+    end"#)
+                                       .unwrap())
+        .unwrap();
+
+    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.resume::<_, i64>(0).unwrap(), Some(0));
+    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.resume::<_, i64>(1).unwrap(), Some(1));
+    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.resume::<_, i64>(2).unwrap(), Some(3));
+    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.resume::<_, i64>(3).unwrap(), Some(6));
+    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.resume::<_, i64>(4).unwrap(), Some(10));
+    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Dead);
+
+    let accumulate = lua.create_thread(lua.eval::<LuaFunction>(r#"function (sum)
+        while true do
+            sum = sum + coroutine.yield(sum)
+        end
+    end"#)
+                                           .unwrap())
+        .unwrap();
+
+    for i in 0..4 {
+        accumulate.resume::<_, ()>(i).unwrap();
+    }
+    assert_eq!(accumulate.resume::<_, i64>(4).unwrap(), Some(10));
+    assert_eq!(accumulate.status().unwrap(), LuaThreadStatus::Active);
+    assert!(accumulate.resume::<_, ()>("error").is_err());
+    assert_eq!(accumulate.status().unwrap(), LuaThreadStatus::Error);
+
+    let thread = lua.eval::<LuaThread>(r#"coroutine.create(function ()
+        while true do
+            coroutine.yield(42)
+        end
+    end)"#)
+        .unwrap();
+    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.resume::<_, i64>(()).unwrap(), Some(42));
 }
