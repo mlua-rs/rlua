@@ -908,11 +908,11 @@ impl Lua {
         }
     }
 
-    pub fn to<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> LuaResult<LuaValue<'lua>> {
+    pub fn from<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> LuaResult<LuaValue<'lua>> {
         t.to_lua(self)
     }
 
-    pub fn from<'lua, T: FromLua<'lua>>(&'lua self, value: LuaValue<'lua>) -> LuaResult<T> {
+    pub fn to<'lua, T: FromLua<'lua>>(&'lua self, value: LuaValue<'lua>) -> LuaResult<T> {
         T::from_lua(value, self)
     }
 
