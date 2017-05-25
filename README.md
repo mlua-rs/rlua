@@ -2,9 +2,9 @@
 
 [![Build Status](https://travis-ci.org/chucklefish/rlua.svg?branch=master)](https://travis-ci.org/chucklefish/rlua)
 
-This library is a WIP high level interface between Rust and Lua.  Its major goal
-is to expose as flexible of an API between Rust and Lua as possible, while also
-being completely safe.
+This library is a WIP high level interface between Rust and Lua.  Its major
+goal is to expose as easy to use, practical, and flexible of an API between
+Rust and Lua as possible, while also being completely safe.
 
 There are other high level lua bindings systems for rust, and this crate is an
 exploration of a different part of the design space.  The main high level
@@ -29,13 +29,10 @@ IS slightly slower than the approach that hlua takes of only manipulating the
 lua stack, but this, combined with internal mutability, allows for a much more
 flexible API.
 
-Currently exposes a *somewhat* complete Lua API covering values and tables and
-functions and userdata, but does not yet cover coroutines.  This API is actually
-heavily inspired by the lua API that I previously wrote for Starbound, and will
-become feature complete with that API over time.  Some capabilities that API has
-that are on the roadmap:
+This API is actually heavily inspired by the lua API that I previously wrote
+for Starbound, and will become feature complete with that API over time.  Some
+capabilities that API has that are on the roadmap:
 
-  * Proper coroutine support
   * Lua profiling support
   * Execution limits like total instruction limits or lua <-> rust recursion
     limits
@@ -63,9 +60,14 @@ in rustc.  For example:
     that would do the wrapping.
   * Once tuple based variadic generics land, the plan is to completely
     eliminate the hlist macros in favor of simple tuples.
- 
+
 See [this reddit discussion](http://www.reddit.com/r/rust/comments/5yujt6/) for
 details of the current lifetime problem with callback wrapping.
+
+It is also worth it to list some non-goals for the project:
+
+  * Be a perfect zero cost wrapper over the lua C api
+  * Allow the user to do absolutely everything that the lua C api might allow
 
 ## API Stability or lack thereof
 
@@ -89,7 +91,9 @@ situations such as:
   * Leaving the correct elements on the lua stack and in the correct order,
     and panicking if these invariants are not met (due to internal bugs).
   * Correctly guarding the metatables of userdata so that scripts cannot, for
-    example, swap the `__gc` methods around and cause UB.
+    example, swap the `__gc` methods of userdata and cause UB.
+  * Correctly handling complex recursive callback scenarios where control goes
+    from rust to lua back to rust back to lua and so forth.
 
 The library currently *attempts* to handle each of these situations, but there
 are so many ways to cause unsafety with Lua that it just needs more testing.
