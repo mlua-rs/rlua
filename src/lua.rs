@@ -695,6 +695,8 @@ impl Lua {
         }
     }
 
+    /// Evaluate the given expression or statement inside this Lua state, and if it is an
+    /// expression or a statement with return, this returns the value.
     pub fn eval<'lua, R: FromLuaMulti<'lua>>(&'lua self, source: &str) -> LuaResult<R> {
         unsafe {
             stack_guard(self.state, 0, || {
