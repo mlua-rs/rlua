@@ -195,12 +195,15 @@ impl<'lua> LuaTable<'lua> {
         }
     }
 
-    pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(&self) -> LuaResult<Vec<(K, V)>> {
+    /// Loop over each key, value pair in the table
+    pub fn for_each_pair<K, V, F>(&self, mut f: F) -> LuaResult<()>
+        where K: FromLua<'lua>,
+              V: FromLua<'lua>,
+              F: FnMut(K, V)
+    {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {
-                let mut pairs = Vec::new();
-
                 check_stack(lua.state, 4)?;
                 lua.push_ref(lua.state, &self.0);
                 ffi::lua_pushnil(lua.state);
@@ -209,21 +212,22 @@ impl<'lua> LuaTable<'lua> {
                     ffi::lua_pushvalue(lua.state, -2);
                     let key = K::from_lua(lua.pop_value(lua.state)?, lua)?;
                     let value = V::from_lua(lua.pop_value(lua.state)?, lua)?;
-                    pairs.push((key, value));
+                    f(key, value);
                 }
 
                 ffi::lua_pop(lua.state, 1);
-                Ok(pairs)
+                Ok(())
             })
         }
     }
 
-    /// Strictly interpret the table as an array, and fail if it is not a proper lua array.
-    pub fn array_values<V: FromLua<'lua>>(&self) -> LuaResult<Vec<V>> {
+    /// Loop over the table, strictly interpreting the table as an array, and
+    /// fail if it is not a proper lua array.
+    pub fn for_each_array_value<V: FromLua<'lua>, F: FnMut(V)>(&self, mut f: F) -> LuaResult<()> {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {
-                let mut values = Vec::new();
+                let mut count = 0;
 
                 check_stack(lua.state, 4)?;
                 lua.push_ref(lua.state, &self.0);
@@ -246,16 +250,32 @@ impl<'lua> LuaTable<'lua> {
                     }
 
                     // Skip missing keys
-                    while values.len() < (i - 1) as usize {
-                        values.push(V::from_lua(LuaNil, lua)?);
+                    while count < (i - 1) as usize {
+                        f(V::from_lua(LuaNil, lua)?);
+                        count += 1;
                     }
-                    values.push(V::from_lua(lua.pop_value(lua.state)?, lua)?);
+                    f(V::from_lua(lua.pop_value(lua.state)?, lua)?);
+                    count += 1;
                 }
 
                 ffi::lua_pop(lua.state, 1);
-                Ok(values)
+                Ok(())
             })
         }
+    }
+
+    /// Collect all the pairs in the table into a Vec
+    pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(&self) -> LuaResult<Vec<(K, V)>> {
+        let mut pairs = Vec::new();
+        self.for_each_pair(|k, v| pairs.push((k, v)))?;
+        Ok(pairs)
+    }
+
+    /// Collect all the values in an array-like table into a Vec
+    pub fn array_values<V: FromLua<'lua>>(&self) -> LuaResult<Vec<V>> {
+        let mut values = Vec::new();
+        self.for_each_array_value(|v| values.push(v))?;
+        Ok(values)
     }
 }
 
