@@ -2,8 +2,9 @@
 name = "rlua"
 version = "0.4.1"
 authors = ["kyren <catherine@chucklefish.org>"]
-repository = "https://github.com/chucklefish/rlua"
 description = "High level bindings to Lua 5.3"
+repository = "github.com/chucklefish/rlua"
+documentation = "docs.rs/rlua"
 readme = "README.md"
 keywords = ["lua"]
 license = "MIT"

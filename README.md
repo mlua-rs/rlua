@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/chucklefish/rlua.svg?branch=master)](https://travis-ci.org/chucklefish/rlua)
 
+[WIP API Documentation](docs.rs/rlua)
+
 This library is a WIP high level interface between Rust and Lua.  Its major
 goal is to expose as easy to use, practical, and flexible of an API between
 Rust and Lua as possible, while also being completely safe.
