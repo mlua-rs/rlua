@@ -641,7 +641,7 @@ impl<'lua> LuaUserData<'lua> {
 /// Top level Lua struct which holds the lua state itself.
 pub struct Lua {
     state: *mut ffi::lua_State,
-    top_state: *mut ffi::lua_State,
+    main_state: *mut ffi::lua_State,
     ephemeral: bool,
 }
 
@@ -649,7 +649,7 @@ impl Drop for Lua {
     fn drop(&mut self) {
         unsafe {
             if !self.ephemeral {
-                ffi::lua_close(self.top_state);
+                ffi::lua_close(self.state);
             }
         }
     }
@@ -720,18 +720,9 @@ impl Lua {
             })
                 .unwrap();
 
-            stack_guard(state, 0, || {
-                ffi::lua_pushlightuserdata(state,
-                                           &TOP_STATE_REGISTRY_KEY as *const u8 as *mut c_void);
-                ffi::lua_pushlightuserdata(state, state as *mut c_void);
-                ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
-                Ok(())
-            })
-                .unwrap();
-
             Lua {
                 state,
-                top_state: state,
+                main_state: state,
                 ephemeral: false,
             }
         }
@@ -1001,15 +992,9 @@ impl Lua {
     fn create_callback_function(&self, func: LuaCallback) -> LuaResult<LuaFunction> {
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, || {
-                ffi::lua_pushlightuserdata(state,
-                                           &TOP_STATE_REGISTRY_KEY as *const u8 as *mut c_void);
-                ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX);
-                let top_state = ffi::lua_touserdata(state, -1) as *mut ffi::lua_State;
-                ffi::lua_pop(state, 1);
-
                 let lua = Lua {
                     state: state,
-                    top_state: top_state,
+                    main_state: main_state(state),
                     ephemeral: true,
                 };
 
@@ -1148,8 +1133,8 @@ impl Lua {
     }
 
     unsafe fn push_ref(&self, state: *mut ffi::lua_State, lref: &LuaRef) {
-        assert_eq!(lref.lua.top_state,
-                   self.top_state,
+        assert_eq!(lref.lua.main_state,
+                   self.main_state,
                    "Lua instance passed LuaValue created from a different Lua");
 
         ffi::lua_rawgeti(state,
@@ -1278,4 +1263,3 @@ impl Lua {
 
 static LUA_USERDATA_REGISTRY_KEY: u8 = 0;
 static FUNCTION_METATABLE_REGISTRY_KEY: u8 = 0;
-static TOP_STATE_REGISTRY_KEY: u8 = 0;

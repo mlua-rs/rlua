@@ -294,6 +294,14 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
     res
 }
 
+/// Does not call checkstack, uses 1 stack space
+pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
+    ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_MAINTHREAD);
+    let state = ffi::lua_tothread(state, -1);
+    ffi::lua_pop(state, 1);
+    state
+}
+
 static ERROR_METATABLE_REGISTRY_KEY: u8 = 0;
 
 enum WrappedError {
