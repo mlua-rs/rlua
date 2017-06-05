@@ -571,4 +571,6 @@ fn test_table_error() {
     assert!(bad_table.raw_set(1, 1).is_ok());
     assert!(bad_table.raw_get::<_, i32>(1).is_ok());
     assert_eq!(bad_table.raw_length().unwrap(), 1);
+    assert!(bad_table.pairs::<i64, i64>().is_ok());
+    assert!(bad_table.array_values::<i64>().is_ok());
 }
