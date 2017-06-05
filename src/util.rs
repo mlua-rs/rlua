@@ -76,11 +76,11 @@ pub unsafe fn error_guard<F, R>(state: *mut ffi::lua_State,
         func(state)
     }
 
-    pub unsafe fn cpcall<F>(state: *mut ffi::lua_State,
-                            nargs: c_int,
-                            nresults: c_int,
-                            mut func: F)
-                            -> LuaResult<()>
+    unsafe fn cpcall<F>(state: *mut ffi::lua_State,
+                        nargs: c_int,
+                        nresults: c_int,
+                        mut func: F)
+                        -> LuaResult<()>
         where F: FnOnce(*mut ffi::lua_State) -> c_int
     {
         ffi::lua_pushcfunction(state, call_impl::<F>);
