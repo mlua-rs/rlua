@@ -77,6 +77,13 @@ fn test_table() {
     assert_eq!(table3.length().unwrap(), 5);
     assert_eq!(table3.array_values::<Option<i64>>().unwrap(),
                vec![Some(1), Some(2), None, Some(4), Some(5)]);
+
+    lua.set("table4",
+            lua.create_array_table(vec![1, 2, 3, 4, 5]).unwrap())
+        .unwrap();
+    let table4 = lua.get::<_, LuaTable>("table4").unwrap();
+    assert_eq!(table4.pairs::<i64, i64>().unwrap(),
+               vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]);
 }
 
 #[test]

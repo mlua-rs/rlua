@@ -822,24 +822,26 @@ impl Lua {
               V: ToLua<'lua>,
               I: IntoIterator<Item = (K, V)>
     {
-        let table = self.create_empty_table()?;
-        for (k, v) in cont {
-            table.set(k, v)?;
+        unsafe {
+            stack_guard(self.state, 0, || {
+                check_stack(self.state, 3)?;
+                ffi::lua_newtable(self.state);
+
+                for (k, v) in cont.into_iter() {
+                    self.push_value(self.state, k.to_lua(self)?)?;
+                    self.push_value(self.state, v.to_lua(self)?)?;
+                    ffi::lua_rawset(self.state, -3);
+                }
+                Ok(LuaTable(self.pop_ref(self.state)))
+            })
         }
-        Ok(table)
     }
 
     pub fn create_array_table<'lua, T, I>(&'lua self, cont: I) -> LuaResult<LuaTable>
         where T: ToLua<'lua>,
               I: IntoIterator<Item = T>
     {
-        let table = self.create_empty_table()?;
-        let mut index = 1;
-        for elem in cont {
-            table.set(index, elem)?;
-            index += 1;
-        }
-        Ok(table)
+        self.create_table(cont.into_iter().enumerate().map(|(k, v)| (k + 1, v)))
     }
 
     pub fn create_function<F>(&self, func: F) -> LuaResult<LuaFunction>
