@@ -102,6 +102,7 @@ extern "C" {
     pub fn lua_newthread(state: *mut lua_State) -> *mut lua_State;
 
     pub fn lua_settable(state: *mut lua_State, index: c_int);
+    pub fn lua_rawset(state: *mut lua_State, index: c_int);
     pub fn lua_setmetatable(state: *mut lua_State, index: c_int);
 
     pub fn lua_len(state: *mut lua_State, index: c_int);
@@ -109,6 +110,7 @@ extern "C" {
     pub fn lua_rawequal(state: *mut lua_State, index1: c_int, index2: c_int) -> c_int;
 
     pub fn lua_error(state: *mut lua_State) -> !;
+    pub fn lua_atpanic(state: *mut lua_State, panic: lua_CFunction) -> lua_CFunction;
 
     pub fn luaL_newstate() -> *mut lua_State;
     pub fn luaL_openlibs(state: *mut lua_State);
@@ -125,6 +127,7 @@ extern "C" {
                           state: *mut lua_State,
                           msg: *const c_char,
                           level: c_int);
+    pub fn luaL_len(push_state: *mut lua_State, index: c_int) -> lua_Integer;
 }
 
 pub unsafe fn lua_pop(state: *mut lua_State, n: c_int) {

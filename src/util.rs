@@ -14,6 +14,14 @@ macro_rules! cstr {
   );
 }
 
+pub unsafe fn check_stack(state: *mut ffi::lua_State, amount: c_int) -> LuaResult<()> {
+    if ffi::lua_checkstack(state, amount) == 0 {
+        Err("out of lua stack space".into())
+    } else {
+        Ok(())
+    }
+}
+
 // Run an operation on a lua_State and automatically clean up the stack before returning.  Takes
 // the lua_State, the expected stack size change, and an operation to run.  If the operation
 // results in success, then the stack is inspected to make sure the change in stack size matches
@@ -46,12 +54,52 @@ pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F
     res
 }
 
-pub unsafe fn check_stack(state: *mut ffi::lua_State, amount: c_int) -> LuaResult<()> {
-    if ffi::lua_checkstack(state, amount) == 0 {
-        Err("out of lua stack space".into())
-    } else {
-        Ok(())
+// Call the given rust function in a protected lua context, similar to pcall.
+// The stack given to the protected function is a separate protected stack. This
+// catches all calls to lua_error, but ffi functions that can call lua_error are
+// still longjmps, and have all the same dangers as longjmps, so extreme care
+// must still be taken in code that uses this function.  Does not call
+// lua_checkstack, and uses 2 extra stack spaces.
+pub unsafe fn error_guard<F, R>(state: *mut ffi::lua_State,
+                                nargs: c_int,
+                                nresults: c_int,
+                                func: F)
+                                -> LuaResult<R>
+    where F: FnOnce(*mut ffi::lua_State) -> LuaResult<R> + UnwindSafe
+{
+    unsafe extern "C" fn call_impl<F>(state: *mut ffi::lua_State) -> c_int
+        where F: FnOnce(*mut ffi::lua_State) -> c_int
+    {
+        let func = ffi::lua_touserdata(state, -1) as *mut F;
+        let func = mem::replace(&mut *func, mem::uninitialized());
+        ffi::lua_pop(state, 1);
+        func(state)
     }
+
+    pub unsafe fn cpcall<F>(state: *mut ffi::lua_State,
+                            nargs: c_int,
+                            nresults: c_int,
+                            mut func: F)
+                            -> LuaResult<()>
+        where F: FnOnce(*mut ffi::lua_State) -> c_int
+    {
+        ffi::lua_pushcfunction(state, call_impl::<F>);
+        ffi::lua_insert(state, -(nargs + 1));
+        ffi::lua_pushlightuserdata(state, &mut func as *mut F as *mut c_void);
+        mem::forget(func);
+        if pcall_with_traceback(state, nargs + 1, nresults) != ffi::LUA_OK {
+            Err(pop_error(state))
+        } else {
+            Ok(())
+        }
+    }
+
+    let mut res = None;
+    cpcall(state, nargs, nresults, |state| {
+        res = Some(callback_error(state, || func(state)));
+        ffi::lua_gettop(state)
+    })?;
+    Ok(res.unwrap())
 }
 
 pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) {
@@ -129,13 +177,13 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State) -> LuaError {
 
     } else {
         ffi::lua_pop(state, 1);
-        LuaErrorKind::ScriptError("<unprintable error>".to_owned())
-            .into()
+        LuaErrorKind::ScriptError("<unprintable error>".to_owned()).into()
     }
 }
 
 // ffi::lua_pcall with a message handler that gives a nice traceback.  If the caught error is
-// actually a LuaError, will simply pass the error along.
+// actually a LuaError, will simply pass the error along.  Does not call
+// checkstack, and uses 2 extra stack spaces.
 pub unsafe fn pcall_with_traceback(state: *mut ffi::lua_State,
                                    nargs: c_int,
                                    nresults: c_int)
@@ -145,7 +193,7 @@ pub unsafe fn pcall_with_traceback(state: *mut ffi::lua_State,
             if !is_panic_error(state, 1) {
                 let error = pop_error(state);
                 ffi::luaL_traceback(state, state, ptr::null(), 0);
-                let traceback = CStr::from_ptr(ffi::lua_tolstring(state, 1, ptr::null_mut()))
+                let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
                     .to_str()
                     .unwrap()
                     .to_owned();
@@ -180,7 +228,7 @@ pub unsafe fn resume_with_traceback(state: *mut ffi::lua_State,
             if !is_panic_error(state, 1) {
                 let error = pop_error(state);
                 ffi::luaL_traceback(from, state, ptr::null(), 0);
-                let traceback = CStr::from_ptr(ffi::lua_tolstring(from, 1, ptr::null_mut()))
+                let traceback = CStr::from_ptr(ffi::lua_tolstring(from, -1, ptr::null_mut()))
                     .to_str()
                     .unwrap()
                     .to_owned();

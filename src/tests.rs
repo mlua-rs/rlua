@@ -18,10 +18,12 @@ fn test_set_get() {
 #[test]
 fn test_load() {
     let lua = Lua::new();
-    lua.load(r#"
+    lua.load(
+        r#"
             res = 'foo'..'bar'
         "#,
-             None)
+        None,
+    )
         .unwrap();
     assert_eq!(lua.get::<_, String>("res").unwrap(), "foobar");
 }
@@ -52,12 +54,14 @@ fn test_table() {
     assert_eq!(table2.get::<_, String>("foo").unwrap(), "bar");
     assert_eq!(table1.get::<_, String>("baz").unwrap(), "baf");
 
-    lua.load(r#"
+    lua.load(
+        r#"
             table1 = {1, 2, 3, 4, 5}
             table2 = {}
             table3 = {1, 2, nil, 4, 5}
         "#,
-             None)
+        None,
+    )
         .unwrap();
 
     let table1 = lua.get::<_, LuaTable>("table1").unwrap();
@@ -78,12 +82,14 @@ fn test_table() {
 #[test]
 fn test_function() {
     let lua = Lua::new();
-    lua.load(r#"
+    lua.load(
+        r#"
             function concat(arg1, arg2)
                 return arg1 .. arg2
             end
         "#,
-             None)
+        None,
+    )
         .unwrap();
 
     let concat = lua.get::<_, LuaFunction>("concat").unwrap();
@@ -94,7 +100,8 @@ fn test_function() {
 #[test]
 fn test_bind() {
     let lua = Lua::new();
-    lua.load(r#"
+    lua.load(
+        r#"
             function concat(...)
                 local res = ""
                 for _, s in pairs({...}) do
@@ -103,7 +110,8 @@ fn test_bind() {
                 return res
             end
         "#,
-             None)
+        None,
+    )
         .unwrap();
 
     let mut concat = lua.get::<_, LuaFunction>("concat").unwrap();
@@ -117,7 +125,8 @@ fn test_bind() {
 #[test]
 fn test_rust_function() {
     let lua = Lua::new();
-    lua.load(r#"
+    lua.load(
+        r#"
             function lua_function()
                 return rust_function()
             end
@@ -125,7 +134,8 @@ fn test_rust_function() {
             -- Test to make sure chunk return is ignored
             return 1
         "#,
-             None)
+        None,
+    )
         .unwrap();
 
     let lua_function = lua.get::<_, LuaFunction>("lua_function").unwrap();
@@ -174,7 +184,8 @@ fn test_methods() {
     let lua = Lua::new();
     let userdata = lua.create_userdata(UserData(42)).unwrap();
     lua.set("userdata", userdata.clone()).unwrap();
-    lua.load(r#"
+    lua.load(
+        r#"
             function get_it()
                 return userdata:get_value()
             end
@@ -183,7 +194,8 @@ fn test_methods() {
                 return userdata:set_value(i)
             end
         "#,
-             None)
+        None,
+    )
         .unwrap();
     let get = lua.get::<_, LuaFunction>("get_it").unwrap();
     let set = lua.get::<_, LuaFunction>("set_it").unwrap();
@@ -234,12 +246,14 @@ fn test_metamethods() {
 #[test]
 fn test_scope() {
     let lua = Lua::new();
-    lua.load(r#"
+    lua.load(
+        r#"
             touter = {
                 tin = {1, 2, 3}
             }
         "#,
-             None)
+        None,
+    )
         .unwrap();
 
     // Make sure that table gets do not borrow the table, but instead just borrow lua.
@@ -268,7 +282,8 @@ fn test_scope() {
 #[test]
 fn test_lua_multi() {
     let lua = Lua::new();
-    lua.load(r#"
+    lua.load(
+        r#"
             function concat(arg1, arg2)
                 return arg1 .. arg2
             end
@@ -277,7 +292,8 @@ fn test_lua_multi() {
                 return 1, 2, 3, 4, 5, 6
             end
         "#,
-             None)
+        None,
+    )
         .unwrap();
 
     let concat = lua.get::<_, LuaFunction>("concat").unwrap();
@@ -295,12 +311,14 @@ fn test_lua_multi() {
 #[test]
 fn test_coercion() {
     let lua = Lua::new();
-    lua.load(r#"
+    lua.load(
+        r#"
             int = 123
             str = "123"
             num = 123.0
         "#,
-             None)
+        None,
+    )
         .unwrap();
 
     assert_eq!(lua.get::<_, String>("int").unwrap(), "123");
@@ -330,7 +348,8 @@ fn test_error() {
     }
 
     let lua = Lua::new();
-    lua.load(r#"
+    lua.load(
+        r#"
             function no_error()
             end
 
@@ -368,7 +387,8 @@ fn test_error() {
                 understand_recursion()
             end
         "#,
-             None)
+        None,
+    )
         .unwrap();
 
     let rust_error_function =
@@ -400,12 +420,14 @@ fn test_error() {
 
     match catch_unwind(|| -> LuaResult<()> {
         let lua = Lua::new();
-        lua.load(r#"
+        lua.load(
+            r#"
                 function rust_panic()
                     pcall(function () rust_panic_function() end)
                 end
             "#,
-                 None)?;
+            None,
+        )?;
         let rust_panic_function = lua.create_function(|_, _| {
             panic!("expected panic, this panic should be caught in rust")
         })?;
@@ -422,12 +444,14 @@ fn test_error() {
 
     match catch_unwind(|| -> LuaResult<()> {
         let lua = Lua::new();
-        lua.load(r#"
+        lua.load(
+            r#"
                 function rust_panic()
                     xpcall(function() rust_panic_function() end, function() end)
                 end
             "#,
-                 None)?;
+            None,
+        )?;
         let rust_panic_function = lua.create_function(|_, _| {
             panic!("expected panic, this panic should be caught in rust")
         })?;
@@ -497,14 +521,46 @@ fn test_thread() {
 #[test]
 fn test_lightuserdata() {
     let lua = Lua::new();
-    lua.load(r#"function id(a)
+    lua.load(
+        r#"function id(a)
         return a
     end"#,
-             None)
+        None,
+    )
         .unwrap();
     let res = lua.get::<_, LuaFunction>("id")
         .unwrap()
         .call::<_, LightUserData>(LightUserData(42 as *mut c_void))
         .unwrap();
     assert_eq!(res, LightUserData(42 as *mut c_void));
+}
+
+#[test]
+fn test_table_error() {
+    let lua = Lua::new();
+    lua.load(
+        r#"
+            table = {}
+            setmetatable(table, {
+                __index = function()
+                    error("lua error")
+                end,
+                __newindex = function()
+                    error("lua error")
+                end,
+                __len = function()
+                    error("lua error")
+                end
+            })
+        "#,
+        None,
+    )
+        .unwrap();
+
+    let bad_table: LuaTable = lua.get("table").unwrap();
+    assert!(bad_table.set("key", 1).is_err());
+    assert!(bad_table.get::<_, i32>("key").is_err());
+    assert!(bad_table.length().is_err());
+    assert!(bad_table.raw_set("key", 1).is_ok());
+    assert!(bad_table.raw_get::<_, i32>("key").is_ok());
 }
