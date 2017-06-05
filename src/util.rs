@@ -102,6 +102,17 @@ pub unsafe fn error_guard<F, R>(state: *mut ffi::lua_State,
     Ok(res.unwrap())
 }
 
+// If the return code indicates an error, pops the error off of the stack and
+// returns Err. If the error was actually a rust panic, clears the current lua
+// stack and panics.
+pub unsafe fn handle_error(state: *mut ffi::lua_State, ret: c_int) -> LuaResult<()> {
+    if ret != ffi::LUA_OK && ret != ffi::LUA_YIELD {
+        Err(pop_error(state))
+    } else {
+        Ok(())
+    }
+}
+
 pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) {
     ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
 }

@@ -152,21 +152,38 @@ pub struct LuaTable<'lua>(LuaRef<'lua>);
 impl<'lua> LuaTable<'lua> {
     pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> LuaResult<()> {
         let lua = self.0.lua;
+        let key = key.to_lua(lua)?;
+        let value = value.to_lua(lua)?;
         unsafe {
-            stack_guard(lua.state, 0, || {
-                check_stack(lua.state, 3)?;
-                lua.push_ref(lua.state, &self.0);
-                lua.push_value(lua.state, key.to_lua(lua)?)?;
-                lua.push_value(lua.state, value.to_lua(lua)?)?;
-                error_guard(lua.state, 3, 0, |state| {
-                    ffi::lua_settable(state, -3);
-                    Ok(())
-                })?;
+            error_guard(lua.state, 0, 0, |state| {
+                check_stack(state, 3)?;
+                lua.push_ref(state, &self.0);
+                lua.push_value(state, key)?;
+                lua.push_value(state, value)?;
+                ffi::lua_settable(state, -3);
                 Ok(())
             })
         }
     }
 
+    pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> LuaResult<V> {
+        let lua = self.0.lua;
+        let key = key.to_lua(lua)?;
+        unsafe {
+            let res = error_guard(lua.state, 0, 0, |state| {
+                check_stack(state, 2)?;
+                lua.push_ref(state, &self.0);
+                lua.push_value(state, key.to_lua(lua)?)?;
+                ffi::lua_gettable(state, -2);
+                let res = lua.pop_value(state)?;
+                ffi::lua_pop(state, 1);
+                Ok(res)
+            })?;
+            V::from_lua(res, lua)
+        }
+    }
+
+    /// Set a field in the table, without invoking metamethods
     pub fn raw_set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> LuaResult<()> {
         let lua = self.0.lua;
         unsafe {
@@ -182,24 +199,7 @@ impl<'lua> LuaTable<'lua> {
         }
     }
 
-    pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> LuaResult<V> {
-        let lua = self.0.lua;
-        unsafe {
-            stack_guard(lua.state, 0, || {
-                check_stack(lua.state, 2)?;
-                lua.push_ref(lua.state, &self.0);
-                lua.push_value(lua.state, key.to_lua(lua)?)?;
-                error_guard(lua.state, 2, 2, |state| {
-                    ffi::lua_gettable(state, -2);
-                    Ok(())
-                })?;
-                let res = V::from_lua(lua.pop_value(lua.state)?, lua)?;
-                ffi::lua_pop(lua.state, 1);
-                Ok(res)
-            })
-        }
-    }
-
+    /// Get a field in the table, without invoking metamethods
     pub fn raw_get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> LuaResult<V> {
         let lua = self.0.lua;
         unsafe {
@@ -219,10 +219,25 @@ impl<'lua> LuaTable<'lua> {
     pub fn length(&self) -> LuaResult<LuaInteger> {
         let lua = self.0.lua;
         unsafe {
+            error_guard(lua.state, 0, 0, |state| {
+                check_stack(state, 1)?;
+                lua.push_ref(state, &self.0);
+                Ok(ffi::luaL_len(state, -1))
+            })
+        }
+    }
+
+    /// Equivalent to the result of the lua '#' operator, without invoking the
+    /// __len metamethod.
+    pub fn raw_length(&self) -> LuaResult<LuaInteger> {
+        let lua = self.0.lua;
+        unsafe {
             stack_guard(lua.state, 0, || {
                 check_stack(lua.state, 1)?;
                 lua.push_ref(lua.state, &self.0);
-                error_guard(lua.state, 1, 0, |state| Ok(ffi::luaL_len(state, -1)))
+                let len = ffi::lua_rawlen(lua.state, -1);
+                ffi::lua_pop(lua.state, 1);
+                Ok(len as LuaInteger)
             })
         }
     }
@@ -264,7 +279,7 @@ impl<'lua> LuaTable<'lua> {
                 check_stack(lua.state, 4)?;
                 lua.push_ref(lua.state, &self.0);
 
-                let len = error_guard(lua.state, 1, 1, |state| Ok(ffi::luaL_len(state, -1)))?;
+                let len = ffi::lua_rawlen(lua.state, -1) as ffi::lua_Integer;
                 ffi::lua_pushnil(lua.state);
 
                 while ffi::lua_next(lua.state, -2) != 0 {
@@ -1271,14 +1286,3 @@ impl Lua {
 static LUA_USERDATA_REGISTRY_KEY: u8 = 0;
 static FUNCTION_METATABLE_REGISTRY_KEY: u8 = 0;
 static TOP_STATE_REGISTRY_KEY: u8 = 0;
-
-// If the return code indicates an error, pops the error off of the stack and
-// returns Err. If the error was actually a rust panic, clears the current lua
-// stack and panics.
-unsafe fn handle_error(state: *mut ffi::lua_State, ret: c_int) -> LuaResult<()> {
-    if ret != ffi::LUA_OK && ret != ffi::LUA_YIELD {
-        Err(pop_error(state))
-    } else {
-        Ok(())
-    }
-}

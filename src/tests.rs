@@ -558,9 +558,10 @@ fn test_table_error() {
         .unwrap();
 
     let bad_table: LuaTable = lua.get("table").unwrap();
-    assert!(bad_table.set("key", 1).is_err());
-    assert!(bad_table.get::<_, i32>("key").is_err());
+    assert!(bad_table.set(1, 1).is_err());
+    assert!(bad_table.get::<_, i32>(1).is_err());
     assert!(bad_table.length().is_err());
-    assert!(bad_table.raw_set("key", 1).is_ok());
-    assert!(bad_table.raw_get::<_, i32>("key").is_ok());
+    assert!(bad_table.raw_set(1, 1).is_ok());
+    assert!(bad_table.raw_get::<_, i32>(1).is_ok());
+    assert_eq!(bad_table.raw_length().unwrap(), 1);
 }

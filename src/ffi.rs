@@ -106,6 +106,7 @@ extern "C" {
     pub fn lua_setmetatable(state: *mut lua_State, index: c_int);
 
     pub fn lua_len(state: *mut lua_State, index: c_int);
+    pub fn lua_rawlen(state: *mut lua_State, index: c_int) -> usize;
     pub fn lua_next(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_rawequal(state: *mut lua_State, index1: c_int, index2: c_int) -> c_int;
 
