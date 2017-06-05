@@ -659,15 +659,6 @@ impl Lua {
     pub fn new() -> Lua {
         unsafe {
             let state = ffi::luaL_newstate();
-            unsafe extern "C" fn panic_function(state: *mut ffi::lua_State) -> c_int {
-                if let Some(s) = ffi::lua_tostring(state, -1).as_ref() {
-                    panic!("rlua - unprotected error in call to Lua API ({})", s)
-                } else {
-                    panic!("rlua - unprotected error in call to Lua API <unprintable error>")
-                }
-            }
-
-            ffi::lua_atpanic(state, panic_function);
             ffi::luaL_openlibs(state);
 
             stack_guard(state, 0, || {
