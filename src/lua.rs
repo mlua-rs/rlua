@@ -503,10 +503,11 @@ pub enum LuaMetaMethod {
     Call,
 }
 
-/// Methods added will be added to the __index table on the metatable for the userdata, so they can
-/// be called as userdata:method(args) as expected.  If there are any regular methods, and an
-/// "Index" metamethod is given, it will be called as a *fallback* if the index doesn't match an
-/// existing regular method.
+/// Methods added will be added to the __index table on the metatable for the
+/// userdata, so they can be called as userdata:method(args) as expected.  If
+/// there are any regular methods, and an "Index" metamethod is given, it will
+/// be called as a *fallback* if the index doesn't match an existing regular
+/// method.
 pub struct LuaUserDataMethods<T> {
     methods: HashMap<String, LuaCallback>,
     meta_methods: HashMap<LuaMetaMethod, LuaCallback>,
@@ -600,8 +601,9 @@ pub trait LuaUserDataType: 'static + Sized {
     fn add_methods(_methods: &mut LuaUserDataMethods<Self>) {}
 }
 
-/// Handle to an internal instance of custom userdata.  All userdata in this API is based around
-/// RefCell, to best match the mutable semantics of the lua language.
+/// Handle to an internal instance of custom userdata.  All userdata in this API
+/// is based around RefCell, to best match the mutable semantics of the lua
+/// language.
 #[derive(Clone, Debug)]
 pub struct LuaUserData<'lua>(LuaRef<'lua>);
 
@@ -783,8 +785,9 @@ impl Lua {
         unsafe {
             stack_guard(self.state, 0, || {
                 let stack_start = ffi::lua_gettop(self.state);
-                // First, try interpreting the lua as an expression by adding "return", then
-                // as a statement.  This is the same thing the actual lua repl does.
+                // First, try interpreting the lua as an expression by adding
+                // "return", then as a statement.  This is the same thing the
+                // actual lua repl does.
                 let return_source = "return ".to_owned() + source;
                 let mut res = ffi::luaL_loadbuffer(self.state,
                                                    return_source.as_ptr() as *const c_char,
@@ -904,6 +907,7 @@ impl Lua {
         }
     }
 
+    /// Returns a handle to the globals table
     pub fn globals<'lua>(&'lua self) -> LuaResult<LuaTable<'lua>> {
         unsafe {
             check_stack(self.state, 1)?;

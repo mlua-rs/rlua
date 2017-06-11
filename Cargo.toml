@@ -1,6 +1,6 @@
 [package]
 name = "rlua"
-version = "0.5.0-pre"
+version = "0.5.0"
 authors = ["kyren <catherine@chucklefish.org>"]
 description = "High level bindings to Lua 5.3"
 repository = "https://github.com/chucklefish/rlua"
