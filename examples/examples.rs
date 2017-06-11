@@ -10,23 +10,26 @@ fn examples() -> LuaResult<()> {
     // functionality.
 
     let lua = Lua::new();
+    let globals = lua.globals()?;
 
     // You can get and set global variables
 
-    lua.set("string_var", "hello")?;
-    lua.set("int_var", 42)?;
+    globals.set("string_var", "hello")?;
+    globals.set("int_var", 42)?;
 
-    assert_eq!(lua.get::<_, String>("string_var")?, "hello");
-    assert_eq!(lua.get::<_, i64>("int_var")?, 42);
+    assert_eq!(globals.get::<_, String>("string_var")?, "hello");
+    assert_eq!(globals.get::<_, i64>("int_var")?, 42);
 
     // You can load and evaluate lua code.  The second parameter here gives the chunk a better name
     // when lua error messages are printed.
 
-    lua.load(r#"
+    lua.load::<()>(
+        r#"
             global = 'foo'..'bar'
         "#,
-              Some("example code"))?;
-    assert_eq!(lua.get::<_, String>("global")?, "foobar");
+        Some("example code"),
+    )?;
+    assert_eq!(globals.get::<_, String>("global")?, "foobar");
 
     assert_eq!(lua.eval::<i32>("1 + 1")?, 2);
     assert_eq!(lua.eval::<bool>("false == false")?, true);
@@ -49,10 +52,11 @@ fn examples() -> LuaResult<()> {
 
     // You can pass values like LuaTable back into Lua
 
-    lua.set("array_table", array_table)?;
-    lua.set("map_table", map_table)?;
+    globals.set("array_table", array_table)?;
+    globals.set("map_table", map_table)?;
 
-    lua.eval::<()>(r#"
+    lua.eval::<()>(
+        r#"
         for k, v in pairs(array_table) do
             print(k, v)
         end
@@ -60,11 +64,12 @@ fn examples() -> LuaResult<()> {
         for k, v in pairs(map_table) do
             print(k, v)
         end
-    "#)?;
+    "#,
+    )?;
 
     // You can load lua functions
 
-    let print: LuaFunction = lua.get("print")?;
+    let print: LuaFunction = globals.get("print")?;
     print.call::<_, ()>("hello from rust")?;
 
     // There is a specific method for handling variadics that involves Heterogeneous Lists.  This
@@ -90,7 +95,7 @@ fn examples() -> LuaResult<()> {
         // signature limitations.
         lua.pack(list1 == list2)
     })?;
-    lua.set("check_equal", check_equal)?;
+    globals.set("check_equal", check_equal)?;
 
     // You can also accept variadic arguments to rust functions
     let join = lua.create_function(|lua, args| {
@@ -98,7 +103,7 @@ fn examples() -> LuaResult<()> {
                                        // (This is quadratic!, it's just an example!)
                                        lua.pack(strings.iter().fold("".to_owned(), |a, b| a + b))
                                    })?;
-    lua.set("join", join)?;
+    globals.set("join", join)?;
 
     assert_eq!(lua.eval::<bool>(r#"check_equal({"a", "b", "c"}, {"a", "b", "c"})"#)?,
                true);
@@ -127,10 +132,10 @@ fn examples() -> LuaResult<()> {
     }
 
     let vec2_constructor = lua.create_function(|lua, args| {
-            let hlist_pat![x, y] = lua.unpack::<HList![f32, f32]>(args)?;
-            lua.pack(Vec2(x, y))
-        })?;
-    lua.set("vec2", vec2_constructor)?;
+        let hlist_pat![x, y] = lua.unpack::<HList![f32, f32]>(args)?;
+        lua.pack(Vec2(x, y))
+    })?;
+    globals.set("vec2", vec2_constructor)?;
 
     assert_eq!(lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()")?,
                5.0);

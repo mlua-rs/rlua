@@ -183,6 +183,23 @@ impl<'lua> LuaTable<'lua> {
         }
     }
 
+    /// Shorthand for checking whether get(key) is nil
+    pub fn has<K: ToLua<'lua>>(&self, key: K) -> LuaResult<bool> {
+        let lua = self.0.lua;
+        let key = key.to_lua(lua)?;
+        unsafe {
+            error_guard(lua.state, 0, 0, |state| {
+                check_stack(state, 2)?;
+                lua.push_ref(state, &self.0);
+                lua.push_value(state, key)?;
+                ffi::lua_gettable(state, -2);
+                let has = ffi::lua_isnil(state, -1) == 0;
+                ffi::lua_pop(state, 2);
+                Ok(has)
+            })
+        }
+    }
+
     /// Set a field in the table, without invoking metamethods
     pub fn raw_set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> LuaResult<()> {
         let lua = self.0.lua;
@@ -681,8 +698,7 @@ impl Lua {
 
                 ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
                 Ok(())
-            })
-                .unwrap();
+            }).unwrap();
 
             stack_guard(state, 0, || {
                 ffi::lua_pushlightuserdata(state,
@@ -701,8 +717,7 @@ impl Lua {
 
                 ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
                 Ok(())
-            })
-                .unwrap();
+            }).unwrap();
 
             stack_guard(state, 0, || {
                 ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
@@ -717,8 +732,7 @@ impl Lua {
 
                 ffi::lua_pop(state, 1);
                 Ok(())
-            })
-                .unwrap();
+            }).unwrap();
 
             Lua {
                 state,
@@ -728,9 +742,13 @@ impl Lua {
         }
     }
 
-    pub fn load(&self, source: &str, name: Option<&str>) -> LuaResult<()> {
+    pub fn load<'lua, R: FromLuaMulti<'lua>>(&'lua self,
+                                             source: &str,
+                                             name: Option<&str>)
+                                             -> LuaResult<R> {
         unsafe {
             stack_guard(self.state, 0, || {
+                let stack_start = ffi::lua_gettop(self.state);
                 handle_error(self.state,
                              if let Some(name) = name {
                                  let name = CString::new(name.to_owned())?;
@@ -746,7 +764,15 @@ impl Lua {
                              })?;
 
                 check_stack(self.state, 2)?;
-                handle_error(self.state, pcall_with_traceback(self.state, 0, 0))
+                handle_error(self.state,
+                             pcall_with_traceback(self.state, 0, ffi::LUA_MULTRET))?;
+
+                let nresults = ffi::lua_gettop(self.state) - stack_start;
+                let mut results = LuaMultiValue::new();
+                for _ in 0..nresults {
+                    results.push_front(self.pop_value(self.state)?);
+                }
+                R::from_lua_multi(results, self)
             })
         }
     }
@@ -878,37 +904,11 @@ impl Lua {
         }
     }
 
-    pub fn set<'lua, K, V>(&'lua self, key: K, value: V) -> LuaResult<()>
-        where K: ToLua<'lua>,
-              V: ToLua<'lua>
-    {
+    pub fn globals<'lua>(&'lua self) -> LuaResult<LuaTable<'lua>> {
         unsafe {
-            stack_guard(self.state, 0, || {
-                check_stack(self.state, 3)?;
-                ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
-                self.push_value(self.state, key.to_lua(self)?)?;
-                self.push_value(self.state, value.to_lua(self)?)?;
-                ffi::lua_rawset(self.state, -3);
-                ffi::lua_pop(self.state, 1);
-                Ok(())
-            })
-        }
-    }
-
-    pub fn get<'lua, K, V>(&'lua self, key: K) -> LuaResult<V>
-        where K: ToLua<'lua>,
-              V: FromLua<'lua>
-    {
-        unsafe {
-            stack_guard(self.state, 0, || {
-                check_stack(self.state, 2)?;
-                ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
-                self.push_value(self.state, key.to_lua(self)?)?;
-                ffi::lua_gettable(self.state, -2);
-                let ret = self.pop_value(self.state)?;
-                ffi::lua_pop(self.state, 1);
-                V::from_lua(ret, self)
-            })
+            check_stack(self.state, 1)?;
+            ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
+            Ok(LuaTable(self.pop_ref(self.state)))
         }
     }
 
