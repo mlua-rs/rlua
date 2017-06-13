@@ -1,8 +1,4 @@
-#[cfg(test)]
-#[macro_use]
-extern crate hlist_macro;
-
-#[cfg(not(test))]
+#[cfg_attr(test, macro_use)]
 extern crate hlist_macro;
 
 #[macro_use]
