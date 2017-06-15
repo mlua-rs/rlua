@@ -130,8 +130,8 @@ fn examples() -> LuaResult<()> {
     assert_eq!(lua.eval::<String>(r#"join("a", "b", "c")"#)?, "abc");
 
     // You can create userdata with methods and metamethods defined on them.
-    // Here's a more complete example that shows all of the features of this API
-    // together
+    // Here's a more complete example that shows many of the features of this
+    // API together
 
     #[derive(Copy, Clone)]
     struct Vec2(f32, f32);
