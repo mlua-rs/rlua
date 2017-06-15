@@ -15,6 +15,22 @@ impl<'lua> FromLuaMulti<'lua> for () {
     }
 }
 
+impl<'lua, T: ToLua<'lua>, E: ToLua<'lua>> ToLuaMulti<'lua> for Result<T, E> {
+    fn to_lua_multi(self, lua: &'lua Lua) -> LuaResult<LuaMultiValue<'lua>> {
+        let mut result = LuaMultiValue::new();
+
+        match self {
+            Ok(v) => result.push_back(v.to_lua(lua)?),
+            Err(e) => {
+                result.push_back(LuaNil);
+                result.push_back(e.to_lua(lua)?);
+            }
+        }
+
+        Ok(result)
+    }
+}
+
 impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for T {
     fn to_lua_multi(self, lua: &'lua Lua) -> LuaResult<LuaMultiValue<'lua>> {
         let mut v = LuaMultiValue::new();

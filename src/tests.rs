@@ -625,3 +625,32 @@ fn test_table_error() {
     assert!(bad_table.pairs::<i64, i64>().is_ok());
     assert!(bad_table.array_values::<i64>().is_ok());
 }
+
+#[test]
+fn test_result_conversions() {
+    let lua = Lua::new();
+    let globals = lua.globals().unwrap();
+
+    let err = lua.create_function(|lua, args| {
+        lua.pack(Result::Err::<String, String>("only through failure can we succeed".to_string()))
+    }).unwrap();
+    let ok = lua.create_function(|lua, args| {
+        lua.pack(Result::Ok::<String, String>("!".to_string()))
+    }).unwrap();
+
+    globals.set("err", err).unwrap();
+    globals.set("ok", ok).unwrap();
+
+    lua.load::<()>(
+        r#"
+            local err, msg = err()
+            assert(err == nil)
+            assert(msg == "only through failure can we succeed")
+
+            local ok, extra = ok()
+            assert(ok == "!")
+            assert(extra == nil)
+        "#,
+        None,
+    ).unwrap();
+}
