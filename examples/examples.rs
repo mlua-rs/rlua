@@ -2,6 +2,8 @@
 extern crate hlist_macro;
 extern crate rlua;
 
+use std::f32;
+
 use rlua::*;
 
 fn examples() -> LuaResult<()> {
@@ -154,10 +156,7 @@ fn examples() -> LuaResult<()> {
     })?;
     globals.set("vec2", vec2_constructor)?;
 
-    assert_eq!(
-        lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()")?,
-        5.0
-    );
+    assert!(lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()")? - 5.0 < f32::EPSILON);
 
     Ok(())
 }

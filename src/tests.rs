@@ -631,10 +631,10 @@ fn test_result_conversions() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
 
-    let err = lua.create_function(|lua, args| {
+    let err = lua.create_function(|lua, _| {
         lua.pack(Result::Err::<String, String>("only through failure can we succeed".to_string()))
     }).unwrap();
-    let ok = lua.create_function(|lua, args| {
+    let ok = lua.create_function(|lua, _| {
         lua.pack(Result::Ok::<String, String>("!".to_string()))
     }).unwrap();
 

@@ -31,12 +31,12 @@ pub enum LuaValue<'lua> {
 }
 pub use self::LuaValue::Nil as LuaNil;
 
-/// Trait for types convertible to LuaValue
+/// Trait for types convertible to `LuaValue`
 pub trait ToLua<'a> {
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue<'a>>;
 }
 
-/// Trait for types convertible from LuaValue
+/// Trait for types convertible from `LuaValue`
 pub trait FromLua<'a>: Sized {
     fn from_lua(lua_value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self>;
 }
@@ -416,8 +416,9 @@ impl<'lua> LuaFunction<'lua> {
     }
 }
 
-/// A LuaThread is Active before the coroutine function finishes, Dead after it finishes, and in
-/// Error state if error has been called inside the coroutine.
+/// A `LuaThread` is Active before the coroutine function finishes, Dead after
+/// it finishes, and in Error state if error has been called inside the
+/// coroutine.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum LuaThreadStatus {
     Dead,
@@ -430,8 +431,8 @@ pub enum LuaThreadStatus {
 pub struct LuaThread<'lua>(LuaRef<'lua>);
 
 impl<'lua> LuaThread<'lua> {
-    /// If this thread has yielded a value, will return Some, otherwise the thread is finished and
-    /// this will return None.
+    /// If this thread has yielded a value, will return Some, otherwise the
+    /// thread is finished and this will return None.
     pub fn resume<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(
         &self,
         args: A,
@@ -463,7 +464,7 @@ impl<'lua> LuaThread<'lua> {
                 for _ in 0..nresults {
                     results.push_front(lua.pop_value(thread_state)?);
                 }
-                R::from_lua_multi(results, lua).map(|r| Some(r))
+                R::from_lua_multi(results, lua).map(Some)
             })
         }
     }
@@ -614,7 +615,7 @@ pub trait LuaUserDataType: 'static + Sized {
 }
 
 /// Handle to an internal instance of custom userdata.  All userdata in this API
-/// is based around RefCell, to best match the mutable semantics of the lua
+/// is based around `RefCell`, to best match the mutable semantics of the lua
 /// language.
 #[derive(Clone, Debug)]
 pub struct LuaUserData<'lua>(LuaRef<'lua>);
@@ -881,7 +882,7 @@ impl Lua {
                 check_stack(self.state, 3)?;
                 ffi::lua_newtable(self.state);
 
-                for (k, v) in cont.into_iter() {
+                for (k, v) in cont {
                     self.push_value(self.state, k.to_lua(self)?)?;
                     self.push_value(self.state, v.to_lua(self)?)?;
                     ffi::lua_rawset(self.state, -3);
@@ -947,7 +948,7 @@ impl Lua {
     }
 
     /// Returns a handle to the globals table
-    pub fn globals<'lua>(&'lua self) -> LuaResult<LuaTable<'lua>> {
+    pub fn globals(&self) -> LuaResult<LuaTable> {
         unsafe {
             check_stack(self.state, 1)?;
             ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
