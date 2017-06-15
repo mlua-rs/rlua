@@ -41,12 +41,14 @@ fn test_load() {
         None,
     ).unwrap();
     assert!(module.has("func").unwrap());
-    assert_eq!(module
-                   .get::<_, LuaFunction>("func")
-                   .unwrap()
-                   .call::<_, String>(())
-                   .unwrap(),
-               "hello");
+    assert_eq!(
+        module
+            .get::<_, LuaFunction>("func")
+            .unwrap()
+            .call::<_, String>(())
+            .unwrap(),
+        "hello"
+    );
 }
 
 #[test]
@@ -92,22 +94,30 @@ fn test_table() {
     let table3 = globals.get::<_, LuaTable>("table3").unwrap();
 
     assert_eq!(table1.length().unwrap(), 5);
-    assert_eq!(table1.pairs::<i64, i64>().unwrap(),
-               vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]);
+    assert_eq!(
+        table1.pairs::<i64, i64>().unwrap(),
+        vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
+    );
     assert_eq!(table2.length().unwrap(), 0);
     assert_eq!(table2.pairs::<i64, i64>().unwrap(), vec![]);
     assert_eq!(table2.array_values::<i64>().unwrap(), vec![]);
     assert_eq!(table3.length().unwrap(), 5);
-    assert_eq!(table3.array_values::<Option<i64>>().unwrap(),
-               vec![Some(1), Some(2), None, Some(4), Some(5)]);
+    assert_eq!(
+        table3.array_values::<Option<i64>>().unwrap(),
+        vec![Some(1), Some(2), None, Some(4), Some(5)]
+    );
 
     globals
-        .set("table4",
-             lua.create_array_table(vec![1, 2, 3, 4, 5]).unwrap())
+        .set(
+            "table4",
+            lua.create_array_table(vec![1, 2, 3, 4, 5]).unwrap(),
+        )
         .unwrap();
     let table4 = globals.get::<_, LuaTable>("table4").unwrap();
-    assert_eq!(table4.pairs::<i64, i64>().unwrap(),
-               vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]);
+    assert_eq!(
+        table4.pairs::<i64, i64>().unwrap(),
+        vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
+    );
 }
 
 #[test]
@@ -124,8 +134,10 @@ fn test_function() {
     ).unwrap();
 
     let concat = globals.get::<_, LuaFunction>("concat").unwrap();
-    assert_eq!(concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
-               "foobar");
+    assert_eq!(
+        concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
+        "foobar"
+    );
 }
 
 #[test]
@@ -149,8 +161,10 @@ fn test_bind() {
     concat = concat.bind("foo").unwrap();
     concat = concat.bind("bar").unwrap();
     concat = concat.bind(hlist!["baz", "baf"]).unwrap();
-    assert_eq!(concat.call::<_, String>(hlist!["hi", "wut"]).unwrap(),
-               "foobarbazbafhiwut");
+    assert_eq!(
+        concat.call::<_, String>(hlist!["hi", "wut"]).unwrap(),
+        "foobarbazbafhiwut"
+    );
 }
 
 #[test]
@@ -331,8 +345,10 @@ fn test_lua_multi() {
     let concat = globals.get::<_, LuaFunction>("concat").unwrap();
     let mreturn = globals.get::<_, LuaFunction>("mreturn").unwrap();
 
-    assert_eq!(concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
-               "foobar");
+    assert_eq!(
+        concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
+        "foobar"
+    );
     let hlist_pat![a, b] = mreturn.call::<_, HList![u64, u64]>(hlist![]).unwrap();
     assert_eq!((a, b), (1, 2));
     let hlist_pat![a, b, LuaVariadic(v)] = mreturn.call::<_, HList![u64, u64, LuaVariadic<u64>]>(hlist![]).unwrap();
@@ -423,9 +439,9 @@ fn test_error() {
         None,
     ).unwrap();
 
-    let rust_error_function =
-        lua.create_function(|_, _| Err(LuaExternalError(Box::new(TestError)).into()))
-            .unwrap();
+    let rust_error_function = lua.create_function(
+        |_, _| Err(LuaExternalError(Box::new(TestError)).into()),
+    ).unwrap();
     globals
         .set("rust_error_function", rust_error_function)
         .unwrap();

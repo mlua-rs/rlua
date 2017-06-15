@@ -80,8 +80,9 @@ fn examples() -> LuaResult<()> {
     // Heterogeneous Lists.  This is one way to call a function with multiple
     // parameters:
 
-    print
-        .call::<_, ()>(hlist!["hello", "again", "from", "rust"])?;
+    print.call::<_, ()>(
+        hlist!["hello", "again", "from", "rust"],
+    )?;
 
     // You can bind rust functions to lua as well
 
@@ -106,16 +107,24 @@ fn examples() -> LuaResult<()> {
 
     // You can also accept variadic arguments to rust functions
     let join = lua.create_function(|lua, args| {
-                                       let strings = lua.unpack::<LuaVariadic<String>>(args)?.0;
-                                       // (This is quadratic!, it's just an example!)
-                                       lua.pack(strings.iter().fold("".to_owned(), |a, b| a + b))
-                                   })?;
+        let strings = lua.unpack::<LuaVariadic<String>>(args)?.0;
+        // (This is quadratic!, it's just an example!)
+        lua.pack(strings.iter().fold("".to_owned(), |a, b| a + b))
+    })?;
     globals.set("join", join)?;
 
-    assert_eq!(lua.eval::<bool>(r#"check_equal({"a", "b", "c"}, {"a", "b", "c"})"#)?,
-               true);
-    assert_eq!(lua.eval::<bool>(r#"check_equal({"a", "b", "c"}, {"d", "e", "f"})"#)?,
-               false);
+    assert_eq!(
+        lua.eval::<bool>(
+            r#"check_equal({"a", "b", "c"}, {"a", "b", "c"})"#,
+        )?,
+        true
+    );
+    assert_eq!(
+        lua.eval::<bool>(
+            r#"check_equal({"a", "b", "c"}, {"d", "e", "f"})"#,
+        )?,
+        false
+    );
     assert_eq!(lua.eval::<String>(r#"join("a", "b", "c")"#)?, "abc");
 
     // You can create userdata with methods and metamethods defined on them.
@@ -145,8 +154,10 @@ fn examples() -> LuaResult<()> {
     })?;
     globals.set("vec2", vec2_constructor)?;
 
-    assert_eq!(lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()")?,
-               5.0);
+    assert_eq!(
+        lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()")?,
+        5.0
+    );
 
     Ok(())
 }

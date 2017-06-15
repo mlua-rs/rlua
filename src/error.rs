@@ -56,7 +56,8 @@ pub trait LuaExternalResult<T> {
 }
 
 impl<T, E> LuaExternalResult<T> for Result<T, E>
-    where E: 'static + Error + Send
+where
+    E: 'static + Error + Send,
 {
     fn to_lua_err(self) -> LuaResult<T> {
         self.map_err(|e| LuaExternalError(Box::new(e)).into())

@@ -47,18 +47,21 @@ pub const LUA_TTHREAD: c_int = 8;
 
 extern "C" {
     pub fn lua_close(state: *mut lua_State);
-    pub fn lua_callk(state: *mut lua_State,
-                     nargs: c_int,
-                     nresults: c_int,
-                     ctx: lua_KContext,
-                     k: Option<lua_KFunction>);
-    pub fn lua_pcallk(state: *mut lua_State,
-                      nargs: c_int,
-                      nresults: c_int,
-                      msgh: c_int,
-                      ctx: lua_KContext,
-                      k: Option<lua_KFunction>)
-                      -> c_int;
+    pub fn lua_callk(
+        state: *mut lua_State,
+        nargs: c_int,
+        nresults: c_int,
+        ctx: lua_KContext,
+        k: Option<lua_KFunction>,
+    );
+    pub fn lua_pcallk(
+        state: *mut lua_State,
+        nargs: c_int,
+        nresults: c_int,
+        msgh: c_int,
+        ctx: lua_KContext,
+        k: Option<lua_KFunction>,
+    ) -> c_int;
     pub fn lua_resume(state: *mut lua_State, from: *mut lua_State, nargs: c_int) -> c_int;
     pub fn lua_status(state: *mut lua_State) -> c_int;
 
@@ -115,19 +118,22 @@ extern "C" {
 
     pub fn luaL_newstate() -> *mut lua_State;
     pub fn luaL_openlibs(state: *mut lua_State);
-    pub fn luaL_loadbufferx(state: *mut lua_State,
-                            buf: *const c_char,
-                            size: usize,
-                            name: *const c_char,
-                            mode: *const c_char)
-                            -> c_int;
+    pub fn luaL_loadbufferx(
+        state: *mut lua_State,
+        buf: *const c_char,
+        size: usize,
+        name: *const c_char,
+        mode: *const c_char,
+    ) -> c_int;
     pub fn luaL_ref(state: *mut lua_State, table: c_int) -> c_int;
     pub fn luaL_unref(state: *mut lua_State, table: c_int, lref: c_int);
     pub fn luaL_checkstack(state: *mut lua_State, size: c_int, msg: *const c_char);
-    pub fn luaL_traceback(push_state: *mut lua_State,
-                          state: *mut lua_State,
-                          msg: *const c_char,
-                          level: c_int);
+    pub fn luaL_traceback(
+        push_state: *mut lua_State,
+        state: *mut lua_State,
+        msg: *const c_char,
+        level: c_int,
+    );
     pub fn luaL_len(push_state: *mut lua_State, index: c_int) -> lua_Integer;
 }
 
@@ -228,11 +234,12 @@ pub unsafe fn lua_call(state: *mut lua_State, nargs: c_int, nresults: c_int) {
     lua_callk(state, nargs, nresults, ptr::null_mut(), None)
 }
 
-pub unsafe fn lua_pcall(state: *mut lua_State,
-                        nargs: c_int,
-                        nresults: c_int,
-                        msgh: c_int)
-                        -> c_int {
+pub unsafe fn lua_pcall(
+    state: *mut lua_State,
+    nargs: c_int,
+    nresults: c_int,
+    msgh: c_int,
+) -> c_int {
     lua_pcallk(state, nargs, nresults, msgh, ptr::null_mut(), None)
 }
 
@@ -241,10 +248,11 @@ pub unsafe fn lua_replace(state: *mut lua_State, index: c_int) {
     lua_pop(state, 1);
 }
 
-pub unsafe fn luaL_loadbuffer(state: *mut lua_State,
-                              buf: *const c_char,
-                              size: usize,
-                              name: *const c_char)
-                              -> c_int {
+pub unsafe fn luaL_loadbuffer(
+    state: *mut lua_State,
+    buf: *const c_char,
+    size: usize,
+    name: *const c_char,
+) -> c_int {
     luaL_loadbufferx(state, buf, size, name, ptr::null())
 }
