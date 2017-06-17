@@ -1,8 +1,17 @@
 extern crate gcc;
 
+use std::env;
+
 fn main() {
-    gcc::Config::new()
-        .define("LUA_USE_APICHECK", None)
+    let mut config = gcc::Config::new();
+
+    if env::var("CARGO_CFG_TARGET_OS") == Ok("linux".to_string()) {
+        // Among other things, this enables `io.popen` support.
+        // Despite the name, we could enable this on more platforms.
+        config.define("LUA_USE_LINUX", None);
+    }
+
+    config.define("LUA_USE_APICHECK", None)
         .include("lua")
         .file("lua/lapi.c")
         .file("lua/lauxlib.c")
