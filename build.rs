@@ -5,13 +5,25 @@ use std::env;
 fn main() {
     let mut config = gcc::Config::new();
 
-    if env::var("CARGO_CFG_TARGET_OS") == Ok("linux".to_string()) {
-        // Among other things, this enables `io.popen` support.
-        // Despite the name, we could enable this on more platforms.
+    let target_os = env::var("CARGO_CFG_TARGET_OS");
+    let target_family = env::var("CARGO_CFG_TARGET_FAMILY");
+
+    if target_os == Ok("linux".to_string()) {
         config.define("LUA_USE_LINUX", None);
+    } else if target_os == Ok("macos".to_string()) {
+        config.define("LUA_USE_MACOSX", None);
+    } else if target_family == Ok("unix".to_string()) {
+        config.define("LUA_USE_POSIX", None);
+    } else if target_family == Ok("windows".to_string()) {
+        config.define("LUA_USE_WINDOWS", None);
     }
 
-    config.define("LUA_USE_APICHECK", None)
+    // Enables lua api checking, which has a slight performance penalty.  We
+    // could allow disabling this via cfg one day when there is much more
+    // confidence in the soundness of the API.
+    config.define("LUA_USE_APICHECK", None);
+
+    config
         .include("lua")
         .file("lua/lapi.c")
         .file("lua/lauxlib.c")
