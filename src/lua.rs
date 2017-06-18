@@ -168,7 +168,7 @@ pub struct LuaString<'lua>(LuaRef<'lua>);
 
 impl<'lua> LuaString<'lua> {
     /// Get a `&str` slice if the Lua string is valid UTF-8.
-    pub fn get(&self) -> LuaResult<&str> {
+    pub fn to_str(&self) -> LuaResult<&str> {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {
@@ -233,7 +233,7 @@ impl<'lua> LuaTable<'lua> {
     }
 
     /// Checks whether the table contains a non-nil value for `key`.
-    pub fn has<K: ToLua<'lua>>(&self, key: K) -> LuaResult<bool> {
+    pub fn contains_key<K: ToLua<'lua>>(&self, key: K) -> LuaResult<bool> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         unsafe {
@@ -285,7 +285,7 @@ impl<'lua> LuaTable<'lua> {
     ///
     /// This might invoke the `__len` metamethod. Use the `raw_length` method if that is not
     /// desired.
-    pub fn length(&self) -> LuaResult<LuaInteger> {
+    pub fn len(&self) -> LuaResult<LuaInteger> {
         let lua = self.0.lua;
         unsafe {
             error_guard(lua.state, 0, 0, |state| {
@@ -298,7 +298,7 @@ impl<'lua> LuaTable<'lua> {
 
     /// Returns the result of the Lua `#` operator, without invoking the
     /// `__len` metamethod.
-    pub fn raw_length(&self) -> LuaResult<LuaInteger> {
+    pub fn raw_len(&self) -> LuaResult<LuaInteger> {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {
@@ -905,7 +905,7 @@ impl Lua {
     /// results in better error traces.
     ///
     /// Returns the values returned by the chunk.
-    pub fn load<'lua, R: FromLuaMulti<'lua>>(
+    pub fn exec<'lua, R: FromLuaMulti<'lua>>(
         &'lua self,
         source: &str,
         name: Option<&str>,

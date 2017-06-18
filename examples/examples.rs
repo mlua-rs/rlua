@@ -29,7 +29,7 @@ fn examples() -> LuaResult<()> {
     // You can load and evaluate lua code.  The second parameter here gives the
     // chunk a better name when lua error messages are printed.
 
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             global = 'foo'..'bar'
         "#,
@@ -47,7 +47,7 @@ fn examples() -> LuaResult<()> {
     array_table.set(1, "one")?;
     array_table.set(2, "two")?;
     array_table.set(3, "three")?;
-    assert_eq!(array_table.length()?, 3);
+    assert_eq!(array_table.len()?, 3);
 
     let map_table = lua.create_empty_table()?;
     map_table.set("one", 1)?;

@@ -143,7 +143,7 @@ impl<'lua> ToLua<'lua> for String {
 
 impl<'lua> FromLua<'lua> for String {
     fn from_lua(value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
-        Ok(lua.coerce_string(value)?.get()?.to_owned())
+        Ok(lua.coerce_string(value)?.to_str()?.to_owned())
     }
 }
 

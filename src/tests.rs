@@ -20,7 +20,7 @@ fn test_set_get() {
 fn test_load() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             res = 'foo'..'bar'
         "#,
@@ -28,7 +28,7 @@ fn test_load() {
     ).unwrap();
     assert_eq!(globals.get::<_, String>("res").unwrap(), "foobar");
 
-    let module: LuaTable = lua.load(
+    let module: LuaTable = lua.exec(
         r#"
             local module = {}
 
@@ -40,7 +40,7 @@ fn test_load() {
         "#,
         None,
     ).unwrap();
-    assert!(module.has("func").unwrap());
+    assert!(module.contains_key("func").unwrap());
     assert_eq!(
         module
             .get::<_, LuaFunction>("func")
@@ -80,7 +80,7 @@ fn test_table() {
     assert_eq!(table2.get::<_, String>("foo").unwrap(), "bar");
     assert_eq!(table1.get::<_, String>("baz").unwrap(), "baf");
 
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             table1 = {1, 2, 3, 4, 5}
             table2 = {}
@@ -93,15 +93,15 @@ fn test_table() {
     let table2 = globals.get::<_, LuaTable>("table2").unwrap();
     let table3 = globals.get::<_, LuaTable>("table3").unwrap();
 
-    assert_eq!(table1.length().unwrap(), 5);
+    assert_eq!(table1.len().unwrap(), 5);
     assert_eq!(
         table1.pairs::<i64, i64>().unwrap(),
         vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
     );
-    assert_eq!(table2.length().unwrap(), 0);
+    assert_eq!(table2.len().unwrap(), 0);
     assert_eq!(table2.pairs::<i64, i64>().unwrap(), vec![]);
     assert_eq!(table2.array_values::<i64>().unwrap(), vec![]);
-    assert_eq!(table3.length().unwrap(), 5);
+    assert_eq!(table3.len().unwrap(), 5);
     assert_eq!(
         table3.array_values::<Option<i64>>().unwrap(),
         vec![Some(1), Some(2), None, Some(4), Some(5)]
@@ -124,7 +124,7 @@ fn test_table() {
 fn test_function() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function concat(arg1, arg2)
                 return arg1 .. arg2
@@ -144,7 +144,7 @@ fn test_function() {
 fn test_bind() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function concat(...)
                 local res = ""
@@ -171,7 +171,7 @@ fn test_bind() {
 fn test_rust_function() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function lua_function()
                 return rust_function()
@@ -230,7 +230,7 @@ fn test_methods() {
     let globals = lua.globals().unwrap();
     let userdata = lua.create_userdata(UserData(42)).unwrap();
     globals.set("userdata", userdata.clone()).unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function get_it()
                 return userdata:get_value()
@@ -269,7 +269,7 @@ fn test_metamethods() {
             });
             methods.add_meta_method(LuaMetaMethod::Index, |lua, data, args| {
                 let index = lua.unpack::<LuaString>(args)?;
-                if index.get()? == "inner" {
+                if index.to_str()? == "inner" {
                     lua.pack(data.0)
                 } else {
                     Err("no such custom index".into())
@@ -293,7 +293,7 @@ fn test_metamethods() {
 fn test_scope() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             touter = {
                 tin = {1, 2, 3}
@@ -329,7 +329,7 @@ fn test_scope() {
 fn test_lua_multi() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function concat(arg1, arg2)
                 return arg1 .. arg2
@@ -360,7 +360,7 @@ fn test_lua_multi() {
 fn test_coercion() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             int = 123
             str = "123"
@@ -397,7 +397,7 @@ fn test_error() {
 
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function no_error()
             end
@@ -472,7 +472,7 @@ fn test_error() {
 
     match catch_unwind(|| -> LuaResult<()> {
         let lua = Lua::new();
-        lua.load::<()>(
+        lua.exec::<()>(
             r#"
                 function rust_panic()
                     pcall(function () rust_panic_function() end)
@@ -496,7 +496,7 @@ fn test_error() {
 
     match catch_unwind(|| -> LuaResult<()> {
         let lua = Lua::new();
-        lua.load::<()>(
+        lua.exec::<()>(
             r#"
                 function rust_panic()
                     xpcall(function() rust_panic_function() end, function() end)
@@ -605,7 +605,7 @@ fn test_thread() {
 fn test_lightuserdata() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function id(a)
                 return a
@@ -625,7 +625,7 @@ fn test_lightuserdata() {
 fn test_table_error() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             table = {}
             setmetatable(table, {
@@ -646,10 +646,10 @@ fn test_table_error() {
     let bad_table: LuaTable = globals.get("table").unwrap();
     assert!(bad_table.set(1, 1).is_err());
     assert!(bad_table.get::<_, i32>(1).is_err());
-    assert!(bad_table.length().is_err());
+    assert!(bad_table.len().is_err());
     assert!(bad_table.raw_set(1, 1).is_ok());
     assert!(bad_table.raw_get::<_, i32>(1).is_ok());
-    assert_eq!(bad_table.raw_length().unwrap(), 1);
+    assert_eq!(bad_table.raw_len().unwrap(), 1);
     assert!(bad_table.pairs::<i64, i64>().is_ok());
     assert!(bad_table.array_values::<i64>().is_ok());
 }
@@ -671,7 +671,7 @@ fn test_result_conversions() {
     globals.set("err", err).unwrap();
     globals.set("ok", ok).unwrap();
 
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             local err, msg = err()
             assert(err == nil)
