@@ -168,7 +168,7 @@ pub struct LuaString<'lua>(LuaRef<'lua>);
 
 impl<'lua> LuaString<'lua> {
     /// Get a `&str` slice if the Lua string is valid UTF-8.
-    pub fn get(&self) -> LuaResult<&str> {
+    pub fn to_str(&self) -> LuaResult<&str> {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {

@@ -269,7 +269,7 @@ fn test_metamethods() {
             });
             methods.add_meta_method(LuaMetaMethod::Index, |lua, data, args| {
                 let index = lua.unpack::<LuaString>(args)?;
-                if index.get()? == "inner" {
+                if index.to_str()? == "inner" {
                     lua.pack(data.0)
                 } else {
                     Err("no such custom index".into())
