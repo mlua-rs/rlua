@@ -93,15 +93,15 @@ fn test_table() {
     let table2 = globals.get::<_, LuaTable>("table2").unwrap();
     let table3 = globals.get::<_, LuaTable>("table3").unwrap();
 
-    assert_eq!(table1.length().unwrap(), 5);
+    assert_eq!(table1.len().unwrap(), 5);
     assert_eq!(
         table1.pairs::<i64, i64>().unwrap(),
         vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
     );
-    assert_eq!(table2.length().unwrap(), 0);
+    assert_eq!(table2.len().unwrap(), 0);
     assert_eq!(table2.pairs::<i64, i64>().unwrap(), vec![]);
     assert_eq!(table2.array_values::<i64>().unwrap(), vec![]);
-    assert_eq!(table3.length().unwrap(), 5);
+    assert_eq!(table3.len().unwrap(), 5);
     assert_eq!(
         table3.array_values::<Option<i64>>().unwrap(),
         vec![Some(1), Some(2), None, Some(4), Some(5)]
@@ -646,10 +646,10 @@ fn test_table_error() {
     let bad_table: LuaTable = globals.get("table").unwrap();
     assert!(bad_table.set(1, 1).is_err());
     assert!(bad_table.get::<_, i32>(1).is_err());
-    assert!(bad_table.length().is_err());
+    assert!(bad_table.len().is_err());
     assert!(bad_table.raw_set(1, 1).is_ok());
     assert!(bad_table.raw_get::<_, i32>(1).is_ok());
-    assert_eq!(bad_table.raw_length().unwrap(), 1);
+    assert_eq!(bad_table.raw_len().unwrap(), 1);
     assert!(bad_table.pairs::<i64, i64>().is_ok());
     assert!(bad_table.array_values::<i64>().is_ok());
 }

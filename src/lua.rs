@@ -285,7 +285,7 @@ impl<'lua> LuaTable<'lua> {
     ///
     /// This might invoke the `__len` metamethod. Use the `raw_length` method if that is not
     /// desired.
-    pub fn length(&self) -> LuaResult<LuaInteger> {
+    pub fn len(&self) -> LuaResult<LuaInteger> {
         let lua = self.0.lua;
         unsafe {
             error_guard(lua.state, 0, 0, |state| {
@@ -298,7 +298,7 @@ impl<'lua> LuaTable<'lua> {
 
     /// Returns the result of the Lua `#` operator, without invoking the
     /// `__len` metamethod.
-    pub fn raw_length(&self) -> LuaResult<LuaInteger> {
+    pub fn raw_len(&self) -> LuaResult<LuaInteger> {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {
