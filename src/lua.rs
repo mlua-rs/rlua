@@ -601,6 +601,20 @@ pub enum LuaMetaMethod {
     Pow,
     /// The unary minus (`-`) operator.
     Unm,
+    /// The floor division (//) operator.
+    IDiv,
+    /// The bitwise AND (&) operator.
+    BAnd,
+    /// The bitwise OR (|) operator.
+    BOr,
+    /// The bitwise XOR (binary ~) operator.
+    BXor,
+    /// The bitwise NOT (unary ~) operator.
+    BNot,
+    /// The bitwise left shift (<<) operator.
+    Shl,
+    /// The bitwise right shift (>>) operator.
+    Shr,
     /// The string concatenation operator `..`.
     Concat,
     /// The length operator `#`.
@@ -617,8 +631,6 @@ pub enum LuaMetaMethod {
     NewIndex,
     /// The call "operator" `obj(arg1, args2, ...)`.
     Call,
-
-    // Missing: binary operators, floor division (5.3 only)
 }
 
 /// Stores methods of a userdata object.
@@ -635,7 +647,8 @@ pub struct LuaUserDataMethods<T> {
 }
 
 impl<T: LuaUserDataType> LuaUserDataMethods<T> {
-    /// Add a regular method as a function which accepts a &T parameter
+    /// Add a regular method as a function which accepts a &T as the first
+    /// parameter.
     pub fn add_method<M>(&mut self, name: &str, method: M)
         where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -646,7 +659,8 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         );
     }
 
-    /// Add a regular method as a function which accepts a &mut T parameter
+    /// Add a regular method as a function which accepts a &mut T as the first
+    /// parameter.
     pub fn add_method_mut<M>(&mut self, name: &str, method: M)
         where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -657,8 +671,8 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         );
     }
 
-    /// Add a regular method as a function which accepts generic arguments, the first argument will
-    /// always be a LuaUserData of real type T
+    /// Add a regular method as a function which accepts generic arguments, the
+    /// first argument will always be a LuaUserData of type T.
     pub fn add_function<F>(&mut self, name: &str, function: F)
         where F: 'static + for<'a, 'lua> FnMut(&'lua Lua, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -666,7 +680,9 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         self.methods.insert(name.to_owned(), Box::new(function));
     }
 
-    /// Add a metamethod as a function which accepts a &T parameter
+    /// Add a metamethod as a function which accepts a &T as the first
+    /// parameter.  This can cause an error with certain binary metamethods that
+    /// can trigger if ony the right side has a metatable.
     pub fn add_meta_method<M>(&mut self, meta: LuaMetaMethod, method: M)
         where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -674,7 +690,9 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
 
-    /// Add a metamethod as a function which accepts a &mut T parameter
+    /// Add a metamethod as a function which accepts a &mut T as the first
+    /// parameter.  This can cause an error with certain binary metamethods that
+    /// can trigger if ony the right side has a metatable.
     pub fn add_meta_method_mut<M>(&mut self, meta: LuaMetaMethod, method: M)
         where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -682,8 +700,10 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
 
-    /// Add a metamethod as a function which accepts generic arguments, the first argument will
-    /// always be a LuaUserData of real type T
+    /// Add a metamethod as a function which accepts generic arguments.
+    /// Metamethods in Lua for binary operators can be triggered if either the
+    /// left or right argument to the binary operator has a metatable, so the
+    /// first argument here is not necessarily a userdata of type T.
     pub fn add_meta_function<F>(&mut self, meta: LuaMetaMethod, function: F)
         where F: 'static + for<'a, 'lua> FnMut(&'lua Lua, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -1342,9 +1362,11 @@ impl Lua {
         );
     }
 
-    /// Pops the topmost element of the stack and stores a reference to it in the registry.
-    ///
-    /// This pins the object, preventing garbage collection until the returned `LuaRef` is dropped.
+    // Pops the topmost element of the stack and stores a reference to it in the
+    // registry.
+    //
+    // This pins the object, preventing garbage collection until the returned
+    // `LuaRef` is dropped.
     unsafe fn pop_ref(&self, state: *mut ffi::lua_State) -> LuaRef {
         let registry_id = ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX);
         LuaRef {
@@ -1437,6 +1459,13 @@ impl Lua {
                                 LuaMetaMethod::Mod => "__mod",
                                 LuaMetaMethod::Pow => "__pow",
                                 LuaMetaMethod::Unm => "__unm",
+                                LuaMetaMethod::IDiv => "__idiv",
+                                LuaMetaMethod::BAnd => "__band",
+                                LuaMetaMethod::BOr => "__bor",
+                                LuaMetaMethod::BXor => "__bxor",
+                                LuaMetaMethod::BNot => "__bnot",
+                                LuaMetaMethod::Shl => "__shl",
+                                LuaMetaMethod::Shr => "__shr",
                                 LuaMetaMethod::Concat => "__concat",
                                 LuaMetaMethod::Len => "__len",
                                 LuaMetaMethod::Eq => "__eq",
