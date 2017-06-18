@@ -283,8 +283,8 @@ impl<'lua> LuaTable<'lua> {
 
     /// Returns the result of the Lua `#` operator.
     ///
-    /// This might invoke the `__len` metamethod. Use the `raw_length` method if that is not
-    /// desired.
+    /// This might invoke the `__len` metamethod. Use the `raw_len` method if
+    /// that is not desired.
     pub fn len(&self) -> LuaResult<LuaInteger> {
         let lua = self.0.lua;
         unsafe {
