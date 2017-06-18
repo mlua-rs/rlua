@@ -512,14 +512,16 @@ impl<'lua> LuaThread<'lua> {
     /// are passed to its main function.
     ///
     /// If the thread is no longer in `Active` state (meaning it has finished execution or
-    /// encountered an error), returns `None`. Otherwise, returns `Some` as follows:
+    /// encountered an error), this will return Err(CoroutineInactive),
+    /// otherwise will return Ok as follows:
     ///
     /// If the thread calls `coroutine.yield`, returns the values passed to `yield`. If the thread
     /// `return`s values from its main function, returns those.
-    pub fn resume<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(
-        &self,
-        args: A,
-    ) -> LuaResult<Option<R>> {
+    pub fn resume<A, R>(&self, args: A) -> LuaResult<R>
+    where
+        A: ToLuaMulti<'lua>,
+        R: FromLuaMulti<'lua>,
+    {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {
@@ -529,32 +531,31 @@ impl<'lua> LuaThread<'lua> {
                 let thread_state = ffi::lua_tothread(lua.state, -1);
 
                 let status = ffi::lua_status(thread_state);
-                if status == ffi::LUA_YIELD || ffi::lua_gettop(thread_state) > 0 {
-                    ffi::lua_pop(lua.state, 1);
-
-                    let args = args.to_lua_multi(lua)?;
-                    let nargs = args.len() as c_int;
-                    check_stack(thread_state, nargs)?;
-
-                    for arg in args {
-                        lua.push_value(thread_state, arg)?;
-                    }
-
-                    handle_error(
-                        lua.state,
-                        resume_with_traceback(thread_state, lua.state, nargs),
-                    )?;
-
-                    let nresults = ffi::lua_gettop(thread_state);
-                    let mut results = LuaMultiValue::new();
-                    for _ in 0..nresults {
-                        results.push_front(lua.pop_value(thread_state)?);
-                    }
-                    R::from_lua_multi(results, lua).map(Some)
-                } else {
-                    ffi::lua_pop(lua.state, 1);
-                    Ok(None)
+                if status != ffi::LUA_YIELD && ffi::lua_gettop(thread_state) == 0 {
+                    return Err(LuaErrorKind::CoroutineInactive.into());
                 }
+
+                ffi::lua_pop(lua.state, 1);
+
+                let args = args.to_lua_multi(lua)?;
+                let nargs = args.len() as c_int;
+                check_stack(thread_state, nargs)?;
+
+                for arg in args {
+                    lua.push_value(thread_state, arg)?;
+                }
+
+                handle_error(
+                    lua.state,
+                    resume_with_traceback(thread_state, lua.state, nargs),
+                )?;
+
+                let nresults = ffi::lua_gettop(thread_state);
+                let mut results = LuaMultiValue::new();
+                for _ in 0..nresults {
+                    results.push_front(lua.pop_value(thread_state)?);
+                }
+                R::from_lua_multi(results, lua)
             })
         }
     }

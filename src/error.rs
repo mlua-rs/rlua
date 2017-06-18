@@ -39,6 +39,9 @@ error_chain! {
         IncompleteStatement(err: String) {
             display("Incomplete lua statement {}", err)
         }
+        CoroutineInactive {
+            display("Cannot resume inactive coroutine")
+        }
     }
 
     foreign_links {

@@ -458,12 +458,12 @@ fn test_error() {
     match lua_error.call::<_, ()>(()) {
         Err(LuaError(LuaErrorKind::ScriptError(_), _)) => {}
         Err(_) => panic!("error is not ScriptError kind"),
-        _ => panic!("error not thrown"),
+        _ => panic!("error not returned"),
     }
     match rust_error.call::<_, ()>(()) {
         Err(LuaError(LuaErrorKind::CallbackError(_), _)) => {}
         Err(_) => panic!("error is not CallbackError kind"),
-        _ => panic!("error not thrown"),
+        _ => panic!("error not returned"),
     }
 
     test_pcall.call::<_, ()>(()).unwrap();
@@ -537,15 +537,15 @@ fn test_thread() {
     ).unwrap();
 
     assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
-    assert_eq!(thread.resume::<_, i64>(0).unwrap(), Some(0));
+    assert_eq!(thread.resume::<_, i64>(0).unwrap(), 0);
     assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
-    assert_eq!(thread.resume::<_, i64>(1).unwrap(), Some(1));
+    assert_eq!(thread.resume::<_, i64>(1).unwrap(), 1);
     assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
-    assert_eq!(thread.resume::<_, i64>(2).unwrap(), Some(3));
+    assert_eq!(thread.resume::<_, i64>(2).unwrap(), 3);
     assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
-    assert_eq!(thread.resume::<_, i64>(3).unwrap(), Some(6));
+    assert_eq!(thread.resume::<_, i64>(3).unwrap(), 6);
     assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
-    assert_eq!(thread.resume::<_, i64>(4).unwrap(), Some(10));
+    assert_eq!(thread.resume::<_, i64>(4).unwrap(), 10);
     assert_eq!(thread.status().unwrap(), LuaThreadStatus::Dead);
 
     let accumulate = lua.create_thread(
@@ -563,7 +563,7 @@ fn test_thread() {
     for i in 0..4 {
         accumulate.resume::<_, ()>(i).unwrap();
     }
-    assert_eq!(accumulate.resume::<_, i64>(4).unwrap(), Some(10));
+    assert_eq!(accumulate.resume::<_, i64>(4).unwrap(), 10);
     assert_eq!(accumulate.status().unwrap(), LuaThreadStatus::Active);
     assert!(accumulate.resume::<_, ()>("error").is_err());
     assert_eq!(accumulate.status().unwrap(), LuaThreadStatus::Error);
@@ -578,7 +578,7 @@ fn test_thread() {
         "#,
     ).unwrap();
     assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
-    assert_eq!(thread.resume::<_, i64>(()).unwrap(), Some(42));
+    assert_eq!(thread.resume::<_, i64>(()).unwrap(), 42);
 
     let thread: LuaThread = lua.eval(
         r#"
@@ -591,9 +591,14 @@ fn test_thread() {
         "#,
     ).unwrap();
 
-    assert_eq!(thread.resume::<_, u32>(42).unwrap(), Some(123));
-    assert_eq!(thread.resume::<_, u32>(43).unwrap(), Some(987));
-    assert_eq!(thread.resume::<_, u32>(()).unwrap(), None);
+    assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);
+    assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);
+
+    match thread.resume::<_, u32>(()) {
+        Err(LuaError(LuaErrorKind::CoroutineInactive, _)) => {}
+        Err(_) => panic!("resuming dead coroutine error is not CoroutineInactive kind"),
+        _ => panic!("resuming dead coroutine did not return error"),
+    }
 }
 
 #[test]
