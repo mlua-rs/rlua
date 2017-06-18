@@ -524,13 +524,15 @@ fn test_thread() {
     let lua = Lua::new();
     let thread = lua.create_thread(
         lua.eval::<LuaFunction>(
-            r#"function (s)
-        local sum = s
-        for i = 1,4 do
-            sum = sum + coroutine.yield(sum)
-        end
-        return sum
-    end"#,
+            r#"
+                function (s)
+                    local sum = s
+                    for i = 1,4 do
+                        sum = sum + coroutine.yield(sum)
+                    end
+                    return sum
+                end
+            "#,
         ).unwrap(),
     ).unwrap();
 
@@ -548,11 +550,13 @@ fn test_thread() {
 
     let accumulate = lua.create_thread(
         lua.eval::<LuaFunction>(
-            r#"function (sum)
-        while true do
-            sum = sum + coroutine.yield(sum)
-        end
-    end"#,
+            r#"
+                function (sum)
+                    while true do
+                        sum = sum + coroutine.yield(sum)
+                    end
+                end
+            "#,
         ).unwrap(),
     ).unwrap();
 
@@ -565,14 +569,31 @@ fn test_thread() {
     assert_eq!(accumulate.status().unwrap(), LuaThreadStatus::Error);
 
     let thread = lua.eval::<LuaThread>(
-        r#"coroutine.create(function ()
-        while true do
-            coroutine.yield(42)
-        end
-    end)"#,
+        r#"
+            coroutine.create(function ()
+                while true do
+                    coroutine.yield(42)
+                end
+            end)
+        "#,
     ).unwrap();
     assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(()).unwrap(), Some(42));
+
+    let thread: LuaThread = lua.eval(
+        r#"
+            coroutine.create(function(arg)
+                assert(arg == 42)
+                local yieldarg = coroutine.yield(123)
+                assert(yieldarg == 43)
+                return 987
+            end)
+        "#,
+    ).unwrap();
+
+    assert_eq!(thread.resume::<_, u32>(42).unwrap(), Some(123));
+    assert_eq!(thread.resume::<_, u32>(43).unwrap(), Some(987));
+    assert_eq!(thread.resume::<_, u32>(()).unwrap(), None);
 }
 
 #[test]
@@ -580,9 +601,11 @@ fn test_lightuserdata() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
     lua.load::<()>(
-        r#"function id(a)
-        return a
-    end"#,
+        r#"
+            function id(a)
+                return a
+            end
+        "#,
         None,
     ).unwrap();
     let res = globals
@@ -632,7 +655,9 @@ fn test_result_conversions() {
     let globals = lua.globals().unwrap();
 
     let err = lua.create_function(|lua, _| {
-        lua.pack(Result::Err::<String, String>("only through failure can we succeed".to_string()))
+        lua.pack(Result::Err::<String, String>(
+            "only through failure can we succeed".to_string(),
+        ))
     }).unwrap();
     let ok = lua.create_function(|lua, _| {
         lua.pack(Result::Ok::<String, String>("!".to_string()))

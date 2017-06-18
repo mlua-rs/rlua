@@ -444,27 +444,34 @@ impl<'lua> LuaThread<'lua> {
 
                 lua.push_ref(lua.state, &self.0);
                 let thread_state = ffi::lua_tothread(lua.state, -1);
-                ffi::lua_pop(lua.state, 1);
 
-                let args = args.to_lua_multi(lua)?;
-                let nargs = args.len() as c_int;
-                check_stack(thread_state, nargs)?;
+                let status = ffi::lua_status(thread_state);
+                if status == ffi::LUA_YIELD || ffi::lua_gettop(thread_state) > 0 {
+                    ffi::lua_pop(lua.state, 1);
 
-                for arg in args {
-                    lua.push_value(thread_state, arg)?;
+                    let args = args.to_lua_multi(lua)?;
+                    let nargs = args.len() as c_int;
+                    check_stack(thread_state, nargs)?;
+
+                    for arg in args {
+                        lua.push_value(thread_state, arg)?;
+                    }
+
+                    handle_error(
+                        lua.state,
+                        resume_with_traceback(thread_state, lua.state, nargs),
+                    )?;
+
+                    let nresults = ffi::lua_gettop(thread_state);
+                    let mut results = LuaMultiValue::new();
+                    for _ in 0..nresults {
+                        results.push_front(lua.pop_value(thread_state)?);
+                    }
+                    R::from_lua_multi(results, lua).map(Some)
+                } else {
+                    ffi::lua_pop(lua.state, 1);
+                    Ok(None)
                 }
-
-                handle_error(
-                    lua.state,
-                    resume_with_traceback(thread_state, lua.state, nargs),
-                )?;
-
-                let nresults = ffi::lua_gettop(thread_state);
-                let mut results = LuaMultiValue::new();
-                for _ in 0..nresults {
-                    results.push_front(lua.pop_value(thread_state)?);
-                }
-                R::from_lua_multi(results, lua).map(Some)
             })
         }
     }
