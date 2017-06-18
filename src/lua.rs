@@ -233,7 +233,7 @@ impl<'lua> LuaTable<'lua> {
     }
 
     /// Checks whether the table contains a non-nil value for `key`.
-    pub fn has<K: ToLua<'lua>>(&self, key: K) -> LuaResult<bool> {
+    pub fn contains_key<K: ToLua<'lua>>(&self, key: K) -> LuaResult<bool> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         unsafe {

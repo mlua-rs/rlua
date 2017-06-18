@@ -40,7 +40,7 @@ fn test_load() {
         "#,
         None,
     ).unwrap();
-    assert!(module.has("func").unwrap());
+    assert!(module.contains_key("func").unwrap());
     assert_eq!(
         module
             .get::<_, LuaFunction>("func")
