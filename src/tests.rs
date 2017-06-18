@@ -20,7 +20,7 @@ fn test_set_get() {
 fn test_load() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             res = 'foo'..'bar'
         "#,
@@ -28,7 +28,7 @@ fn test_load() {
     ).unwrap();
     assert_eq!(globals.get::<_, String>("res").unwrap(), "foobar");
 
-    let module: LuaTable = lua.load(
+    let module: LuaTable = lua.exec(
         r#"
             local module = {}
 
@@ -80,7 +80,7 @@ fn test_table() {
     assert_eq!(table2.get::<_, String>("foo").unwrap(), "bar");
     assert_eq!(table1.get::<_, String>("baz").unwrap(), "baf");
 
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             table1 = {1, 2, 3, 4, 5}
             table2 = {}
@@ -124,7 +124,7 @@ fn test_table() {
 fn test_function() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function concat(arg1, arg2)
                 return arg1 .. arg2
@@ -144,7 +144,7 @@ fn test_function() {
 fn test_bind() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function concat(...)
                 local res = ""
@@ -171,7 +171,7 @@ fn test_bind() {
 fn test_rust_function() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function lua_function()
                 return rust_function()
@@ -230,7 +230,7 @@ fn test_methods() {
     let globals = lua.globals().unwrap();
     let userdata = lua.create_userdata(UserData(42)).unwrap();
     globals.set("userdata", userdata.clone()).unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function get_it()
                 return userdata:get_value()
@@ -293,7 +293,7 @@ fn test_metamethods() {
 fn test_scope() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             touter = {
                 tin = {1, 2, 3}
@@ -329,7 +329,7 @@ fn test_scope() {
 fn test_lua_multi() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function concat(arg1, arg2)
                 return arg1 .. arg2
@@ -360,7 +360,7 @@ fn test_lua_multi() {
 fn test_coercion() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             int = 123
             str = "123"
@@ -397,7 +397,7 @@ fn test_error() {
 
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function no_error()
             end
@@ -472,7 +472,7 @@ fn test_error() {
 
     match catch_unwind(|| -> LuaResult<()> {
         let lua = Lua::new();
-        lua.load::<()>(
+        lua.exec::<()>(
             r#"
                 function rust_panic()
                     pcall(function () rust_panic_function() end)
@@ -496,7 +496,7 @@ fn test_error() {
 
     match catch_unwind(|| -> LuaResult<()> {
         let lua = Lua::new();
-        lua.load::<()>(
+        lua.exec::<()>(
             r#"
                 function rust_panic()
                     xpcall(function() rust_panic_function() end, function() end)
@@ -605,7 +605,7 @@ fn test_thread() {
 fn test_lightuserdata() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             function id(a)
                 return a
@@ -625,7 +625,7 @@ fn test_lightuserdata() {
 fn test_table_error() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             table = {}
             setmetatable(table, {
@@ -671,7 +671,7 @@ fn test_result_conversions() {
     globals.set("err", err).unwrap();
     globals.set("ok", ok).unwrap();
 
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             local err, msg = err()
             assert(err == nil)

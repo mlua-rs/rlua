@@ -29,7 +29,7 @@ fn examples() -> LuaResult<()> {
     // You can load and evaluate lua code.  The second parameter here gives the
     // chunk a better name when lua error messages are printed.
 
-    lua.load::<()>(
+    lua.exec::<()>(
         r#"
             global = 'foo'..'bar'
         "#,

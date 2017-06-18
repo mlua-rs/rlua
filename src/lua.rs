@@ -905,7 +905,7 @@ impl Lua {
     /// results in better error traces.
     ///
     /// Returns the values returned by the chunk.
-    pub fn load<'lua, R: FromLuaMulti<'lua>>(
+    pub fn exec<'lua, R: FromLuaMulti<'lua>>(
         &'lua self,
         source: &str,
         name: Option<&str>,
