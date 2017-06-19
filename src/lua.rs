@@ -312,7 +312,7 @@ impl<'lua> LuaTable<'lua> {
     }
 
     /// Consume this table and return an iterator over the pairs of the table,
-    /// like the Lua 'pairs' function.
+    /// works like the Lua 'pairs' function.
     pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(self) -> LuaTablePairs<'lua, K, V> {
         let next_key = Some(LuaRef {
             lua: self.0.lua,
@@ -340,7 +340,7 @@ impl<'lua> LuaTable<'lua> {
 
 /// An iterator over the pairs of a Lua table.
 ///
-/// Should behave exactly like the lua 'pairs" function.  Holds an internal
+/// Should behave exactly like the lua 'pairs' function.  Holds an internal
 /// reference to the table.
 pub struct LuaTablePairs<'lua, K, V> {
     table: LuaRef<'lua>,
