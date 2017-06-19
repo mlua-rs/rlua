@@ -95,27 +95,54 @@ fn test_table() {
 
     assert_eq!(table1.len().unwrap(), 5);
     assert_eq!(
-        table1.pairs::<i64, i64>().unwrap(),
+        table1
+            .clone()
+            .pairs()
+            .collect::<LuaResult<Vec<(i64, i64)>>>()
+            .unwrap(),
         vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
     );
-    assert_eq!(table2.len().unwrap(), 0);
-    assert_eq!(table2.pairs::<i64, i64>().unwrap(), vec![]);
-    assert_eq!(table2.array_values::<i64>().unwrap(), vec![]);
-    assert_eq!(table3.len().unwrap(), 5);
     assert_eq!(
-        table3.array_values::<Option<i64>>().unwrap(),
-        vec![Some(1), Some(2), None, Some(4), Some(5)]
+        table1
+            .clone()
+            .ipairs()
+            .collect::<LuaResult<Vec<i64>>>()
+            .unwrap(),
+        vec![1, 2, 3, 4, 5]
+    );
+
+    assert_eq!(table2.len().unwrap(), 0);
+    assert_eq!(
+        table2
+            .clone()
+            .pairs()
+            .collect::<LuaResult<Vec<(i64, i64)>>>()
+            .unwrap(),
+        vec![]
+    );
+    assert_eq!(
+        table2.ipairs().collect::<LuaResult<Vec<i64>>>().unwrap(),
+        vec![]
+    );
+
+    /// ipairs should only iterate until the first border
+    assert_eq!(
+        table3.ipairs().collect::<LuaResult<Vec<i64>>>().unwrap(),
+        vec![1, 2]
     );
 
     globals
         .set(
             "table4",
-            lua.create_array_table(vec![1, 2, 3, 4, 5]).unwrap(),
+            lua.create_sequence_table(vec![1, 2, 3, 4, 5]).unwrap(),
         )
         .unwrap();
     let table4 = globals.get::<_, LuaTable>("table4").unwrap();
     assert_eq!(
-        table4.pairs::<i64, i64>().unwrap(),
+        table4
+            .pairs()
+            .collect::<LuaResult<Vec<(i64, i64)>>>()
+            .unwrap(),
         vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
     );
 }
@@ -650,8 +677,6 @@ fn test_table_error() {
     assert!(bad_table.raw_set(1, 1).is_ok());
     assert!(bad_table.raw_get::<_, i32>(1).is_ok());
     assert_eq!(bad_table.raw_len().unwrap(), 1);
-    assert!(bad_table.pairs::<i64, i64>().is_ok());
-    assert!(bad_table.array_values::<i64>().is_ok());
 }
 
 #[test]

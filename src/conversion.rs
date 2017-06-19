@@ -1,5 +1,4 @@
 use std::collections::{HashMap, BTreeMap, HashSet, BTreeSet};
-use std::iter::FromIterator;
 use std::hash::Hash;
 
 use error::*;
@@ -201,14 +200,14 @@ lua_convert_float!(f64);
 
 impl<'lua, T: ToLua<'lua>> ToLua<'lua> for Vec<T> {
     fn to_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
-        Ok(LuaValue::Table(lua.create_array_table(self)?))
+        Ok(LuaValue::Table(lua.create_sequence_table(self)?))
     }
 }
 
 impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Vec<T> {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<Self> {
         if let LuaValue::Table(table) = value {
-            table.array_values()
+            table.ipairs().collect()
         } else {
             Err("cannot convert lua value to table for Vec".into())
         }
@@ -217,14 +216,14 @@ impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Vec<T> {
 
 impl<'lua, T: Eq + Hash + ToLua<'lua>> ToLua<'lua> for HashSet<T> {
     fn to_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
-        Ok(LuaValue::Table(lua.create_array_table(self)?))
+        Ok(LuaValue::Table(lua.create_sequence_table(self)?))
     }
 }
 
 impl<'lua, T: Eq + Hash + FromLua<'lua>> FromLua<'lua> for HashSet<T> {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<Self> {
         if let LuaValue::Table(table) = value {
-            Ok(HashSet::from_iter(table.array_values()?))
+            table.ipairs().collect()
         } else {
             Err("cannot convert lua value to table for HashSet".into())
         }
@@ -233,14 +232,14 @@ impl<'lua, T: Eq + Hash + FromLua<'lua>> FromLua<'lua> for HashSet<T> {
 
 impl<'lua, T: Ord + ToLua<'lua>> ToLua<'lua> for BTreeSet<T> {
     fn to_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
-        Ok(LuaValue::Table(lua.create_array_table(self)?))
+        Ok(LuaValue::Table(lua.create_sequence_table(self)?))
     }
 }
 
 impl<'lua, T: Ord + FromLua<'lua>> FromLua<'lua> for BTreeSet<T> {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<Self> {
         if let LuaValue::Table(table) = value {
-            Ok(BTreeSet::from_iter(table.array_values()?))
+            table.ipairs().collect()
         } else {
             Err("cannot convert lua value to table for BTreeSet".into())
         }
@@ -256,7 +255,7 @@ impl<'lua, K: Eq + Hash + ToLua<'lua>, V: ToLua<'lua>> ToLua<'lua> for HashMap<K
 impl<'lua, K: Eq + Hash + FromLua<'lua>, V: FromLua<'lua>> FromLua<'lua> for HashMap<K, V> {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<Self> {
         if let LuaValue::Table(table) = value {
-            Ok(HashMap::from_iter(table.pairs()?))
+            table.pairs().collect()
         } else {
             Err("cannot convert lua value to table for HashMap".into())
         }
@@ -272,7 +271,7 @@ impl<'lua, K: Ord + ToLua<'lua>, V: ToLua<'lua>> ToLua<'lua> for BTreeMap<K, V> 
 impl<'lua, K: Ord + FromLua<'lua>, V: FromLua<'lua>> FromLua<'lua> for BTreeMap<K, V> {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<Self> {
         if let LuaValue::Table(table) = value {
-            Ok(BTreeMap::from_iter(table.pairs()?))
+            table.pairs().collect()
         } else {
             Err("cannot convert lua value to table for BTreeMap".into())
         }

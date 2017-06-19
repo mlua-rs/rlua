@@ -202,8 +202,8 @@ impl<'lua> LuaTable<'lua> {
             error_guard(lua.state, 0, 0, |state| {
                 check_stack(state, 3)?;
                 lua.push_ref(state, &self.0);
-                lua.push_value(state, key)?;
-                lua.push_value(state, value)?;
+                lua.push_value(state, key);
+                lua.push_value(state, value);
                 ffi::lua_settable(state, -3);
                 Ok(())
             })
@@ -222,9 +222,9 @@ impl<'lua> LuaTable<'lua> {
             let res = error_guard(lua.state, 0, 0, |state| {
                 check_stack(state, 2)?;
                 lua.push_ref(state, &self.0);
-                lua.push_value(state, key.to_lua(lua)?)?;
+                lua.push_value(state, key.to_lua(lua)?);
                 ffi::lua_gettable(state, -2);
-                let res = lua.pop_value(state)?;
+                let res = lua.pop_value(state);
                 ffi::lua_pop(state, 1);
                 Ok(res)
             })?;
@@ -240,7 +240,7 @@ impl<'lua> LuaTable<'lua> {
             error_guard(lua.state, 0, 0, |state| {
                 check_stack(state, 2)?;
                 lua.push_ref(state, &self.0);
-                lua.push_value(state, key)?;
+                lua.push_value(state, key);
                 ffi::lua_gettable(state, -2);
                 let has = ffi::lua_isnil(state, -1) == 0;
                 ffi::lua_pop(state, 2);
@@ -256,8 +256,8 @@ impl<'lua> LuaTable<'lua> {
             stack_guard(lua.state, 0, || {
                 check_stack(lua.state, 3)?;
                 lua.push_ref(lua.state, &self.0);
-                lua.push_value(lua.state, key.to_lua(lua)?)?;
-                lua.push_value(lua.state, value.to_lua(lua)?)?;
+                lua.push_value(lua.state, key.to_lua(lua)?);
+                lua.push_value(lua.state, value.to_lua(lua)?);
                 ffi::lua_rawset(lua.state, -3);
                 ffi::lua_pop(lua.state, 1);
                 Ok(())
@@ -272,9 +272,9 @@ impl<'lua> LuaTable<'lua> {
             stack_guard(lua.state, 0, || {
                 check_stack(lua.state, 2)?;
                 lua.push_ref(lua.state, &self.0);
-                lua.push_value(lua.state, key.to_lua(lua)?)?;
+                lua.push_value(lua.state, key.to_lua(lua)?);
                 ffi::lua_gettable(lua.state, -2);
-                let res = V::from_lua(lua.pop_value(lua.state)?, lua)?;
+                let res = V::from_lua(lua.pop_value(lua.state), lua)?;
                 ffi::lua_pop(lua.state, 1);
                 Ok(res)
             })
@@ -311,89 +311,141 @@ impl<'lua> LuaTable<'lua> {
         }
     }
 
-    /// Apply a closure to each key-value pair in the table.
-    ///
-    /// Converts all pairs in the table to Rust types `K` and `V`. If any conversion fails, returns
-    /// an `Err`.
-    pub fn for_each_pair<K, V, F>(&self, mut f: F) -> LuaResult<()>
-    where
-        K: FromLua<'lua>,
-        V: FromLua<'lua>,
-        F: FnMut(K, V),
-    {
-        let lua = self.0.lua;
-        unsafe {
-            stack_guard(lua.state, 0, || {
-                check_stack(lua.state, 4)?;
-                lua.push_ref(lua.state, &self.0);
-                ffi::lua_pushnil(lua.state);
+    /// Consume this table and return an iterator over the pairs of the table,
+    /// like the Lua 'pairs' function.
+    pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(self) -> LuaTablePairs<'lua, K, V> {
+        let next_key = Some(LuaRef {
+            lua: self.0.lua,
+            registry_id: ffi::LUA_REFNIL,
+        });
 
-                while ffi::lua_next(lua.state, -2) != 0 {
-                    ffi::lua_pushvalue(lua.state, -2);
-                    let key = K::from_lua(lua.pop_value(lua.state)?, lua)?;
-                    let value = V::from_lua(lua.pop_value(lua.state)?, lua)?;
-                    f(key, value);
-                }
-
-                ffi::lua_pop(lua.state, 1);
-                Ok(())
-            })
+        LuaTablePairs {
+            table: self.0,
+            next_key,
+            _phantom: PhantomData,
         }
     }
 
-    /// Apply a closure to each value in the table, interpreting it as an array.
-    ///
-    /// Returns an `Err` if the table is not a proper Lua array.
-    pub fn for_each_array_value<V: FromLua<'lua>, F: FnMut(V)>(&self, mut f: F) -> LuaResult<()> {
-        let lua = self.0.lua;
-        unsafe {
-            stack_guard(lua.state, 0, || {
-                let mut count = 0;
-
-                check_stack(lua.state, 4)?;
-                lua.push_ref(lua.state, &self.0);
-
-                let len = ffi::lua_rawlen(lua.state, -1) as ffi::lua_Integer;
-                ffi::lua_pushnil(lua.state);
-
-                while ffi::lua_next(lua.state, -2) != 0 {
-                    let mut isnum = 0;
-                    let i = ffi::lua_tointegerx(lua.state, -2, &mut isnum);
-                    if isnum == 0 {
-                        return Err("Not all table keys are integers".into());
-                    } else if i > len {
-                        return Err("integer key in table is greater than length".into());
-                    } else if i <= 0 {
-                        return Err("integer key in table is less than 1".into());
-                    }
-
-                    // Skip missing keys
-                    while count < (i - 1) as usize {
-                        f(V::from_lua(LuaNil, lua)?);
-                        count += 1;
-                    }
-                    f(V::from_lua(lua.pop_value(lua.state)?, lua)?);
-                    count += 1;
-                }
-
-                ffi::lua_pop(lua.state, 1);
-                Ok(())
-            })
+    /// Consume this table and return an iterator over the values of this table,
+    /// which should be a sequence.  Works like the Lua 'ipairs' function, but
+    /// doesn't return the indexes, only the values in order.
+    pub fn ipairs<V: FromLua<'lua>>(self) -> LuaTableIPairs<'lua, V> {
+        LuaTableIPairs {
+            table: self.0,
+            index: Some(1),
+            _phantom: PhantomData,
         }
     }
+}
 
-    /// Collect all the pairs in the table into a `Vec`.
-    pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(&self) -> LuaResult<Vec<(K, V)>> {
-        let mut pairs = Vec::new();
-        self.for_each_pair(|k, v| pairs.push((k, v)))?;
-        Ok(pairs)
+/// An iterator over the pairs of a Lua table.
+///
+/// Should behave exactly like the lua 'pairs" function.  Holds an internal
+/// reference to the table.
+pub struct LuaTablePairs<'lua, K, V> {
+    table: LuaRef<'lua>,
+    next_key: Option<LuaRef<'lua>>,
+    _phantom: PhantomData<(K, V)>,
+}
+
+impl<'lua, K, V> Iterator for LuaTablePairs<'lua, K, V>
+where
+    K: FromLua<'lua>,
+    V: FromLua<'lua>,
+{
+    type Item = LuaResult<(K, V)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(next_key) = self.next_key.take() {
+            let lua = self.table.lua;
+
+            unsafe {
+                if let Err(e) = check_stack(lua.state, 4) {
+                    return Some(Err(e));
+                }
+
+                lua.push_ref(lua.state, &self.table);
+                lua.push_ref(lua.state, &next_key);
+
+                match error_guard(lua.state, 2, 0, |state| if ffi::lua_next(state, -2) != 0 {
+                    ffi::lua_pushvalue(state, -2);
+                    let key = lua.pop_value(state);
+                    let value = lua.pop_value(state);
+                    let next_key = lua.pop_ref(lua.state);
+                    ffi::lua_pop(lua.state, 1);
+                    Ok(Some((key, value, next_key)))
+                } else {
+                    ffi::lua_pop(lua.state, 1);
+                    Ok(None)
+                }) {
+                    Ok(Some((key, value, next_key))) => {
+                        self.next_key = Some(next_key);
+                        Some((|| {
+                             let key = K::from_lua(key, lua)?;
+                             let value = V::from_lua(value, lua)?;
+                             Ok((key, value))
+                         })())
+                    }
+                    Ok(None) => None,
+                    Err(e) => Some(Err(e)),
+                }
+            }
+        } else {
+            None
+        }
     }
+}
 
-    /// Collect all the values in an array-like table into a `Vec`.
-    pub fn array_values<V: FromLua<'lua>>(&self) -> LuaResult<Vec<V>> {
-        let mut values = Vec::new();
-        self.for_each_array_value(|v| values.push(v))?;
-        Ok(values)
+/// An iterator over the sequence part of a Lua table.
+///
+/// Should behave similarly to the lua 'ipairs" function, except only produces
+/// the values, not the indexes.  Holds an internal reference to the table.
+pub struct LuaTableIPairs<'lua, V> {
+    table: LuaRef<'lua>,
+    index: Option<LuaInteger>,
+    _phantom: PhantomData<V>,
+}
+
+impl<'lua, V> Iterator for LuaTableIPairs<'lua, V>
+where
+    V: FromLua<'lua>,
+{
+    type Item = LuaResult<V>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(index) = self.index.take() {
+            let lua = self.table.lua;
+
+            unsafe {
+                if let Err(e) = check_stack(lua.state, 2) {
+                    return Some(Err(e));
+                }
+
+                lua.push_ref(lua.state, &self.table);
+                match error_guard(
+                    lua.state,
+                    1,
+                    0,
+                    |state| if ffi::lua_geti(state, -1, index) != ffi::LUA_TNIL {
+                        let value = lua.pop_value(state);
+                        ffi::lua_pop(state, 1);
+                        Ok(Some(value))
+                    } else {
+                        ffi::lua_pop(state, 2);
+                        Ok(None)
+                    },
+                ) {
+                    Ok(Some(r)) => {
+                        self.index = Some(index + 1);
+                        Some(V::from_lua(r, lua))
+                    }
+                    Ok(None) => None,
+                    Err(e) => Some(Err(e)),
+                }
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -416,7 +468,7 @@ impl<'lua> LuaFunction<'lua> {
                 let stack_start = ffi::lua_gettop(lua.state);
                 lua.push_ref(lua.state, &self.0);
                 for arg in args {
-                    lua.push_value(lua.state, arg)?;
+                    lua.push_value(lua.state, arg);
                 }
                 handle_error(
                     lua.state,
@@ -425,7 +477,7 @@ impl<'lua> LuaFunction<'lua> {
                 let nresults = ffi::lua_gettop(lua.state) - stack_start;
                 let mut results = LuaMultiValue::new();
                 for _ in 0..nresults {
-                    results.push_front(lua.pop_value(lua.state)?);
+                    results.push_front(lua.pop_value(lua.state));
                 }
                 R::from_lua_multi(results, lua)
             })
@@ -472,7 +524,7 @@ impl<'lua> LuaFunction<'lua> {
                 lua.push_ref(lua.state, &self.0);
                 ffi::lua_pushinteger(lua.state, nargs as ffi::lua_Integer);
                 for arg in args {
-                    lua.push_value(lua.state, arg)?;
+                    lua.push_value(lua.state, arg);
                 }
 
                 ffi::lua_pushcclosure(lua.state, bind_call_impl, nargs + 2);
@@ -542,7 +594,7 @@ impl<'lua> LuaThread<'lua> {
                 check_stack(thread_state, nargs)?;
 
                 for arg in args {
-                    lua.push_value(thread_state, arg)?;
+                    lua.push_value(thread_state, arg);
                 }
 
                 handle_error(
@@ -553,7 +605,7 @@ impl<'lua> LuaThread<'lua> {
                 let nresults = ffi::lua_gettop(thread_state);
                 let mut results = LuaMultiValue::new();
                 for _ in 0..nresults {
-                    results.push_front(lua.pop_value(thread_state)?);
+                    results.push_front(lua.pop_value(thread_state));
                 }
                 R::from_lua_multi(results, lua)
             })
@@ -942,7 +994,7 @@ impl Lua {
                 let nresults = ffi::lua_gettop(self.state) - stack_start;
                 let mut results = LuaMultiValue::new();
                 for _ in 0..nresults {
-                    results.push_front(self.pop_value(self.state)?);
+                    results.push_front(self.pop_value(self.state));
                 }
                 R::from_lua_multi(results, self)
             })
@@ -988,7 +1040,7 @@ impl Lua {
                 let nresults = ffi::lua_gettop(self.state) - stack_start;
                 let mut results = LuaMultiValue::new();
                 for _ in 0..nresults {
-                    results.push_front(self.pop_value(self.state)?);
+                    results.push_front(self.pop_value(self.state));
                 }
                 R::from_lua_multi(results, self)
             })
@@ -1030,8 +1082,8 @@ impl Lua {
                 ffi::lua_newtable(self.state);
 
                 for (k, v) in cont {
-                    self.push_value(self.state, k.to_lua(self)?)?;
-                    self.push_value(self.state, v.to_lua(self)?)?;
+                    self.push_value(self.state, k.to_lua(self)?);
+                    self.push_value(self.state, v.to_lua(self)?);
                     ffi::lua_rawset(self.state, -3);
                 }
                 Ok(LuaTable(self.pop_ref(self.state)))
@@ -1040,7 +1092,7 @@ impl Lua {
     }
 
     /// Creates a table from an iterator of values, using `1..` as the keys.
-    pub fn create_array_table<'lua, T, I>(&'lua self, cont: I) -> LuaResult<LuaTable>
+    pub fn create_sequence_table<'lua, T, I>(&'lua self, cont: I) -> LuaResult<LuaTable>
     where
         T: ToLua<'lua>,
         I: IntoIterator<Item = T>,
@@ -1118,7 +1170,7 @@ impl Lua {
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1)?;
-                    self.push_value(self.state, v)?;
+                    self.push_value(self.state, v);
                     if ffi::lua_tostring(self.state, -1).is_null() {
                         Err("cannot convert lua value to string".into())
                     } else {
@@ -1140,7 +1192,7 @@ impl Lua {
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1)?;
-                    self.push_value(self.state, v)?;
+                    self.push_value(self.state, v);
                     let mut isint = 0;
                     let i = ffi::lua_tointegerx(self.state, -1, &mut isint);
                     if isint == 0 {
@@ -1165,7 +1217,7 @@ impl Lua {
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1)?;
-                    self.push_value(self.state, v)?;
+                    self.push_value(self.state, v);
                     let mut isnum = 0;
                     let n = ffi::lua_tonumberx(self.state, -1, &mut isnum);
                     if isnum == 0 {
@@ -1219,14 +1271,14 @@ impl Lua {
                 let nargs = ffi::lua_gettop(state);
                 let mut args = LuaMultiValue::new();
                 for _ in 0..nargs {
-                    args.push_front(lua.pop_value(state)?);
+                    args.push_front(lua.pop_value(state));
                 }
 
                 let results = func(&lua, args)?;
                 let nresults = results.len() as c_int;
 
                 for r in results {
-                    lua.push_value(state, r)?;
+                    lua.push_value(state, r);
                 }
 
                 Ok(nresults)
@@ -1256,96 +1308,93 @@ impl Lua {
         }
     }
 
-    unsafe fn push_value(&self, state: *mut ffi::lua_State, value: LuaValue) -> LuaResult<()> {
-        stack_guard(state, 1, move || {
-            match value {
-                LuaValue::Nil => {
-                    ffi::lua_pushnil(state);
-                }
-
-                LuaValue::Boolean(b) => {
-                    ffi::lua_pushboolean(state, if b { 1 } else { 0 });
-                }
-
-                LuaValue::LightUserData(ud) => {
-                    ffi::lua_pushlightuserdata(state, ud.0);
-                }
-
-                LuaValue::Integer(i) => {
-                    ffi::lua_pushinteger(state, i);
-                }
-
-                LuaValue::Number(n) => {
-                    ffi::lua_pushnumber(state, n);
-                }
-
-                LuaValue::String(s) => {
-                    self.push_ref(state, &s.0);
-                }
-
-                LuaValue::Table(t) => {
-                    self.push_ref(state, &t.0);
-                }
-
-                LuaValue::Function(f) => {
-                    self.push_ref(state, &f.0);
-                }
-
-                LuaValue::UserData(ud) => {
-                    self.push_ref(state, &ud.0);
-                }
-
-                LuaValue::Thread(t) => {
-                    self.push_ref(state, &t.0);
-                }
+    unsafe fn push_value(&self, state: *mut ffi::lua_State, value: LuaValue) {
+        match value {
+            LuaValue::Nil => {
+                ffi::lua_pushnil(state);
             }
-            Ok(())
-        })
+
+            LuaValue::Boolean(b) => {
+                ffi::lua_pushboolean(state, if b { 1 } else { 0 });
+            }
+
+            LuaValue::LightUserData(ud) => {
+                ffi::lua_pushlightuserdata(state, ud.0);
+            }
+
+            LuaValue::Integer(i) => {
+                ffi::lua_pushinteger(state, i);
+            }
+
+            LuaValue::Number(n) => {
+                ffi::lua_pushnumber(state, n);
+            }
+
+            LuaValue::String(s) => {
+                self.push_ref(state, &s.0);
+            }
+
+            LuaValue::Table(t) => {
+                self.push_ref(state, &t.0);
+            }
+
+            LuaValue::Function(f) => {
+                self.push_ref(state, &f.0);
+            }
+
+            LuaValue::UserData(ud) => {
+                self.push_ref(state, &ud.0);
+            }
+
+            LuaValue::Thread(t) => {
+                self.push_ref(state, &t.0);
+            }
+        }
     }
 
-    unsafe fn pop_value(&self, state: *mut ffi::lua_State) -> LuaResult<LuaValue> {
-        stack_guard(state, -1, || match ffi::lua_type(state, -1) {
+    unsafe fn pop_value(&self, state: *mut ffi::lua_State) -> LuaValue {
+        match ffi::lua_type(state, -1) {
             ffi::LUA_TNIL => {
                 ffi::lua_pop(state, 1);
-                Ok(LuaNil)
+                LuaNil
             }
 
             ffi::LUA_TBOOLEAN => {
                 let b = LuaValue::Boolean(ffi::lua_toboolean(state, -1) != 0);
                 ffi::lua_pop(state, 1);
-                Ok(b)
+                b
             }
 
             ffi::LUA_TLIGHTUSERDATA => {
                 let ud = LuaValue::LightUserData(LightUserData(ffi::lua_touserdata(state, -1)));
                 ffi::lua_pop(state, 1);
-                Ok(ud)
+                ud
             }
 
             ffi::LUA_TNUMBER => {
                 if ffi::lua_isinteger(state, -1) != 0 {
                     let i = LuaValue::Integer(ffi::lua_tointeger(state, -1));
                     ffi::lua_pop(state, 1);
-                    Ok(i)
+                    i
                 } else {
                     let n = LuaValue::Number(ffi::lua_tonumber(state, -1));
                     ffi::lua_pop(state, 1);
-                    Ok(n)
+                    n
                 }
             }
 
-            ffi::LUA_TSTRING => Ok(LuaValue::String(LuaString(self.pop_ref(state)))),
+            ffi::LUA_TSTRING => LuaValue::String(LuaString(self.pop_ref(state))),
 
-            ffi::LUA_TTABLE => Ok(LuaValue::Table(LuaTable(self.pop_ref(state)))),
+            ffi::LUA_TTABLE => LuaValue::Table(LuaTable(self.pop_ref(state))),
 
-            ffi::LUA_TFUNCTION => Ok(LuaValue::Function(LuaFunction(self.pop_ref(state)))),
+            ffi::LUA_TFUNCTION => LuaValue::Function(LuaFunction(self.pop_ref(state))),
 
-            ffi::LUA_TUSERDATA => Ok(LuaValue::UserData(LuaUserData(self.pop_ref(state)))),
+            ffi::LUA_TUSERDATA => LuaValue::UserData(LuaUserData(self.pop_ref(state))),
 
-            ffi::LUA_TTHREAD => Ok(LuaValue::Thread(LuaThread(self.pop_ref(state)))),
+            ffi::LUA_TTHREAD => LuaValue::Thread(LuaThread(self.pop_ref(state))),
 
-            _ => Err("Unsupported type in pop_value".into()),
-        })
+            _ => unreachable!("LUA_TNONE in pop_value"),
+        }
     }
 
     unsafe fn push_ref(&self, state: *mut ffi::lua_State, lref: &LuaRef) {
@@ -1431,7 +1480,7 @@ impl Lua {
                             self.push_value(
                                 self.state,
                                 LuaValue::Function(self.create_callback_function(m)?),
-                            )?;
+                            );
                             ffi::lua_rawset(self.state, -3);
                         }
 
@@ -1447,7 +1496,7 @@ impl Lua {
                             self.push_value(
                                 self.state,
                                 LuaValue::Function(self.create_callback_function(m)?),
-                            )?;
+                            );
                             ffi::lua_pushcclosure(self.state, meta_index_impl, 2);
                             ffi::lua_rawset(self.state, -3);
                         } else {
@@ -1479,7 +1528,7 @@ impl Lua {
                             self.push_value(
                                 self.state,
                                 LuaValue::Function(self.create_callback_function(m)?),
-                            )?;
+                            );
                             ffi::lua_rawset(self.state, -3);
                         }
                     }

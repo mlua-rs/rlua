@@ -28,6 +28,9 @@ pub const LUA_ERRMEM: c_int = 4;
 pub const LUA_ERRGCMM: c_int = 5;
 pub const LUA_ERRERR: c_int = 6;
 
+pub const LUA_NOREF: c_int = -2;
+pub const LUA_REFNIL: c_int = -1;
+
 pub const LUA_MULTRET: c_int = -1;
 pub const LUAI_MAXSTACK: c_int = 1000000;
 pub const LUA_REGISTRYINDEX: c_int = -LUAI_MAXSTACK - 1000;
@@ -96,6 +99,7 @@ extern "C" {
     pub fn lua_type(state: *mut lua_State, index: c_int) -> c_int;
 
     pub fn lua_gettable(state: *mut lua_State, index: c_int) -> c_int;
+    pub fn lua_geti(state: *mut lua_State, index: c_int, i: lua_Integer) -> c_int;
     pub fn lua_rawget(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_rawgeti(state: *mut lua_State, index: c_int, n: lua_Integer) -> c_int;
     pub fn lua_getmetatable(state: *mut lua_State, index: c_int) -> c_int;
