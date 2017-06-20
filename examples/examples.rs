@@ -43,13 +43,13 @@ fn examples() -> LuaResult<()> {
 
     // You can create and manage lua tables
 
-    let array_table = lua.create_empty_table()?;
+    let array_table = lua.create_table()?;
     array_table.set(1, "one")?;
     array_table.set(2, "two")?;
     array_table.set(3, "three")?;
     assert_eq!(array_table.len()?, 3);
 
-    let map_table = lua.create_empty_table()?;
+    let map_table = lua.create_table()?;
     map_table.set("one", 1)?;
     map_table.set("two", 2)?;
     map_table.set("three", 3)?;

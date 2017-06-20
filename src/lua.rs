@@ -329,8 +329,8 @@ impl<'lua> LuaTable<'lua> {
     /// Consume this table and return an iterator over the values of this table,
     /// which should be a sequence.  Works like the Lua 'ipairs' function, but
     /// doesn't return the indexes, only the values in order.
-    pub fn ipairs<V: FromLua<'lua>>(self) -> LuaTableIPairs<'lua, V> {
-        LuaTableIPairs {
+    pub fn sequence_values<V: FromLua<'lua>>(self) -> LuaTableSequence<'lua, V> {
+        LuaTableSequence {
             table: self.0,
             index: Some(1),
             _phantom: PhantomData,
@@ -400,13 +400,13 @@ where
 ///
 /// Should behave similarly to the lua 'ipairs" function, except only produces
 /// the values, not the indexes.  Holds an internal reference to the table.
-pub struct LuaTableIPairs<'lua, V> {
+pub struct LuaTableSequence<'lua, V> {
     table: LuaRef<'lua>,
     index: Option<LuaInteger>,
     _phantom: PhantomData<V>,
 }
 
-impl<'lua, V> Iterator for LuaTableIPairs<'lua, V>
+impl<'lua, V> Iterator for LuaTableSequence<'lua, V>
 where
     V: FromLua<'lua>,
 {
@@ -1059,7 +1059,7 @@ impl Lua {
     }
 
     /// Creates and returns a new table.
-    pub fn create_empty_table(&self) -> LuaResult<LuaTable> {
+    pub fn create_table(&self) -> LuaResult<LuaTable> {
         unsafe {
             stack_guard(self.state, 0, || {
                 check_stack(self.state, 1)?;
@@ -1070,7 +1070,7 @@ impl Lua {
     }
 
     /// Creates a table and fills it with values from an iterator.
-    pub fn create_table<'lua, K, V, I>(&'lua self, cont: I) -> LuaResult<LuaTable>
+    pub fn create_table_from<'lua, K, V, I>(&'lua self, cont: I) -> LuaResult<LuaTable>
     where
         K: ToLua<'lua>,
         V: ToLua<'lua>,
@@ -1092,12 +1092,12 @@ impl Lua {
     }
 
     /// Creates a table from an iterator of values, using `1..` as the keys.
-    pub fn create_sequence_table<'lua, T, I>(&'lua self, cont: I) -> LuaResult<LuaTable>
+    pub fn create_sequence_from<'lua, T, I>(&'lua self, cont: I) -> LuaResult<LuaTable>
     where
         T: ToLua<'lua>,
         I: IntoIterator<Item = T>,
     {
-        self.create_table(cont.into_iter().enumerate().map(|(k, v)| (k + 1, v)))
+        self.create_table_from(cont.into_iter().enumerate().map(|(k, v)| (k + 1, v)))
     }
 
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.

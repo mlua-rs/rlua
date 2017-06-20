@@ -68,9 +68,7 @@ fn test_table() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
 
-    globals
-        .set("table", lua.create_empty_table().unwrap())
-        .unwrap();
+    globals.set("table", lua.create_table().unwrap()).unwrap();
     let table1: LuaTable = globals.get("table").unwrap();
     let table2: LuaTable = globals.get("table").unwrap();
 
@@ -105,7 +103,7 @@ fn test_table() {
     assert_eq!(
         table1
             .clone()
-            .ipairs()
+            .sequence_values()
             .collect::<LuaResult<Vec<i64>>>()
             .unwrap(),
         vec![1, 2, 3, 4, 5]
@@ -121,20 +119,26 @@ fn test_table() {
         vec![]
     );
     assert_eq!(
-        table2.ipairs().collect::<LuaResult<Vec<i64>>>().unwrap(),
+        table2
+            .sequence_values()
+            .collect::<LuaResult<Vec<i64>>>()
+            .unwrap(),
         vec![]
     );
 
-    /// ipairs should only iterate until the first border
+    // sequence_values should only iterate until the first border
     assert_eq!(
-        table3.ipairs().collect::<LuaResult<Vec<i64>>>().unwrap(),
+        table3
+            .sequence_values()
+            .collect::<LuaResult<Vec<i64>>>()
+            .unwrap(),
         vec![1, 2]
     );
 
     globals
         .set(
             "table4",
-            lua.create_sequence_table(vec![1, 2, 3, 4, 5]).unwrap(),
+            lua.create_sequence_from(vec![1, 2, 3, 4, 5]).unwrap(),
         )
         .unwrap();
     let table4 = globals.get::<_, LuaTable>("table4").unwrap();
@@ -378,7 +382,8 @@ fn test_lua_multi() {
     );
     let hlist_pat![a, b] = mreturn.call::<_, HList![u64, u64]>(hlist![]).unwrap();
     assert_eq!((a, b), (1, 2));
-    let hlist_pat![a, b, LuaVariadic(v)] = mreturn.call::<_, HList![u64, u64, LuaVariadic<u64>]>(hlist![]).unwrap();
+    let hlist_pat![a, b, LuaVariadic(v)] =
+        mreturn.call::<_, HList![u64, u64, LuaVariadic<u64>]>(hlist![]).unwrap();
     assert_eq!((a, b), (1, 2));
     assert_eq!(v, vec![3, 4, 5, 6]);
 }

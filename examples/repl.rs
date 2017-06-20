@@ -22,7 +22,14 @@ fn main() {
 
             match lua.eval::<LuaMultiValue>(&line) {
                 Ok(values) => {
-                    println!("{}", values.iter().map(|value| format!("{:?}", value)).collect::<Vec<_>>().join("\t"));
+                    println!(
+                        "{}",
+                        values
+                            .iter()
+                            .map(|value| format!("{:?}", value))
+                            .collect::<Vec<_>>()
+                            .join("\t")
+                    );
                     break;
                 }
                 Err(LuaError(LuaErrorKind::IncompleteStatement(_), _)) => {
