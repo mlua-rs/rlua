@@ -714,3 +714,19 @@ fn test_result_conversions() {
         None,
     ).unwrap();
 }
+
+#[test]
+fn test_num_conversion() {
+    let lua = Lua::new();
+    let globals = lua.globals().unwrap();
+
+    globals.set("a", "1.0").unwrap();
+    assert_eq!(globals.get::<_, i64>("a").unwrap(), 1);
+    assert_eq!(globals.get::<_, f64>("a").unwrap(), 1.0);
+    assert_eq!(globals.get::<_, String>("a").unwrap(), "1.0");
+
+    globals.set("a", "1.5").unwrap();
+    assert!(globals.get::<_, i64>("a").is_err());
+    assert_eq!(globals.get::<_, f64>("a").unwrap(), 1.5);
+    assert_eq!(globals.get::<_, String>("a").unwrap(), "1.5");
+}
