@@ -569,6 +569,34 @@ impl<'lua> LuaThread<'lua> {
     ///
     /// If the thread calls `coroutine.yield`, returns the values passed to `yield`. If the thread
     /// `return`s values from its main function, returns those.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::*;
+    ///
+    /// # fn main() {
+    /// let lua = Lua::new();
+    /// let thread: LuaThread = lua.eval(r#"
+    ///     coroutine.create(function(arg)
+    ///         assert(arg == 42)
+    ///         local yieldarg = coroutine.yield(123)
+    ///         assert(yieldarg == 43)
+    ///         return 987
+    ///     end)
+    /// "#).unwrap();
+    ///
+    /// assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);
+    /// assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);
+    ///
+    /// // The coroutine has now returned, so `resume` will fail
+    /// match thread.resume::<_, u32>(()) {
+    ///     Err(LuaError(LuaErrorKind::CoroutineInactive, _)) => {},
+    ///     unexpected => panic!("unexpected result {:?}", unexpected),
+    /// }
+    /// # }
+    /// ```
     pub fn resume<A, R>(&self, args: A) -> LuaResult<R>
     where
         A: ToLuaMulti<'lua>,
