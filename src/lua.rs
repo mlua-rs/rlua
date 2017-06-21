@@ -494,6 +494,26 @@ impl<'lua> LuaFunction<'lua> {
     ///     return function() f(...) end
     /// end
     /// ```
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::*;
+    ///
+    /// # fn main() {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals().unwrap();
+    ///
+    /// // Bind the argument `123` to Lua's `tostring` function
+    /// let tostring: LuaFunction = globals.get("tostring").unwrap();
+    /// let tostring_123: LuaFunction = tostring.bind(123i32).unwrap();
+    ///
+    /// // Now we can call `tostring_123` without arguments to get the result of `tostring(123)`
+    /// let result: String = tostring_123.call(()).unwrap();
+    /// assert_eq!(result, "123");
+    /// # }
+    /// ```
     pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> LuaResult<LuaFunction<'lua>> {
         unsafe extern "C" fn bind_call_impl(state: *mut ffi::lua_State) -> c_int {
             let nargs = ffi::lua_gettop(state);
