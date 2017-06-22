@@ -168,6 +168,23 @@ pub struct LuaString<'lua>(LuaRef<'lua>);
 
 impl<'lua> LuaString<'lua> {
     /// Get a `&str` slice if the Lua string is valid UTF-8.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::*;
+    /// # fn main() {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals().unwrap();
+    ///
+    /// let version: LuaString = globals.get("_VERSION").unwrap();
+    /// assert!(version.to_str().unwrap().contains("Lua"));
+    ///
+    /// let non_utf8: LuaString = lua.eval(r#"  "test\xff"  "#).unwrap();
+    /// assert!(non_utf8.to_str().is_err());
+    /// # }
+    /// ```
     pub fn to_str(&self) -> LuaResult<&str> {
         let lua = self.0.lua;
         unsafe {
