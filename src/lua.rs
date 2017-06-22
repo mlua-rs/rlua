@@ -1047,6 +1047,40 @@ impl Lua {
         }
     }
 
+    /// Loads a chunk of Lua code and returns it as a function.
+    ///
+    /// Unlike `exec`, this will not execute the chunk, but precompile it into a callable
+    /// `LuaFunction`.
+    ///
+    /// Equivalent to Lua's `load` function.
+    pub fn load(&self, source: &str, name: Option<&str>) -> LuaResult<LuaFunction> {
+        unsafe {
+            stack_guard(self.state, 0, || {
+                handle_error(
+                    self.state,
+                    if let Some(name) = name {
+                        let name = CString::new(name.to_owned())?;
+                        ffi::luaL_loadbuffer(
+                            self.state,
+                            source.as_ptr() as *const c_char,
+                            source.len(),
+                            name.as_ptr(),
+                        )
+                    } else {
+                        ffi::luaL_loadbuffer(
+                            self.state,
+                            source.as_ptr() as *const c_char,
+                            source.len(),
+                            ptr::null(),
+                        )
+                    },
+                )?;
+
+                Ok(LuaFunction(self.pop_ref(self.state)))
+            })
+        }
+    }
+
     /// Pass a `&str` slice to Lua, creating and returning a interned Lua string.
     pub fn create_string(&self, s: &str) -> LuaResult<LuaString> {
         unsafe {

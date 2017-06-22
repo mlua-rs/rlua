@@ -17,7 +17,7 @@ fn test_set_get() {
 }
 
 #[test]
-fn test_load() {
+fn test_exec() {
     let lua = Lua::new();
     let globals = lua.globals().unwrap();
     lua.exec::<()>(
@@ -729,4 +729,14 @@ fn test_num_conversion() {
     assert!(globals.get::<_, i64>("a").is_err());
     assert_eq!(globals.get::<_, f64>("a").unwrap(), 1.5);
     assert_eq!(globals.get::<_, String>("a").unwrap(), "1.5");
+}
+
+#[test]
+fn test_load() {
+    let lua = Lua::new();
+    let func = lua.load("return 1+2", None).unwrap();
+    let result: i32 = func.call(()).unwrap();
+    assert_eq!(result, 3);
+
+    assert!(lua.load("§$%§&$%&", None).is_err());
 }
