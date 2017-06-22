@@ -951,106 +951,10 @@ impl Lua {
         }
     }
 
-    /// Execute a chunk of Lua code.
-    ///
-    /// The source can be named by setting the `name` parameter. This is generally recommended as it
-    /// results in better error traces.
-    ///
-    /// Returns the values returned by the chunk.
-    pub fn exec<'lua, R: FromLuaMulti<'lua>>(
-        &'lua self,
-        source: &str,
-        name: Option<&str>,
-    ) -> LuaResult<R> {
-        unsafe {
-            stack_guard(self.state, 0, || {
-                let stack_start = ffi::lua_gettop(self.state);
-                handle_error(
-                    self.state,
-                    if let Some(name) = name {
-                        let name = CString::new(name.to_owned())?;
-                        ffi::luaL_loadbuffer(
-                            self.state,
-                            source.as_ptr() as *const c_char,
-                            source.len(),
-                            name.as_ptr(),
-                        )
-                    } else {
-                        ffi::luaL_loadbuffer(
-                            self.state,
-                            source.as_ptr() as *const c_char,
-                            source.len(),
-                            ptr::null(),
-                        )
-                    },
-                )?;
-
-                check_stack(self.state, 2)?;
-                handle_error(
-                    self.state,
-                    pcall_with_traceback(self.state, 0, ffi::LUA_MULTRET),
-                )?;
-
-                let nresults = ffi::lua_gettop(self.state) - stack_start;
-                let mut results = LuaMultiValue::new();
-                for _ in 0..nresults {
-                    results.push_front(self.pop_value(self.state));
-                }
-                R::from_lua_multi(results, self)
-            })
-        }
-    }
-
-    /// Evaluate the given expression or chunk inside this Lua state.
-    ///
-    /// If `source` is an expression, returns the value it evaluates to. Otherwise, returns the
-    /// values returned by the chunk (if any).
-    pub fn eval<'lua, R: FromLuaMulti<'lua>>(&'lua self, source: &str) -> LuaResult<R> {
-        unsafe {
-            stack_guard(self.state, 0, || {
-                let stack_start = ffi::lua_gettop(self.state);
-                // First, try interpreting the lua as an expression by adding
-                // "return", then as a statement.  This is the same thing the
-                // actual lua repl does.
-                let return_source = "return ".to_owned() + source;
-                let mut res = ffi::luaL_loadbuffer(
-                    self.state,
-                    return_source.as_ptr() as *const c_char,
-                    return_source.len(),
-                    ptr::null(),
-                );
-                if res == ffi::LUA_ERRSYNTAX {
-                    ffi::lua_pop(self.state, 1);
-                    res = ffi::luaL_loadbuffer(
-                        self.state,
-                        source.as_ptr() as *const c_char,
-                        source.len(),
-                        ptr::null(),
-                    );
-                }
-
-                handle_error(self.state, res)?;
-
-                check_stack(self.state, 2)?;
-                handle_error(
-                    self.state,
-                    pcall_with_traceback(self.state, 0, ffi::LUA_MULTRET),
-                )?;
-
-                let nresults = ffi::lua_gettop(self.state) - stack_start;
-                let mut results = LuaMultiValue::new();
-                for _ in 0..nresults {
-                    results.push_front(self.pop_value(self.state));
-                }
-                R::from_lua_multi(results, self)
-            })
-        }
-    }
-
     /// Loads a chunk of Lua code and returns it as a function.
     ///
-    /// Unlike `exec`, this will not execute the chunk, but precompile it into a callable
-    /// `LuaFunction`.
+    /// The source can be named by setting the `name` parameter. This is
+    /// generally recommended as it results in better error traces.
     ///
     /// Equivalent to Lua's `load` function.
     pub fn load(&self, source: &str, name: Option<&str>) -> LuaResult<LuaFunction> {
@@ -1077,6 +981,53 @@ impl Lua {
                 )?;
 
                 Ok(LuaFunction(self.pop_ref(self.state)))
+            })
+        }
+    }
+
+    /// Execute a chunk of Lua code.
+    ///
+    /// This is equivalent to simply loading the source with `load` and then
+    /// calling the resulting function with no arguments.
+    ///
+    /// Returns the values returned by the chunk.
+    pub fn exec<'lua, R: FromLuaMulti<'lua>>(
+        &'lua self,
+        source: &str,
+        name: Option<&str>,
+    ) -> LuaResult<R> {
+        self.load(source, name)?.call(())
+    }
+
+    /// Evaluate the given expression or chunk inside this Lua state.
+    ///
+    /// If `source` is an expression, returns the value it evaluates
+    /// to. Otherwise, returns the values returned by the chunk (if any).
+    pub fn eval<'lua, R: FromLuaMulti<'lua>>(&'lua self, source: &str) -> LuaResult<R> {
+        unsafe {
+            stack_guard(self.state, 0, || {
+                // First, try interpreting the lua as an expression by adding
+                // "return", then as a statement.  This is the same thing the
+                // actual lua repl does.
+                let return_source = "return ".to_owned() + source;
+                let mut res = ffi::luaL_loadbuffer(
+                    self.state,
+                    return_source.as_ptr() as *const c_char,
+                    return_source.len(),
+                    ptr::null(),
+                );
+                if res == ffi::LUA_ERRSYNTAX {
+                    ffi::lua_pop(self.state, 1);
+                    res = ffi::luaL_loadbuffer(
+                        self.state,
+                        source.as_ptr() as *const c_char,
+                        source.len(),
+                        ptr::null(),
+                    );
+                }
+
+                handle_error(self.state, res)?;
+                LuaFunction(self.pop_ref(self.state)).call(())
             })
         }
     }
