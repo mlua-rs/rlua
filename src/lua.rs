@@ -1238,7 +1238,6 @@ impl Lua {
     pub fn coerce_integer(&self, v: LuaValue) -> LuaResult<LuaInteger> {
         match v {
             LuaValue::Integer(i) => Ok(i),
-            LuaValue::Number(n) => Ok(n as LuaInteger),
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1)?;
@@ -1262,7 +1261,6 @@ impl Lua {
     /// manual for details.
     pub fn coerce_number(&self, v: LuaValue) -> LuaResult<LuaNumber> {
         match v {
-            LuaValue::Integer(i) => Ok(i as LuaNumber),
             LuaValue::Number(n) => Ok(n),
             v => unsafe {
                 stack_guard(self.state, 0, || {
