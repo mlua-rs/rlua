@@ -748,6 +748,8 @@ pub enum LuaMetaMethod {
     NewIndex,
     /// The call "operator" `obj(arg1, args2, ...)`.
     Call,
+    /// tostring(ud) will call this if it exists
+    ToString,
 }
 
 /// Stores methods of a userdata object.
@@ -1571,6 +1573,7 @@ impl Lua {
                                 LuaMetaMethod::Index => "__index",
                                 LuaMetaMethod::NewIndex => "__newIndex",
                                 LuaMetaMethod::Call => "__call",
+                                LuaMetaMethod::ToString => "__tostring",
                             };
                             push_string(self.state, name);
                             self.push_value(
