@@ -118,6 +118,15 @@ pub trait FromLuaMulti<'a>: Sized {
     fn from_lua_multi(values: LuaMultiValue<'a>, lua: &'a Lua) -> LuaResult<Self>;
 }
 
+impl<'lua> ToLua<'lua> for LuaError {
+    fn to_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+        unsafe {
+            push_error(lua.state, self);
+            Ok(lua.pop_value(lua.state))
+        }
+    }
+}
+
 type LuaCallback = Box<
     for<'lua> FnMut(&'lua Lua, LuaMultiValue<'lua>)
                     -> LuaResult<LuaMultiValue<'lua>>,

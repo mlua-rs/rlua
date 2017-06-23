@@ -700,12 +700,12 @@ fn test_result_conversions() {
     let globals = lua.globals().unwrap();
 
     let err = lua.create_function(|lua, _| {
-        lua.pack(Result::Err::<String, String>(
-            "only through failure can we succeed".to_string(),
+        lua.pack(Result::Err::<String, LuaError>(
+            "only through failure can we succeed".into(),
         ))
     }).unwrap();
     let ok = lua.create_function(|lua, _| {
-        lua.pack(Result::Ok::<String, String>("!".to_string()))
+        lua.pack(Result::Ok::<String, LuaError>("!".to_string()))
     }).unwrap();
 
     globals.set("err", err).unwrap();
@@ -713,13 +713,14 @@ fn test_result_conversions() {
 
     lua.exec::<()>(
         r#"
-            local err, msg = err()
-            assert(err == nil)
-            assert(msg == "only through failure can we succeed")
+            local r, e = err()
+            assert(r == nil)
+            assert(tostring(e) == "only through failure can we succeed")
+            assert(type(e:backtrace()) == "string")
 
-            local ok, extra = ok()
-            assert(ok == "!")
-            assert(extra == nil)
+            local r, e = ok()
+            assert(r == "!")
+            assert(e == nil)
         "#,
         None,
     ).unwrap();

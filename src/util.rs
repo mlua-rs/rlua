@@ -4,6 +4,7 @@ use std::ffi::CStr;
 use std::any::Any;
 use std::os::raw::{c_char, c_int, c_void};
 use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
+use error_chain::ChainedError;
 
 use ffi;
 use error::{LuaResult, LuaError, LuaErrorKind};
@@ -137,7 +138,7 @@ pub unsafe extern "C" fn destructor<T>(state: *mut ffi::lua_State) -> c_int {
     }) {
         Ok(r) => r,
         Err(p) => {
-            push_error(state, WrappedError::Panic(p));
+            push_panic(state, p);
             ffi::lua_error(state)
         }
     }
@@ -154,14 +155,24 @@ where
     match catch_unwind(f) {
         Ok(Ok(r)) => r,
         Ok(Err(err)) => {
-            push_error(state, WrappedError::Error(err));
+            push_error(state, err);
             ffi::lua_error(state)
         }
         Err(p) => {
-            push_error(state, WrappedError::Panic(p));
+            push_panic(state, p);
             ffi::lua_error(state)
         }
     }
+}
+
+// Pushes a WrappedError::Error to the top of the stack
+pub unsafe fn push_error(state: *mut ffi::lua_State, err: LuaError) {
+    push_wrapped_error(state, WrappedError::Error(err));
+}
+
+// Pushes a WrappedError::Panic to the top of the stack
+pub unsafe fn push_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>) {
+    push_wrapped_error(state, WrappedError::Panic(panic));
 }
 
 // Pops a WrappedError off of the top of the stack, if it is a WrappedError::Error, returns it, if
@@ -179,7 +190,7 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State) -> LuaError {
         let userdata = ffi::lua_touserdata(state, -1);
         let err = (*(userdata as *mut Option<WrappedError>))
             .take()
-            .unwrap_or_else(|| WrappedError::Error("expired error".into()));
+            .unwrap_or_else(|| WrappedError::Error("consumed error".into()));
         ffi::lua_pop(state, 1);
 
         match err {
@@ -226,10 +237,7 @@ pub unsafe fn pcall_with_traceback(
                     .to_owned();
                 push_error(
                     state,
-                    WrappedError::Error(LuaError::with_chain(
-                        error,
-                        LuaErrorKind::CallbackError(traceback),
-                    )),
+                    LuaError::with_chain(error, LuaErrorKind::CallbackError(traceback)),
                 );
             }
         } else {
@@ -268,10 +276,7 @@ pub unsafe fn resume_with_traceback(
                     .to_owned();
                 push_error(
                     from,
-                    WrappedError::Error(LuaError::with_chain(
-                        error,
-                        LuaErrorKind::CallbackError(traceback),
-                    )),
+                    LuaError::with_chain(error, LuaErrorKind::CallbackError(traceback)),
                 );
             }
         } else {
@@ -339,8 +344,67 @@ enum WrappedError {
 }
 
 // Pushes the given error or panic as a wrapped error onto the stack
-unsafe fn push_error(state: *mut ffi::lua_State, err: WrappedError) {
-    ffi::luaL_checkstack(state, 6, ptr::null());
+unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: WrappedError) {
+    // Wrapped errors have a __tostring metamethod and a 'backtrace' normal
+    // method.
+
+    unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
+        callback_error(state, || {
+            if !is_wrapped_error(state, -1) {
+                return Err("not wrapped error in error method".into());
+            }
+
+            let userdata = ffi::lua_touserdata(state, -1);
+            match (*(userdata as *mut Option<WrappedError>)).as_ref() {
+                Some(&WrappedError::Error(ref error)) => {
+                    push_string(state, &error.to_string());
+                    ffi::lua_remove(state, -2);
+                }
+                Some(&WrappedError::Panic(_)) => {
+                    // This should be impossible, there should be no way for lua
+                    // to catch a panic error.
+                    push_string(state, "panic error");
+                    ffi::lua_remove(state, -2);
+                }
+                None => {
+                    push_string(state, "consumed error");
+                    ffi::lua_remove(state, -2);
+                }
+            }
+
+            Ok(1)
+        })
+    }
+
+    unsafe extern "C" fn error_backtrace(state: *mut ffi::lua_State) -> c_int {
+        callback_error(state, || {
+            if !is_wrapped_error(state, -1) {
+                return Err("not wrapped error in error method".into());
+            }
+
+            let userdata = ffi::lua_touserdata(state, -1);
+            match (*(userdata as *mut Option<WrappedError>)).as_ref() {
+                Some(&WrappedError::Error(ref error)) => {
+                    push_string(state, &error.display().to_string());
+                    ffi::lua_remove(state, -2);
+                }
+                Some(&WrappedError::Panic(_)) => {
+                    // This should be impossible, there should be no way for lua
+                    // to catch a panic error.
+                    push_string(state, "panic error");
+                    ffi::lua_remove(state, -2);
+                }
+                None => {
+                    push_string(state, "consumed error");
+                    ffi::lua_remove(state, -2);
+                }
+            }
+
+            Ok(1)
+        })
+    }
+
+    ffi::luaL_checkstack(state, 2, ptr::null());
 
     let err_userdata = ffi::lua_newuserdata(state, mem::size_of::<Option<WrappedError>>()) as
         *mut Option<WrappedError>;
@@ -351,6 +415,8 @@ unsafe fn push_error(state: *mut ffi::lua_State, err: WrappedError) {
     if ffi::lua_isnil(state, -1) != 0 {
         ffi::lua_pop(state, 1);
 
+        ffi::luaL_checkstack(state, 7, ptr::null());
+
         ffi::lua_newtable(state);
         ffi::lua_pushlightuserdata(
             state,
@@ -360,6 +426,17 @@ unsafe fn push_error(state: *mut ffi::lua_State, err: WrappedError) {
 
         push_string(state, "__gc");
         ffi::lua_pushcfunction(state, destructor::<Option<WrappedError>>);
+        ffi::lua_settable(state, -3);
+
+        push_string(state, "__tostring");
+        ffi::lua_pushcfunction(state, error_tostring);
+        ffi::lua_settable(state, -3);
+
+        push_string(state, "__index");
+        ffi::lua_newtable(state);
+        push_string(state, "backtrace");
+        ffi::lua_pushcfunction(state, error_backtrace);
+        ffi::lua_settable(state, -3);
         ffi::lua_settable(state, -3);
 
         push_string(state, "__metatable");

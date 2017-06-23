@@ -1,6 +1,5 @@
 use std::collections::{HashMap, BTreeMap};
 use std::hash::Hash;
-use error_chain::ChainedError;
 
 use error::*;
 use lua::*;
@@ -262,17 +261,5 @@ impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Option<T> {
             LuaNil => Ok(None),
             value => Ok(Some(T::from_lua(value, lua)?)),
         }
-    }
-}
-
-impl LuaUserDataType for LuaError {
-    fn add_methods(methods: &mut LuaUserDataMethods<Self>) {
-        methods.add_method("backtrace", |lua, err, _| {
-            lua.pack(format!("{}", err.display()))
-        });
-
-        methods.add_meta_method(LuaMetaMethod::ToString, |lua, err, _| {
-            lua.pack(err.to_string())
-        });
     }
 }
