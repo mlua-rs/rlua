@@ -68,7 +68,7 @@ fn test_eval() {
     assert_eq!(lua.eval::<bool>("false == false").unwrap(), true);
     assert_eq!(lua.eval::<i32>("return 1 + 2").unwrap(), 3);
     match lua.eval::<()>("if true then") {
-        Err(LuaError(LuaErrorKind::IncompleteStatement(_), _)) => {}
+        Err(LuaError::IncompleteStatement(_)) => {}
         r => panic!("expected IncompleteStatement, got {:?}", r),
     }
 }
@@ -313,7 +313,7 @@ fn test_metamethods() {
                 if index.to_str()? == "inner" {
                     lua.pack(data.0)
                 } else {
-                    Err("no such custom index".into())
+                    Err("no such custom index".to_lua_err())
                 }
             });
         }
@@ -481,9 +481,8 @@ fn test_error() {
         None,
     ).unwrap();
 
-    let rust_error_function = lua.create_function(
-        |_, _| Err(LuaExternalError(Box::new(TestError)).into()),
-    ).unwrap();
+    let rust_error_function = lua.create_function(|_, _| Err(TestError.to_lua_err()))
+        .unwrap();
     globals
         .set("rust_error_function", rust_error_function)
         .unwrap();
@@ -498,12 +497,12 @@ fn test_error() {
 
     assert!(no_error.call::<_, ()>(()).is_ok());
     match lua_error.call::<_, ()>(()) {
-        Err(LuaError(LuaErrorKind::ScriptError(_), _)) => {}
+        Err(LuaError::ScriptError(_)) => {}
         Err(_) => panic!("error is not ScriptError kind"),
         _ => panic!("error not returned"),
     }
     match rust_error.call::<_, ()>(()) {
-        Err(LuaError(LuaErrorKind::CallbackError(_), _)) => {}
+        Err(LuaError::CallbackError(_, _)) => {}
         Err(_) => panic!("error is not CallbackError kind"),
         _ => panic!("error not returned"),
     }
@@ -637,7 +636,7 @@ fn test_thread() {
     assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);
 
     match thread.resume::<_, u32>(()) {
-        Err(LuaError(LuaErrorKind::CoroutineInactive, _)) => {}
+        Err(LuaError::CoroutineInactive) => {}
         Err(_) => panic!("resuming dead coroutine error is not CoroutineInactive kind"),
         _ => panic!("resuming dead coroutine did not return error"),
     }
@@ -700,13 +699,12 @@ fn test_result_conversions() {
     let globals = lua.globals().unwrap();
 
     let err = lua.create_function(|lua, _| {
-        lua.pack(Result::Err::<String, LuaError>(
-            "only through failure can we succeed".into(),
+        lua.pack(Result::Err::<String, _>(
+            "only through failure can we succeed".to_lua_err(),
         ))
     }).unwrap();
-    let ok = lua.create_function(|lua, _| {
-        lua.pack(Result::Ok::<String, LuaError>("!".to_string()))
-    }).unwrap();
+    let ok = lua.create_function(|lua, _| lua.pack(Result::Ok::<_, LuaError>("!".to_owned())))
+        .unwrap();
 
     globals.set("err", err).unwrap();
     globals.set("ok", ok).unwrap();
@@ -716,7 +714,6 @@ fn test_result_conversions() {
             local r, e = err()
             assert(r == nil)
             assert(tostring(e) == "only through failure can we succeed")
-            assert(type(e:backtrace()) == "string")
 
             local r, e = ok()
             assert(r == "!")

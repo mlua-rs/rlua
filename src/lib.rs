@@ -1,9 +1,6 @@
 #[cfg_attr(test, macro_use)]
 extern crate hlist_macro;
 
-#[macro_use]
-extern crate error_chain;
-
 pub mod ffi;
 mod util;
 mod error;

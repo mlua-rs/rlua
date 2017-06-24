@@ -38,7 +38,9 @@ impl<'lua> FromLua<'lua> for LuaTable<'lua> {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<LuaTable<'lua>> {
         match value {
             LuaValue::Table(table) => Ok(table),
-            _ => Err("cannot convert lua value to table".into()),
+            _ => Err(LuaError::ConversionError(
+                "cannot convert lua value to table".to_owned(),
+            )),
         }
     }
 }
@@ -53,7 +55,9 @@ impl<'lua> FromLua<'lua> for LuaFunction<'lua> {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<LuaFunction<'lua>> {
         match value {
             LuaValue::Function(table) => Ok(table),
-            _ => Err("cannot convert lua value to function".into()),
+            _ => Err(LuaError::ConversionError(
+                "cannot convert lua value to function".to_owned(),
+            )),
         }
     }
 }
@@ -68,7 +72,9 @@ impl<'lua> FromLua<'lua> for LuaUserData<'lua> {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<LuaUserData<'lua>> {
         match value {
             LuaValue::UserData(ud) => Ok(ud),
-            _ => Err("cannot convert lua value to userdata".into()),
+            _ => Err(LuaError::ConversionError(
+                "cannot convert lua value to userdata".to_owned(),
+            )),
         }
     }
 }
@@ -83,7 +89,9 @@ impl<'lua> FromLua<'lua> for LuaThread<'lua> {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<LuaThread<'lua>> {
         match value {
             LuaValue::Thread(t) => Ok(t),
-            _ => Err("cannot convert lua value to thread".into()),
+            _ => Err(LuaError::ConversionError(
+                "cannot convert lua value to thread".to_owned(),
+            )),
         }
     }
 }
@@ -98,7 +106,9 @@ impl<'lua, T: LuaUserDataType + Copy> FromLua<'lua> for T {
     fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<T> {
         match value {
             LuaValue::UserData(ud) => Ok(*ud.borrow::<T>()?),
-            _ => Err("cannot convert lua value to userdata".into()),
+            _ => Err(LuaError::ConversionError(
+                "cannot convert lua value to userdata".to_owned(),
+            )),
         }
     }
 }
@@ -129,7 +139,9 @@ impl<'lua> FromLua<'lua> for LightUserData {
     fn from_lua(v: LuaValue, _: &'lua Lua) -> LuaResult<Self> {
         match v {
             LuaValue::LightUserData(ud) => Ok(ud),
-            _ => Err("cannot convert lua value to lightuserdata".into()),
+            _ => Err(LuaError::ConversionError(
+                "cannot convert lua value to lightuserdata".to_owned(),
+            )),
         }
     }
 }
@@ -209,7 +221,9 @@ impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Vec<T> {
         if let LuaValue::Table(table) = value {
             table.sequence_values().collect()
         } else {
-            Err("cannot convert lua value to table for Vec".into())
+            Err(LuaError::ConversionError(
+                "cannot convert lua value to table for Vec".to_owned(),
+            ))
         }
     }
 }
@@ -225,7 +239,9 @@ impl<'lua, K: Eq + Hash + FromLua<'lua>, V: FromLua<'lua>> FromLua<'lua> for Has
         if let LuaValue::Table(table) = value {
             table.pairs().collect()
         } else {
-            Err("cannot convert lua value to table for HashMap".into())
+            Err(LuaError::ConversionError(
+                "cannot convert lua value to table for HashMap".to_owned(),
+            ))
         }
     }
 }
@@ -241,7 +257,9 @@ impl<'lua, K: Ord + FromLua<'lua>, V: FromLua<'lua>> FromLua<'lua> for BTreeMap<
         if let LuaValue::Table(table) = value {
             table.pairs().collect()
         } else {
-            Err("cannot convert lua value to table for BTreeMap".into())
+            Err(LuaError::ConversionError(
+                "cannot convert lua value to table for BTreeMap".to_owned(),
+            ))
         }
     }
 }
