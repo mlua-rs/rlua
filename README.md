@@ -50,7 +50,7 @@ Additionally, there are ways I would like to change this API, once support lands
 in rustc.  For example:
 
   * Once ATCs land, there should be a way to wrap callbacks based on argument
-    and return signature, rather than calling Lua.pack / Lua.unpack inside the
+    and return signature, rather than calling Lua::pack / Lua::unpack inside the
     callback.  Until then, it is impossible to name the type of the function
     that would do the wrapping (See
     [this reddit discussion](http://www.reddit.com/r/rust/comments/5yujt6/))
