@@ -63,24 +63,6 @@ impl<'lua> FromLua<'lua> for LuaFunction<'lua> {
     }
 }
 
-impl<'lua> ToLua<'lua> for LuaUserData<'lua> {
-    fn to_lua(self, _: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
-        Ok(LuaValue::UserData(self))
-    }
-}
-
-impl<'lua> FromLua<'lua> for LuaUserData<'lua> {
-    fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<LuaUserData<'lua>> {
-        match value {
-            LuaValue::UserData(ud) => Ok(ud),
-            _ => Err(
-                LuaConversionError::FromLua("cannot convert lua value to userdata".to_owned())
-                    .into(),
-            ),
-        }
-    }
-}
-
 impl<'lua> ToLua<'lua> for LuaThread<'lua> {
     fn to_lua(self, _: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
         Ok(LuaValue::Thread(self))
@@ -93,6 +75,24 @@ impl<'lua> FromLua<'lua> for LuaThread<'lua> {
             LuaValue::Thread(t) => Ok(t),
             _ => Err(
                 LuaConversionError::FromLua("cannot convert lua value to thread".to_owned())
+                    .into(),
+            ),
+        }
+    }
+}
+
+impl<'lua> ToLua<'lua> for LuaUserData<'lua> {
+    fn to_lua(self, _: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+        Ok(LuaValue::UserData(self))
+    }
+}
+
+impl<'lua> FromLua<'lua> for LuaUserData<'lua> {
+    fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<LuaUserData<'lua>> {
+        match value {
+            LuaValue::UserData(ud) => Ok(ud),
+            _ => Err(
+                LuaConversionError::FromLua("cannot convert lua value to userdata".to_owned())
                     .into(),
             ),
         }
@@ -114,6 +114,29 @@ impl<'lua, T: LuaUserDataType + Copy> FromLua<'lua> for T {
                     .into(),
             ),
         }
+    }
+}
+
+impl<'lua> ToLua<'lua> for LuaErrorUserData<'lua> {
+    fn to_lua(self, _: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+        Ok(LuaValue::Error(self))
+    }
+}
+
+impl<'lua> FromLua<'lua> for LuaErrorUserData<'lua> {
+    fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<LuaErrorUserData<'lua>> {
+        match value {
+            LuaValue::Error(err) => Ok(err),
+            _ => Err(
+                LuaConversionError::FromLua("cannot convert lua value to error".to_owned()).into(),
+            ),
+        }
+    }
+}
+
+impl<'lua> ToLua<'lua> for LuaError {
+    fn to_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
+        Ok(LuaValue::Error(lua.create_error(self)?))
     }
 }
 

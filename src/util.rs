@@ -121,8 +121,8 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> LuaResult<
     if err == ffi::LUA_OK || err == ffi::LUA_YIELD {
         Ok(())
     } else {
-        if is_wrapped_error(state, -1) {
-            Err(pop_wrapped_error(state).unwrap())
+        if let Some(err) = pop_wrapped_error(state) {
+            Err(err)
 
         } else if is_wrapped_panic(state, -1) {
             let userdata = ffi::lua_touserdata(state, -1);
@@ -200,7 +200,7 @@ pub unsafe extern "C" fn destructor<T>(state: *mut ffi::lua_State) -> c_int {
 
 // In the context of a lua callback, this will call the given function and if the given function
 // returns an error, *or if the given function panics*, this will result in a call to lua_error (a
-// longjmp).  The error or panic is wrapped in such a way that when calling pop_error back on
+// longjmp).  The error or panic is wrapped in such a way that when calling handle_error back on
 // the rust side, it will resume the panic.
 pub unsafe fn callback_error<R, F>(state: *mut ffi::lua_State, f: F) -> R
 where
@@ -228,8 +228,7 @@ pub unsafe fn pcall_with_traceback(
     nresults: c_int,
 ) -> c_int {
     unsafe extern "C" fn message_handler(state: *mut ffi::lua_State) -> c_int {
-        if is_wrapped_error(state, 1) {
-            let error = pop_wrapped_error(state).unwrap();
+        if let Some(error) = pop_wrapped_error(state) {
             ffi::luaL_traceback(state, state, ptr::null(), 0);
             let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
                 .to_str()
@@ -262,8 +261,7 @@ pub unsafe fn resume_with_traceback(
 ) -> c_int {
     let res = ffi::lua_resume(state, from, nargs);
     if res != ffi::LUA_OK && res != ffi::LUA_YIELD {
-        if is_wrapped_error(state, 1) {
-            let error = pop_wrapped_error(state).unwrap();
+        if let Some(error) = pop_wrapped_error(state) {
             ffi::luaL_traceback(from, state, ptr::null(), 0);
             let traceback = CStr::from_ptr(ffi::lua_tolstring(from, -1, ptr::null_mut()))
                 .to_str()

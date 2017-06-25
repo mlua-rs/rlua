@@ -38,10 +38,14 @@ pub enum LuaValue<'lua> {
     Table(LuaTable<'lua>),
     /// Reference to a Lua function (or closure).
     Function(LuaFunction<'lua>),
-    /// Reference to a "full" userdata object.
-    UserData(LuaUserData<'lua>),
     /// Reference to a Lua thread (or coroutine).
     Thread(LuaThread<'lua>),
+    /// Reference to a userdata object that holds a custom type which implements
+    /// `LuaUserDataType`.  Special builtin userdata types will be represented as
+    /// other `LuaValue` variants.
+    UserData(LuaUserData<'lua>),
+    /// `LuaError` is a special builtin userdata type.
+    Error(LuaErrorUserData<'lua>),
 }
 pub use self::LuaValue::Nil as LuaNil;
 
@@ -120,15 +124,6 @@ pub trait FromLuaMulti<'a>: Sized {
     /// if not enough values are given, conversions should assume that any
     /// missing values are nil.
     fn from_lua_multi(values: LuaMultiValue<'a>, lua: &'a Lua) -> LuaResult<Self>;
-}
-
-impl<'lua> ToLua<'lua> for LuaError {
-    fn to_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
-        unsafe {
-            push_wrapped_error(lua.state, self);
-            Ok(lua.pop_value(lua.state))
-        }
-    }
 }
 
 type LuaCallback = Box<
@@ -889,16 +884,20 @@ pub trait LuaUserDataType: 'static + Sized {
     fn add_methods(_methods: &mut LuaUserDataMethods<Self>) {}
 }
 
-/// Handle to an internal instance of custom userdata.  All userdata in this API
-/// is based around `RefCell`, to best match the mutable semantics of the Lua
-/// language.
+/// Handle to an internal Lua userdata for a type that implements
+/// LuaUserDataType.  Internally, instances are stored in a `RefCell`, to best
+/// match the mutable semantics of the Lua language.
 #[derive(Clone, Debug)]
 pub struct LuaUserData<'lua>(LuaRef<'lua>);
 
 impl<'lua> LuaUserData<'lua> {
     /// Checks whether `T` is the type of this userdata.
-    pub fn is<T: LuaUserDataType>(&self) -> bool {
-        self.inspect(|_: &RefCell<T>| Ok(())).is_ok()
+    pub fn is<T: LuaUserDataType>(&self) -> LuaResult<bool> {
+        match self.inspect(|_: &RefCell<T>| Ok(())) {
+            Ok(_) => Ok(true),
+            Err(LuaError::UserDataError(LuaUserDataError::TypeMismatch)) => Ok(false),
+            Err(err) => Err(err),
+        }
     }
 
     /// Borrow this userdata out of the internal RefCell that is held in lua.
@@ -910,7 +909,8 @@ impl<'lua> LuaUserData<'lua> {
         })
     }
 
-    /// Borrow mutably this userdata out of the internal RefCell that is held in lua.
+    /// Borrow mutably this userdata out of the internal RefCell that is held in
+    /// lua.
     pub fn borrow_mut<T: LuaUserDataType>(&self) -> LuaResult<RefMut<T>> {
         self.inspect(|cell| {
             Ok(cell.try_borrow_mut().map_err(
@@ -950,6 +950,27 @@ impl<'lua> LuaUserData<'lua> {
 
                 ffi::lua_pop(lua.state, 3);
                 res
+            })
+        }
+    }
+}
+
+/// Handle to a `LuaError` that is held internally in Lua
+#[derive(Clone, Debug)]
+pub struct LuaErrorUserData<'lua>(LuaRef<'lua>);
+
+impl<'lua> LuaErrorUserData<'lua> {
+    /// Gets a reference to the internally held `LuaError`.
+    pub fn get<T: LuaUserDataType>(&self) -> LuaResult<&LuaError> {
+        unsafe {
+            let lua = self.0.lua;
+            stack_guard(lua.state, 0, move || {
+                check_stack(lua.state, 1)?;
+                lua.push_ref(lua.state, &self.0);
+
+                let userdata = ffi::lua_touserdata(lua.state, -1);
+                let err = &*(userdata as *const WrappedError);
+                Ok(&err.0)
             })
         }
     }
@@ -1236,6 +1257,14 @@ impl Lua {
         }
     }
 
+    /// Create a userdata object from a LuaError
+    pub fn create_error(&self, err: LuaError) -> LuaResult<LuaErrorUserData> {
+        unsafe {
+            push_wrapped_error(self.state, err);
+            Ok(LuaErrorUserData(self.pop_ref(self.state)))
+        }
+    }
+
     /// Returns a handle to the global environment.
     pub fn globals(&self) -> LuaResult<LuaTable> {
         unsafe {
@@ -1436,12 +1465,16 @@ impl Lua {
                 self.push_ref(state, &f.0);
             }
 
+            LuaValue::Thread(t) => {
+                self.push_ref(state, &t.0);
+            }
+
             LuaValue::UserData(ud) => {
                 self.push_ref(state, &ud.0);
             }
 
-            LuaValue::Thread(t) => {
-                self.push_ref(state, &t.0);
+            LuaValue::Error(e) => {
+                self.push_ref(state, &e.0);
             }
         }
     }
@@ -1483,7 +1516,17 @@ impl Lua {
 
             ffi::LUA_TFUNCTION => LuaValue::Function(LuaFunction(self.pop_ref(state))),
 
-            ffi::LUA_TUSERDATA => LuaValue::UserData(LuaUserData(self.pop_ref(state))),
+            ffi::LUA_TUSERDATA => {
+                // It should not be possible to interact with userdata types
+                // other than custom LuaUserDataType types OR a WrappedError.
+                // WrappedPanic should never be able to be caught in lua, so it
+                // should never be here.
+                if is_wrapped_error(state, -1) {
+                    LuaValue::Error(LuaErrorUserData(self.pop_ref(state)))
+                } else {
+                    LuaValue::UserData(LuaUserData(self.pop_ref(state)))
+                }
+            }
 
             ffi::LUA_TTHREAD => LuaValue::Thread(LuaThread(self.pop_ref(state))),
 

@@ -244,10 +244,10 @@ fn test_user_data() {
     let userdata1 = lua.create_userdata(UserData1(1)).unwrap();
     let userdata2 = lua.create_userdata(UserData2(Box::new(2))).unwrap();
 
-    assert!(userdata1.is::<UserData1>());
-    assert!(!userdata1.is::<UserData2>());
-    assert!(userdata2.is::<UserData2>());
-    assert!(!userdata2.is::<UserData1>());
+    assert!(userdata1.is::<UserData1>().unwrap());
+    assert!(!userdata1.is::<UserData2>().unwrap());
+    assert!(userdata2.is::<UserData2>().unwrap());
+    assert!(!userdata2.is::<UserData1>().unwrap());
 
     assert_eq!(userdata1.borrow::<UserData1>().unwrap().0, 1);
     assert_eq!(*userdata2.borrow::<UserData2>().unwrap().0, 2);
