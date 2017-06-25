@@ -2,6 +2,7 @@
 extern crate hlist_macro;
 
 pub mod ffi;
+#[macro_use]
 mod util;
 mod error;
 mod lua;

@@ -16,50 +16,138 @@ macro_rules! cstr {
   );
 }
 
-pub unsafe fn check_stack(state: *mut ffi::lua_State, amount: c_int) -> LuaResult<()> {
-    if ffi::lua_checkstack(state, amount) == 0 {
-        Err(LuaError::StackOverflow)
-    } else {
-        Ok(())
-    }
+// A panic that clears the given lua stack before panicking
+macro_rules! lua_panic {
+    ($state:expr) => {
+        {
+            $crate::ffi::lua_settop($state, 0);
+            panic!("rlua internal error");
+        }
+    };
+
+    ($state:expr, $msg:expr) => {
+        {
+            $crate::ffi::lua_settop($state, 0);
+            panic!(concat!("rlua: ", $msg));
+        }
+    };
+
+    ($state:expr, $fmt:expr, $($arg:tt)+) => {
+        {
+            $crate::ffi::lua_settop($state, 0);
+            panic!(concat!("rlua: ", $fmt), $($arg)+);
+        }
+    };
 }
 
-// Run an operation on a lua_State and automatically clean up the stack before returning.  Takes
-// the lua_State, the expected stack size change, and an operation to run.  If the operation
-// results in success, then the stack is inspected to make sure the change in stack size matches
-// the expected change and otherwise this is a logic error and will panic.  If the operation
-// results in an error, the stack is shrunk to the value before the call.  If the operation
-// results in an error and the stack is smaller than the value before the call, then this is
-// unrecoverable and this will panic.
-pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F) -> LuaResult<R>
+// An assert that clears the given lua stack before panicking
+macro_rules! lua_assert {
+    ($state:expr, $cond:expr) => {
+        if !$cond {
+            $crate::ffi::lua_settop($state, 0);
+            panic!("rlua internal error");
+        }
+    };
+
+    ($state:expr, $cond:expr, $msg:expr) => {
+        if !$cond {
+            $crate::ffi::lua_settop($state, 0);
+            panic!(concat!("rlua: ", $msg));
+        }
+    };
+
+    ($state:expr, $cond:expr, $fmt:expr, $($arg:tt)+) => {
+        if !$cond {
+            $crate::ffi::lua_settop($state, 0);
+            panic!(concat!("rlua: ", $fmt), $($arg)+);
+        }
+    };
+}
+
+// Checks that Lua has enough free stack space for future stack operations.
+// On failure, this will clear the stack and panic.
+pub unsafe fn check_stack(state: *mut ffi::lua_State, amount: c_int) {
+    lua_assert!(
+        state,
+        ffi::lua_checkstack(state, amount) != 0,
+        "out of stack space"
+    );
+}
+
+// Run an operation on a lua_State and check that the stack change is what is
+// expected.  If the stack change does not match, clears the stack and panics.
+pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    let expected = ffi::lua_gettop(state) + change;
+    lua_assert!(
+        state,
+        expected >= 0,
+        "internal stack error: too many values would be popped"
+    );
+
+    let res = op();
+
+    let top = ffi::lua_gettop(state);
+    lua_assert!(
+        state,
+        ffi::lua_gettop(state) == expected,
+        "internal stack error: expected stack to be {}, got {}",
+        expected,
+        top
+    );
+
+    res
+}
+
+// Run an operation on a lua_State and automatically clean up the stack before
+// returning.  Takes the lua_State, the expected stack size change, and an
+// operation to run.  If the operation results in success, then the stack is
+// inspected to make sure the change in stack size matches the expected change
+// and otherwise this is a logic error and will panic.  If the operation results
+// in an error, the stack is shrunk to the value before the call.  If the
+// operation results in an error and the stack is smaller than the value before
+// the call, then this is unrecoverable and this will panic.  If this function
+// panics, it will clear the stack before panicking.
+pub unsafe fn stack_err_guard<F, R>(
+    state: *mut ffi::lua_State,
+    change: c_int,
+    op: F,
+) -> LuaResult<R>
 where
     F: FnOnce() -> LuaResult<R>,
 {
     let expected = ffi::lua_gettop(state) + change;
-    assert!(
+    lua_assert!(
+        state,
         expected >= 0,
-        "lua stack error, too many values would be popped"
+        "internal stack error: too many values would be popped"
     );
+
     let res = op();
+
     let top = ffi::lua_gettop(state);
     if res.is_ok() {
-        assert_eq!(
-            ffi::lua_gettop(state),
-            expected,
-            "lua stack error, expected stack to be {}, got {}",
+        lua_assert!(
+            state,
+            ffi::lua_gettop(state) == expected,
+            "internal stack error: expected stack to be {}, got {}",
             expected,
             top
         );
     } else {
-        assert!(
+        lua_assert!(
+            state,
             top >= expected,
-            "lua stack error, {} too many values popped",
+            "internal stack error: {} too many values popped",
             top - expected
         );
         if top > expected {
             ffi::lua_settop(state, expected);
         }
     }
+
     res
 }
 
@@ -127,9 +215,12 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> LuaResult<
         } else if is_wrapped_panic(state, -1) {
             let userdata = ffi::lua_touserdata(state, -1);
             let panic = &mut *(userdata as *mut WrappedPanic);
-            resume_unwind(panic.0.take().expect(
-                "internal error: panic was resumed twice",
-            ))
+            if let Some(p) = panic.0.take() {
+                ffi::lua_settop(state, 0);
+                resume_unwind(p);
+            } else {
+                lua_panic!(state, "internal error: panic was resumed twice")
+            }
 
         } else {
             let err_string =
@@ -174,7 +265,7 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> LuaResult<
                     println!("Lua error during __gc, aborting!");
                     process::abort()
                 }
-                _ => panic!("unrecognized lua error code"),
+                _ => lua_panic!(state, "internal error: unrecognized lua error code"),
             })
         }
     }

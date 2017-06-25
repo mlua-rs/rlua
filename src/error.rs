@@ -19,9 +19,6 @@ pub enum LuaError {
     ToLuaConversionError(String),
     /// A generic Lua -> Rust conversion error.
     FromLuaConversionError(String),
-    /// Insufficient Lua stack space, only generated from rust when calling
-    /// `lua_checkstack`.
-    StackOverflow,
     /// A `LuaThread` was resumed and the coroutine was no longer active.
     CoroutineInactive,
     /// A `LuaUserData` is not the expected type in a borrow.
@@ -57,7 +54,6 @@ impl fmt::Display for LuaError {
             &LuaError::FromLuaConversionError(ref msg) => {
                 write!(fmt, "Error converting lua type to rust: {}", msg)
             }
-            &LuaError::StackOverflow => write!(fmt, "Lua out of stack space"),
             &LuaError::CoroutineInactive => write!(fmt, "Cannot resume inactive coroutine"),
             &LuaError::UserDataTypeMismatch => write!(fmt, "Userdata not expected type"),
             &LuaError::UserDataBorrowError => write!(fmt, "Userdata already mutably borrowed"),
@@ -79,7 +75,6 @@ impl Error for LuaError {
             &LuaError::ErrorError(_) => "lua error handling error",
             &LuaError::ToLuaConversionError(_) => "conversion error to lua",
             &LuaError::FromLuaConversionError(_) => "conversion error from lua",
-            &LuaError::StackOverflow => "lua stack overflow",
             &LuaError::CoroutineInactive => "lua coroutine inactive",
             &LuaError::UserDataTypeMismatch => "lua userdata type mismatch",
             &LuaError::UserDataBorrowError => "lua userdata already mutably borrowed",

@@ -9,7 +9,7 @@ use super::*;
 #[test]
 fn test_set_get() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     globals.set("foo", "bar").unwrap();
     globals.set("baz", "baf").unwrap();
     assert_eq!(globals.get::<_, String>("foo").unwrap(), "bar");
@@ -29,7 +29,7 @@ fn test_load() {
 #[test]
 fn test_exec() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             res = 'foo'..'bar'
@@ -76,9 +76,9 @@ fn test_eval() {
 #[test]
 fn test_table() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
 
-    globals.set("table", lua.create_table().unwrap()).unwrap();
+    globals.set("table", lua.create_table()).unwrap();
     let table1: LuaTable = globals.get("table").unwrap();
     let table2: LuaTable = globals.get("table").unwrap();
 
@@ -164,7 +164,7 @@ fn test_table() {
 #[test]
 fn test_function() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             function concat(arg1, arg2)
@@ -184,7 +184,7 @@ fn test_function() {
 #[test]
 fn test_bind() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             function concat(...)
@@ -211,7 +211,7 @@ fn test_bind() {
 #[test]
 fn test_rust_function() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             function lua_function()
@@ -225,7 +225,7 @@ fn test_rust_function() {
     ).unwrap();
 
     let lua_function = globals.get::<_, LuaFunction>("lua_function").unwrap();
-    let rust_function = lua.create_function(|lua, _| lua.pack("hello")).unwrap();
+    let rust_function = lua.create_function(|lua, _| lua.pack("hello"));
 
     globals.set("rust_function", rust_function).unwrap();
     assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
@@ -241,13 +241,13 @@ fn test_user_data() {
 
     let lua = Lua::new();
 
-    let userdata1 = lua.create_userdata(UserData1(1)).unwrap();
-    let userdata2 = lua.create_userdata(UserData2(Box::new(2))).unwrap();
+    let userdata1 = lua.create_userdata(UserData1(1));
+    let userdata2 = lua.create_userdata(UserData2(Box::new(2)));
 
-    assert!(userdata1.is::<UserData1>().unwrap());
-    assert!(!userdata1.is::<UserData2>().unwrap());
-    assert!(userdata2.is::<UserData2>().unwrap());
-    assert!(!userdata2.is::<UserData1>().unwrap());
+    assert!(userdata1.is::<UserData1>());
+    assert!(!userdata1.is::<UserData2>());
+    assert!(userdata2.is::<UserData2>());
+    assert!(!userdata2.is::<UserData1>());
 
     assert_eq!(userdata1.borrow::<UserData1>().unwrap().0, 1);
     assert_eq!(*userdata2.borrow::<UserData2>().unwrap().0, 2);
@@ -268,8 +268,8 @@ fn test_methods() {
     }
 
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
-    let userdata = lua.create_userdata(UserData(42)).unwrap();
+    let globals = lua.globals();
+    let userdata = lua.create_userdata(UserData(42));
     globals.set("userdata", userdata.clone()).unwrap();
     lua.exec::<()>(
         r#"
@@ -320,7 +320,7 @@ fn test_metamethods() {
     }
 
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     globals.set("userdata1", UserData(7)).unwrap();
     globals.set("userdata2", UserData(3)).unwrap();
     assert_eq!(lua.eval::<UserData>("userdata1 + userdata2").unwrap().0, 10);
@@ -333,7 +333,7 @@ fn test_metamethods() {
 #[test]
 fn test_scope() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             touter = {
@@ -369,7 +369,7 @@ fn test_scope() {
 #[test]
 fn test_lua_multi() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             function concat(arg1, arg2)
@@ -401,7 +401,7 @@ fn test_lua_multi() {
 #[test]
 fn test_coercion() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             int = 123
@@ -438,7 +438,7 @@ fn test_error() {
     }
 
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             function no_error()
@@ -492,8 +492,7 @@ fn test_error() {
         None,
     ).unwrap();
 
-    let rust_error_function = lua.create_function(|_, _| Err(TestError.to_lua_err()))
-        .unwrap();
+    let rust_error_function = lua.create_function(|_, _| Err(TestError.to_lua_err()));
     globals
         .set("rust_error_function", rust_error_function)
         .unwrap();
@@ -546,6 +545,8 @@ fn test_error() {
 
     match catch_unwind(|| -> LuaResult<()> {
         let lua = Lua::new();
+        let globals = lua.globals();
+
         lua.exec::<()>(
             r#"
                 function rust_panic()
@@ -556,7 +557,7 @@ fn test_error() {
         )?;
         let rust_panic_function = lua.create_function(|_, _| {
             panic!("expected panic, this panic should be caught in rust")
-        })?;
+        });
         globals.set("rust_panic_function", rust_panic_function)?;
 
         let rust_panic = globals.get::<_, LuaFunction>("rust_panic")?;
@@ -570,6 +571,8 @@ fn test_error() {
 
     match catch_unwind(|| -> LuaResult<()> {
         let lua = Lua::new();
+        let globals = lua.globals();
+
         lua.exec::<()>(
             r#"
                 function rust_panic()
@@ -580,7 +583,7 @@ fn test_error() {
         )?;
         let rust_panic_function = lua.create_function(|_, _| {
             panic!("expected panic, this panic should be caught in rust")
-        })?;
+        });
         globals.set("rust_panic_function", rust_panic_function)?;
 
         let rust_panic = globals.get::<_, LuaFunction>("rust_panic")?;
@@ -608,19 +611,19 @@ fn test_thread() {
                 end
             "#,
         ).unwrap(),
-    ).unwrap();
+    );
 
-    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), LuaThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(0).unwrap(), 0);
-    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), LuaThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(1).unwrap(), 1);
-    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), LuaThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(2).unwrap(), 3);
-    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), LuaThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(3).unwrap(), 6);
-    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), LuaThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(4).unwrap(), 10);
-    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Dead);
+    assert_eq!(thread.status(), LuaThreadStatus::Dead);
 
     let accumulate = lua.create_thread(
         lua.eval::<LuaFunction>(
@@ -632,15 +635,15 @@ fn test_thread() {
                 end
             "#,
         ).unwrap(),
-    ).unwrap();
+    );
 
     for i in 0..4 {
         accumulate.resume::<_, ()>(i).unwrap();
     }
     assert_eq!(accumulate.resume::<_, i64>(4).unwrap(), 10);
-    assert_eq!(accumulate.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(accumulate.status(), LuaThreadStatus::Active);
     assert!(accumulate.resume::<_, ()>("error").is_err());
-    assert_eq!(accumulate.status().unwrap(), LuaThreadStatus::Error);
+    assert_eq!(accumulate.status(), LuaThreadStatus::Error);
 
     let thread = lua.eval::<LuaThread>(
         r#"
@@ -651,7 +654,7 @@ fn test_thread() {
             end)
         "#,
     ).unwrap();
-    assert_eq!(thread.status().unwrap(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), LuaThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(()).unwrap(), 42);
 
     let thread: LuaThread = lua.eval(
@@ -678,7 +681,7 @@ fn test_thread() {
 #[test]
 fn test_lightuserdata() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             function id(a)
@@ -698,7 +701,7 @@ fn test_lightuserdata() {
 #[test]
 fn test_table_error() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
     lua.exec::<()>(
         r#"
             table = {}
@@ -723,21 +726,20 @@ fn test_table_error() {
     assert!(bad_table.len().is_err());
     assert!(bad_table.raw_set(1, 1).is_ok());
     assert!(bad_table.raw_get::<_, i32>(1).is_ok());
-    assert_eq!(bad_table.raw_len().unwrap(), 1);
+    assert_eq!(bad_table.raw_len(), 1);
 }
 
 #[test]
 fn test_result_conversions() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
 
     let err = lua.create_function(|lua, _| {
         lua.pack(Result::Err::<String, _>(
             "only through failure can we succeed".to_lua_err(),
         ))
-    }).unwrap();
-    let ok = lua.create_function(|lua, _| lua.pack(Result::Ok::<_, LuaError>("!".to_owned())))
-        .unwrap();
+    });
+    let ok = lua.create_function(|lua, _| lua.pack(Result::Ok::<_, LuaError>("!".to_owned())));
 
     globals.set("err", err).unwrap();
     globals.set("ok", ok).unwrap();
@@ -759,7 +761,7 @@ fn test_result_conversions() {
 #[test]
 fn test_num_conversion() {
     let lua = Lua::new();
-    let globals = lua.globals().unwrap();
+    let globals = lua.globals();
 
     globals.set("n", "1.0").unwrap();
     assert_eq!(globals.get::<_, i64>("n").unwrap(), 1);

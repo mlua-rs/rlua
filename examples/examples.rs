@@ -18,7 +18,7 @@ fn examples() -> LuaResult<()> {
     // code is loaded.  This API is based heavily around internal mutation (just
     // like lua itself).
 
-    let globals = lua.globals()?;
+    let globals = lua.globals();
 
     globals.set("string_var", "hello")?;
     globals.set("int_var", 42)?;
@@ -43,13 +43,13 @@ fn examples() -> LuaResult<()> {
 
     // You can create and manage lua tables
 
-    let array_table = lua.create_table()?;
+    let array_table = lua.create_table();
     array_table.set(1, "one")?;
     array_table.set(2, "two")?;
     array_table.set(3, "three")?;
     assert_eq!(array_table.len()?, 3);
 
-    let map_table = lua.create_table()?;
+    let map_table = lua.create_table();
     map_table.set("one", 1)?;
     map_table.set("two", 2)?;
     map_table.set("three", 3)?;
@@ -104,7 +104,7 @@ fn examples() -> LuaResult<()> {
         // be inferred as part of the function signature due to the same
         // lifetime type signature limitations.
         lua.pack(list1 == list2)
-    })?;
+    });
     globals.set("check_equal", check_equal)?;
 
     // You can also accept variadic arguments to rust functions
@@ -112,7 +112,7 @@ fn examples() -> LuaResult<()> {
         let strings = lua.unpack::<LuaVariadic<String>>(args)?.0;
         // (This is quadratic!, it's just an example!)
         lua.pack(strings.iter().fold("".to_owned(), |a, b| a + b))
-    })?;
+    });
     globals.set("join", join)?;
 
     assert_eq!(
@@ -153,7 +153,7 @@ fn examples() -> LuaResult<()> {
     let vec2_constructor = lua.create_function(|lua, args| {
         let hlist_pat![x, y] = lua.unpack::<HList![f32, f32]>(args)?;
         lua.pack(Vec2(x, y))
-    })?;
+    });
     globals.set("vec2", vec2_constructor)?;
 
     assert!(lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()")? - 5.0 < f32::EPSILON);
