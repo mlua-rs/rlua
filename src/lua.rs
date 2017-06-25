@@ -44,8 +44,8 @@ pub enum LuaValue<'lua> {
     /// `LuaUserDataType`.  Special builtin userdata types will be represented as
     /// other `LuaValue` variants.
     UserData(LuaUserData<'lua>),
-    /// `LuaError` is a special builtin userdata type.  When taken out of Lua it
-    /// is implicitly cloned.
+    /// `LuaError` is a special builtin userdata type.  When received from Lua
+    /// it is implicitly cloned.
     Error(LuaError),
 }
 pub use self::LuaValue::Nil as LuaNil;

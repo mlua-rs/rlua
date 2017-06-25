@@ -452,6 +452,16 @@ fn test_error() {
                 rust_error_function()
             end
 
+            function return_error()
+                local status, res = pcall(rust_error_function)
+                assert(not status)
+                return res
+            end
+
+            function return_string_error()
+                return "this should be converted to an error"
+            end
+
             function test_pcall()
                 local testvar = 0
 
@@ -465,9 +475,10 @@ fn test_error() {
                     return "should be ignored"
                 end
 
-                xpcall(function()
+                local status, res = xpcall(function()
                     error(5)
                 end, handler)
+                assert(not status)
 
                 if testvar ~= 8 then
                     error("testvar had the wrong value, pcall / xpcall misbehaving "..testvar)
@@ -490,6 +501,10 @@ fn test_error() {
     let no_error = globals.get::<_, LuaFunction>("no_error").unwrap();
     let lua_error = globals.get::<_, LuaFunction>("lua_error").unwrap();
     let rust_error = globals.get::<_, LuaFunction>("rust_error").unwrap();
+    let return_error = globals.get::<_, LuaFunction>("return_error").unwrap();
+    let return_string_error = globals
+        .get::<_, LuaFunction>("return_string_error")
+        .unwrap();
     let test_pcall = globals.get::<_, LuaFunction>("test_pcall").unwrap();
     let understand_recursion = globals
         .get::<_, LuaFunction>("understand_recursion")
@@ -506,6 +521,14 @@ fn test_error() {
         Err(_) => panic!("error is not CallbackError kind"),
         _ => panic!("error not returned"),
     }
+
+    match return_error.call::<_, LuaValue>(()) {
+        Ok(LuaValue::Error(_)) => {}
+        _ => panic!("LuaValue::Error not returned"),
+    }
+
+    assert!(return_string_error.call::<_, LuaError>(()).is_ok());
+
     match lua.eval::<()>("if youre happy and you know it syntax error") {
         Err(LuaError::SyntaxError(LuaSyntaxError::Syntax(_))) => {}
         Err(_) => panic!("error is not LuaSyntaxError::Syntax kind"),

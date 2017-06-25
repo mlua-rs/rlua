@@ -286,8 +286,14 @@ pub unsafe extern "C" fn safe_pcall(state: *mut ffi::lua_State) -> c_int {
         if is_wrapped_panic(state, -1) {
             ffi::lua_error(state);
         }
+        ffi::lua_pushboolean(state, 0);
+        ffi::lua_insert(state, -2);
+        2
+    } else {
+        ffi::lua_pushboolean(state, 1);
+        ffi::lua_insert(state, 1);
+        ffi::lua_gettop(state)
     }
-    ffi::lua_gettop(state)
 }
 
 // A variant of xpcall that does not allow lua to catch panic errors from callback_error
@@ -313,8 +319,14 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
         if is_wrapped_panic(state, -1) {
             ffi::lua_error(state);
         }
+        ffi::lua_pushboolean(state, 0);
+        ffi::lua_insert(state, -2);
+        2
+    } else {
+        ffi::lua_pushboolean(state, 1);
+        ffi::lua_insert(state, 1);
+        ffi::lua_gettop(state)
     }
-    res
 }
 
 /// Does not call checkstack, uses 1 stack space
@@ -427,7 +439,9 @@ pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<LuaError> 
     } else {
         let userdata = ffi::lua_touserdata(state, -1);
         let err = &*(userdata as *const WrappedError);
-        Some(err.0.clone())
+        let err = err.0.clone();
+        ffi::lua_pop(state, 1);
+        Some(err)
     }
 }
 
