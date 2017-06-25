@@ -44,8 +44,9 @@ pub enum LuaValue<'lua> {
     /// `LuaUserDataType`.  Special builtin userdata types will be represented as
     /// other `LuaValue` variants.
     UserData(LuaUserData<'lua>),
-    /// `LuaError` is a special builtin userdata type.
-    Error(LuaErrorUserData<'lua>),
+    /// `LuaError` is a special builtin userdata type.  When taken out of Lua it
+    /// is implicitly cloned.
+    Error(LuaError),
 }
 pub use self::LuaValue::Nil as LuaNil;
 
@@ -226,11 +227,11 @@ impl<'lua> LuaTable<'lua> {
         let key = key.to_lua(lua)?;
         let value = value.to_lua(lua)?;
         unsafe {
-            error_guard(lua.state, 0, 0, |state| {
-                check_stack(state, 3)?;
-                lua.push_ref(state, &self.0);
-                lua.push_value(state, key);
-                lua.push_value(state, value);
+            check_stack(lua.state, 3)?;
+            lua.push_ref(lua.state, &self.0);
+            lua.push_value(lua.state, key);
+            lua.push_value(lua.state, value);
+            error_guard(lua.state, 3, 0, |state| {
                 ffi::lua_settable(state, -3);
                 Ok(())
             })
@@ -247,10 +248,10 @@ impl<'lua> LuaTable<'lua> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         unsafe {
-            let res = error_guard(lua.state, 0, 0, |state| {
-                check_stack(state, 2)?;
-                lua.push_ref(state, &self.0);
-                lua.push_value(state, key.to_lua(lua)?);
+            check_stack(lua.state, 2)?;
+            lua.push_ref(lua.state, &self.0);
+            lua.push_value(lua.state, key.to_lua(lua)?);
+            let res = error_guard(lua.state, 2, 0, |state| {
                 ffi::lua_gettable(state, -2);
                 let res = lua.pop_value(state);
                 ffi::lua_pop(state, 1);
@@ -265,10 +266,10 @@ impl<'lua> LuaTable<'lua> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         unsafe {
-            error_guard(lua.state, 0, 0, |state| {
-                check_stack(state, 2)?;
-                lua.push_ref(state, &self.0);
-                lua.push_value(state, key);
+            check_stack(lua.state, 2)?;
+            lua.push_ref(lua.state, &self.0);
+            lua.push_value(lua.state, key);
+            error_guard(lua.state, 2, 0, |state| {
                 ffi::lua_gettable(state, -2);
                 let has = ffi::lua_isnil(state, -1) == 0;
                 ffi::lua_pop(state, 2);
@@ -955,27 +956,6 @@ impl<'lua> LuaUserData<'lua> {
     }
 }
 
-/// Handle to a `LuaError` that is held internally in Lua
-#[derive(Clone, Debug)]
-pub struct LuaErrorUserData<'lua>(LuaRef<'lua>);
-
-impl<'lua> LuaErrorUserData<'lua> {
-    /// Gets a reference to the internally held `LuaError`.
-    pub fn get<T: LuaUserDataType>(&self) -> LuaResult<&LuaError> {
-        unsafe {
-            let lua = self.0.lua;
-            stack_guard(lua.state, 0, move || {
-                check_stack(lua.state, 1)?;
-                lua.push_ref(lua.state, &self.0);
-
-                let userdata = ffi::lua_touserdata(lua.state, -1);
-                let err = &*(userdata as *const WrappedError);
-                Ok(&err.0)
-            })
-        }
-    }
-}
-
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
     state: *mut ffi::lua_State,
@@ -1257,14 +1237,6 @@ impl Lua {
         }
     }
 
-    /// Create a userdata object from a LuaError
-    pub fn create_error(&self, err: LuaError) -> LuaResult<LuaErrorUserData> {
-        unsafe {
-            push_wrapped_error(self.state, err);
-            Ok(LuaErrorUserData(self.pop_ref(self.state)))
-        }
-    }
-
     /// Returns a handle to the global environment.
     pub fn globals(&self) -> LuaResult<LuaTable> {
         unsafe {
@@ -1474,7 +1446,7 @@ impl Lua {
             }
 
             LuaValue::Error(e) => {
-                self.push_ref(state, &e.0);
+                push_wrapped_error(state, e);
             }
         }
     }
@@ -1521,8 +1493,8 @@ impl Lua {
                 // other than custom LuaUserDataType types OR a WrappedError.
                 // WrappedPanic should never be able to be caught in lua, so it
                 // should never be here.
-                if is_wrapped_error(state, -1) {
-                    LuaValue::Error(LuaErrorUserData(self.pop_ref(state)))
+                if let Some(err) = pop_wrapped_error(state) {
+                    LuaValue::Error(err)
                 } else {
                     LuaValue::UserData(LuaUserData(self.pop_ref(state)))
                 }

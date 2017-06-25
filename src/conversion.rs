@@ -117,26 +117,22 @@ impl<'lua, T: LuaUserDataType + Copy> FromLua<'lua> for T {
     }
 }
 
-impl<'lua> ToLua<'lua> for LuaErrorUserData<'lua> {
+impl<'lua> ToLua<'lua> for LuaError {
     fn to_lua(self, _: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
         Ok(LuaValue::Error(self))
     }
 }
 
-impl<'lua> FromLua<'lua> for LuaErrorUserData<'lua> {
-    fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<LuaErrorUserData<'lua>> {
+impl<'lua> FromLua<'lua> for LuaError {
+    fn from_lua(value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<LuaError> {
         match value {
             LuaValue::Error(err) => Ok(err),
-            _ => Err(
-                LuaConversionError::FromLua("cannot convert lua value to error".to_owned()).into(),
-            ),
+            val => Ok(LuaError::RuntimeError(
+                lua.coerce_string(val)
+                    .and_then(|s| Ok(s.to_str()?.to_owned()))
+                    .unwrap_or_else(|_| "<unprintable error>".to_owned()),
+            )),
         }
-    }
-}
-
-impl<'lua> ToLua<'lua> for LuaError {
-    fn to_lua(self, lua: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
-        Ok(LuaValue::Error(lua.create_error(self)?))
     }
 }
 
