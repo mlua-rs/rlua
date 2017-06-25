@@ -203,7 +203,7 @@ impl<'lua> LuaString<'lua> {
                 assert_eq!(ffi::lua_type(lua.state, -1), ffi::LUA_TSTRING);
                 let s = CStr::from_ptr(ffi::lua_tostring(lua.state, -1))
                     .to_str()
-                    .map_err(|e| LuaConversionError::Utf8Error(e))?;
+                    .map_err(|e| LuaError::FromLuaConversionError(e.to_string()))?;
                 ffi::lua_pop(lua.state, 1);
                 Ok(s)
             })
@@ -851,11 +851,10 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
             let userdata = userdata.borrow::<T>()?;
             method(lua, &userdata, args)
         } else {
-            Err(
-                LuaConversionError::FromLua(
-                    "No userdata supplied as first argument to method".to_owned(),
-                ).into(),
-            )
+            Err(LuaError::FromLuaConversionError(
+                "No userdata supplied as first argument to method"
+                    .to_owned(),
+            ))
         })
 
     }
@@ -870,7 +869,7 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
             method(lua, &mut userdata, args)
         } else {
             Err(
-                LuaConversionError::FromLua(
+                LuaError::FromLuaConversionError(
                     "No userdata supplied as first argument to method".to_owned(),
                 ).into(),
             )
@@ -896,7 +895,7 @@ impl<'lua> LuaUserData<'lua> {
     pub fn is<T: LuaUserDataType>(&self) -> LuaResult<bool> {
         match self.inspect(|_: &RefCell<T>| Ok(())) {
             Ok(_) => Ok(true),
-            Err(LuaError::UserDataError(LuaUserDataError::TypeMismatch)) => Ok(false),
+            Err(LuaError::UserDataTypeMismatch) => Ok(false),
             Err(err) => Err(err),
         }
     }
@@ -905,7 +904,7 @@ impl<'lua> LuaUserData<'lua> {
     pub fn borrow<T: LuaUserDataType>(&self) -> LuaResult<Ref<T>> {
         self.inspect(|cell| {
             Ok(
-                cell.try_borrow().map_err(|_| LuaUserDataError::BorrowError)?,
+                cell.try_borrow().map_err(|_| LuaError::UserDataBorrowError)?,
             )
         })
     }
@@ -915,7 +914,7 @@ impl<'lua> LuaUserData<'lua> {
     pub fn borrow_mut<T: LuaUserDataType>(&self) -> LuaResult<RefMut<T>> {
         self.inspect(|cell| {
             Ok(cell.try_borrow_mut().map_err(
-                |_| LuaUserDataError::BorrowError,
+                |_| LuaError::UserDataBorrowMutError,
             )?)
         })
     }
@@ -932,11 +931,12 @@ impl<'lua> LuaUserData<'lua> {
 
                 lua.push_ref(lua.state, &self.0);
                 let userdata = ffi::lua_touserdata(lua.state, -1);
-                assert!(!userdata.is_null());
 
-                if ffi::lua_getmetatable(lua.state, -1) == 0 {
-                    return Err(LuaUserDataError::TypeMismatch.into());
-                }
+                assert!(!userdata.is_null());
+                assert!(
+                    ffi::lua_getmetatable(lua.state, -1) != 0,
+                    "LuaUserData missing metatable"
+                );
 
                 ffi::lua_rawgeti(
                     lua.state,
@@ -944,7 +944,7 @@ impl<'lua> LuaUserData<'lua> {
                     lua.userdata_metatable::<T>()? as ffi::lua_Integer,
                 );
                 if ffi::lua_rawequal(lua.state, -1, -2) == 0 {
-                    return Err(LuaUserDataError::TypeMismatch.into());
+                    return Err(LuaError::UserDataTypeMismatch);
                 }
 
                 let res = func(&*(userdata as *const RefCell<T>));
@@ -1062,7 +1062,7 @@ impl Lua {
                     self.state,
                     if let Some(name) = name {
                         let name = CString::new(name.to_owned()).map_err(|e| {
-                            LuaConversionError::NulError(e)
+                            LuaError::ToLuaConversionError(e.to_string())
                         })?;
                         ffi::luaL_loadbuffer(
                             self.state,
@@ -1257,11 +1257,9 @@ impl Lua {
                     check_stack(self.state, 1)?;
                     self.push_value(self.state, v);
                     if ffi::lua_tostring(self.state, -1).is_null() {
-                        Err(
-                            LuaConversionError::FromLua(
-                                "cannot convert lua value to string".to_owned(),
-                            ).into(),
-                        )
+                        Err(LuaError::FromLuaConversionError(
+                            "cannot convert lua value to string".to_owned(),
+                        ))
                     } else {
                         Ok(LuaString(self.pop_ref(self.state)))
                     }
@@ -1284,11 +1282,9 @@ impl Lua {
                     let mut isint = 0;
                     let i = ffi::lua_tointegerx(self.state, -1, &mut isint);
                     if isint == 0 {
-                        Err(
-                            LuaConversionError::FromLua(
-                                "cannot convert lua value to integer".to_owned(),
-                            ).into(),
-                        )
+                        Err(LuaError::FromLuaConversionError(
+                            "cannot convert lua value to integer".to_owned(),
+                        ))
                     } else {
                         ffi::lua_pop(self.state, 1);
                         Ok(i)
@@ -1312,11 +1308,9 @@ impl Lua {
                     let mut isnum = 0;
                     let n = ffi::lua_tonumberx(self.state, -1, &mut isnum);
                     if isnum == 0 {
-                        Err(
-                            LuaConversionError::FromLua(
-                                "cannot convert lua value to number".to_owned(),
-                            ).into(),
-                        )
+                        Err(LuaError::FromLuaConversionError(
+                            "cannot convert lua value to number".to_owned(),
+                        ))
                     } else {
                         ffi::lua_pop(self.state, 1);
                         Ok(n)

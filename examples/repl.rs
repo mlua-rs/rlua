@@ -32,7 +32,7 @@ fn main() {
                     );
                     break;
                 }
-                Err(LuaError::SyntaxError(LuaSyntaxError::IncompleteStatement(_))) => {
+                Err(LuaError::IncompleteStatement(_)) => {
                     // continue reading input and append it to `line`
                     write!(stdout, ">> ").unwrap();
                     stdout.flush().unwrap();

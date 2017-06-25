@@ -68,7 +68,7 @@ fn test_eval() {
     assert_eq!(lua.eval::<bool>("false == false").unwrap(), true);
     assert_eq!(lua.eval::<i32>("return 1 + 2").unwrap(), 3);
     match lua.eval::<()>("if true then") {
-        Err(LuaError::SyntaxError(LuaSyntaxError::IncompleteStatement(_))) => {}
+        Err(LuaError::IncompleteStatement(_)) => {}
         r => panic!("expected IncompleteStatement, got {:?}", r),
     }
 }
@@ -530,12 +530,12 @@ fn test_error() {
     assert!(return_string_error.call::<_, LuaError>(()).is_ok());
 
     match lua.eval::<()>("if youre happy and you know it syntax error") {
-        Err(LuaError::SyntaxError(LuaSyntaxError::Syntax(_))) => {}
+        Err(LuaError::SyntaxError(_)) => {}
         Err(_) => panic!("error is not LuaSyntaxError::Syntax kind"),
         _ => panic!("error not returned"),
     }
     match lua.eval::<()>("function i_will_finish_what_i()") {
-        Err(LuaError::SyntaxError(LuaSyntaxError::IncompleteStatement(_))) => {}
+        Err(LuaError::IncompleteStatement(_)) => {}
         Err(_) => panic!("error is not LuaSyntaxError::IncompleteStatement kind"),
         _ => panic!("error not returned"),
     }

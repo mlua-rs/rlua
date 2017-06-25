@@ -8,7 +8,7 @@ use std::os::raw::{c_char, c_int, c_void};
 use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
 
 use ffi;
-use error::{LuaResult, LuaSyntaxError, LuaUserDataError, LuaError};
+use error::{LuaResult, LuaError};
 
 macro_rules! cstr {
   ($s:expr) => (
@@ -149,9 +149,9 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> LuaResult<
                     // This seems terrible, but as far as I can tell, this is exactly what the stock lua
                     // repl does.
                     if err_string.ends_with("<eof>") {
-                        LuaSyntaxError::IncompleteStatement(err_string).into()
+                        LuaError::IncompleteStatement(err_string)
                     } else {
-                        LuaSyntaxError::Syntax(err_string).into()
+                        LuaError::SyntaxError(err_string)
                     }
                 }
                 ffi::LUA_ERRERR => LuaError::ErrorError(err_string),
@@ -343,17 +343,19 @@ pub struct WrappedPanic(pub Option<Box<Any + Send>>);
 // Pushes a WrappedError::Error to the top of the stack
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: LuaError) {
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
-        callback_error(state, || {
-            if !is_wrapped_error(state, -1) {
-                return Err(LuaUserDataError::TypeMismatch.into());
-            }
-
+        callback_error(state, || if is_wrapped_error(state, -1) {
             let userdata = ffi::lua_touserdata(state, -1);
             let error = &*(userdata as *const WrappedError);
             push_string(state, &error.0.to_string());
             ffi::lua_remove(state, -2);
 
             Ok(1)
+
+        } else {
+            Err(LuaError::FromLuaConversionError(
+                "internal error: userdata mismatch in LuaError metamethod"
+                    .to_owned(),
+            ))
         })
     }
 
