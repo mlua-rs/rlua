@@ -14,9 +14,9 @@ fn examples() -> LuaResult<()> {
     let lua = Lua::new();
 
     // You can get and set global variables.  Notice that the globals table here
-    // is a permanent reference to _G, it is mutated behind the scenes as lua
-    // code is loaded.  This API is based heavily around internal mutation (just
-    // like lua itself).
+    // is a permanent reference to _G, and it is mutated behind the scenes as
+    // lua code is loaded.  This API is based heavily around internal mutation
+    // (just like lua itself).
 
     let globals = lua.globals();
 
@@ -78,9 +78,8 @@ fn examples() -> LuaResult<()> {
     let print: LuaFunction = globals.get("print")?;
     print.call::<_, ()>("hello from rust")?;
 
-    // There is a specific method for handling variadics that involves
-    // Heterogeneous Lists.  This is one way to call a function with multiple
-    // parameters:
+    // This API handles variadics using Heterogeneous Lists.  This is one way to
+    // call a function with multiple parameters:
 
     print.call::<_, ()>(
         hlist!["hello", "again", "from", "rust"],
@@ -107,7 +106,8 @@ fn examples() -> LuaResult<()> {
     });
     globals.set("check_equal", check_equal)?;
 
-    // You can also accept variadic arguments to rust functions
+    // You can also accept variadic arguments to rust callbacks.
+
     let join = lua.create_function(|lua, args| {
         let strings = lua.unpack::<LuaVariadic<String>>(args)?.0;
         // (This is quadratic!, it's just an example!)
@@ -130,8 +130,8 @@ fn examples() -> LuaResult<()> {
     assert_eq!(lua.eval::<String>(r#"join("a", "b", "c")"#)?, "abc");
 
     // You can create userdata with methods and metamethods defined on them.
-    // Here's a more complete example that shows many of the features of this
-    // API together
+    // Here's a worked example that shows many of the features of this API
+    // together
 
     #[derive(Copy, Clone)]
     struct Vec2(f32, f32);

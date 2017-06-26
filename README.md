@@ -2,11 +2,13 @@
 
 [![Build Status](https://travis-ci.org/chucklefish/rlua.svg?branch=master)](https://travis-ci.org/chucklefish/rlua)
 
-[WIP API Documentation](https://docs.rs/rlua)
+[API Documentation](https://docs.rs/rlua)
 
-This library is a WIP high level interface between Rust and Lua.  Its major
-goal is to expose as easy to use, practical, and flexible of an API between
-Rust and Lua as possible, while also being completely safe.
+[Examples](examples/examples.rs)
+
+This library is a high level interface between Rust and Lua.  Its major goal is
+to expose as easy to use, practical, and flexible of an API between Rust and Lua
+as possible, while also being completely safe.
 
 There are other high level Lua bindings systems for rust, and this crate is an
 exploration of a different part of the design space.  The main high level
@@ -115,7 +117,3 @@ Panic / abort considerations when using this API:
     abort, from exceeding LUAI_MAXCCALLS.
   * There are no checks on argument sizes, and I think you can cause an abort by
     providing a large enough `LuaVariadic`.
-
-## Examples
-
-There's sort of a guided tour of the API [here](examples/examples.rs).
