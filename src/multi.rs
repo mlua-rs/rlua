@@ -15,9 +15,8 @@ impl<'lua> FromLuaMulti<'lua> for () {
     }
 }
 
-/// Result is convertible to `LuaMultiValue` following the common lua idiom of
-/// returning the result on success, or in the case of an error, returning nil
-/// followed by the error
+/// Result is convertible to `LuaMultiValue` following the common lua idiom of returning the result
+/// on success, or in the case of an error, returning nil followed by the error
 impl<'lua, T: ToLua<'lua>, E: ToLua<'lua>> ToLuaMulti<'lua> for Result<T, E> {
     fn to_lua_multi(self, lua: &'lua Lua) -> LuaResult<LuaMultiValue<'lua>> {
         let mut result = LuaMultiValue::new();
@@ -60,10 +59,10 @@ impl<'lua> FromLuaMulti<'lua> for LuaMultiValue<'lua> {
     }
 }
 
-/// Can be used to pass variadic values to or receive variadic values from Lua,
-/// where the type of the values is all the same and the number of values is
-/// defined at runtime.  This can be included in an hlist when unpacking, but
-/// must be the final entry, and will consume the rest of the parameters given.
+/// Can be used to pass variadic values to or receive variadic values from Lua, where the type of
+/// the values is all the same and the number of values is defined at runtime.  This can be included
+/// in an hlist when unpacking, but must be the final entry, and will consume the rest of the
+/// parameters given.
 pub struct LuaVariadic<T>(pub Vec<T>);
 
 impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for LuaVariadic<T> {

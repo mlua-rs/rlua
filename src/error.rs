@@ -5,11 +5,9 @@ use std::error::Error;
 
 #[derive(Debug, Clone)]
 pub enum LuaError {
-    /// Lua syntax error, aka `LUA_ERRSYNTAX` that is NOT an incomplete
-    /// statement.
+    /// Lua syntax error, aka `LUA_ERRSYNTAX` that is NOT an incomplete statement.
     SyntaxError(String),
-    /// Lua syntax error that IS an incomplete statement.  Useful for
-    /// implementing a REPL.
+    /// Lua syntax error that IS an incomplete statement.  Useful for implementing a REPL.
     IncompleteStatement(String),
     /// Lua runtime error, aka `LUA_ERRRUN`.
     RuntimeError(String),
@@ -23,17 +21,15 @@ pub enum LuaError {
     CoroutineInactive,
     /// A `LuaUserData` is not the expected type in a borrow.
     UserDataTypeMismatch,
-    /// A `LuaUserData` immutable borrow failed because it is already borrowed
-    /// mutably.
+    /// A `LuaUserData` immutable borrow failed because it is already borrowed mutably.
     UserDataBorrowError,
     /// A `LuaUserData` mutable borrow failed because it is already borrowed.
     UserDataBorrowMutError,
-    /// Lua error that originated as a LuaError in a callback.  The first field
-    /// is the lua error as a string, the second field is the Arc holding the
-    /// original LuaError.
+    /// Lua error that originated as a LuaError in a callback.  The first field is the lua error as
+    /// a string, the second field is the Arc holding the original LuaError.
     CallbackError(String, Arc<LuaError>),
-    /// Any custom external error type, mostly useful for returning external
-    /// error types from callbacks.
+    /// Any custom external error type, mostly useful for returning external error types from
+    /// callbacks.
     ExternalError(Arc<Error + Send + Sync>),
 }
 

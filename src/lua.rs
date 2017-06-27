@@ -103,9 +103,8 @@ impl<'lua> DerefMut for LuaMultiValue<'lua> {
 
 /// Trait for types convertible to any number of Lua values.
 ///
-/// This is a generalization of `ToLua`, allowing any number of resulting Lua
-/// values instead of just one. Any type that implements `ToLua` will
-/// automatically implement this trait.
+/// This is a generalization of `ToLua`, allowing any number of resulting Lua values instead of just
+/// one. Any type that implements `ToLua` will automatically implement this trait.
 pub trait ToLuaMulti<'a> {
     /// Performs the conversion.
     fn to_lua_multi(self, lua: &'a Lua) -> LuaResult<LuaMultiValue<'a>>;
@@ -113,17 +112,15 @@ pub trait ToLuaMulti<'a> {
 
 /// Trait for types that can be created from an arbitrary number of Lua values.
 ///
-/// This is a generalization of `FromLua`, allowing an arbitrary number of Lua
-/// values to participate in the conversion. Any type that implements `FromLua`
-/// will automatically implement this trait.
+/// This is a generalization of `FromLua`, allowing an arbitrary number of Lua values to participate
+/// in the conversion. Any type that implements `FromLua` will automatically implement this trait.
 pub trait FromLuaMulti<'a>: Sized {
     /// Performs the conversion.
     ///
-    /// In case `values` contains more values than needed to perform the
-    /// conversion, the excess values should be ignored. This reflects the
-    /// semantics of Lua when calling a function or assigning values. Similarly,
-    /// if not enough values are given, conversions should assume that any
-    /// missing values are nil.
+    /// In case `values` contains more values than needed to perform the conversion, the excess
+    /// values should be ignored. This reflects the semantics of Lua when calling a function or
+    /// assigning values. Similarly, if not enough values are given, conversions should assume that
+    /// any missing values are nil.
     fn from_lua_multi(values: LuaMultiValue<'a>, lua: &'a Lua) -> LuaResult<Self>;
 }
 
@@ -220,8 +217,8 @@ impl<'lua> LuaTable<'lua> {
     ///
     /// If the value is `nil`, this will effectively remove the pair.
     ///
-    /// This might invoke the `__newindex` metamethod. Use the `raw_set` method
-    /// if that is not desired.
+    /// This might invoke the `__newindex` metamethod. Use the `raw_set` method if that is not
+    /// desired.
     pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> LuaResult<()> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
@@ -242,8 +239,7 @@ impl<'lua> LuaTable<'lua> {
     ///
     /// If no value is associated to `key`, returns the `nil` value.
     ///
-    /// This might invoke the `__index` metamethod. Use the `raw_get` method if
-    /// that is not desired.
+    /// This might invoke the `__index` metamethod. Use the `raw_get` method if that is not desired.
     pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> LuaResult<V> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
@@ -312,8 +308,7 @@ impl<'lua> LuaTable<'lua> {
 
     /// Returns the result of the Lua `#` operator.
     ///
-    /// This might invoke the `__len` metamethod. Use the `raw_len` method if
-    /// that is not desired.
+    /// This might invoke the `__len` metamethod. Use the `raw_len` method if that is not desired.
     pub fn len(&self) -> LuaResult<LuaInteger> {
         let lua = self.0.lua;
         unsafe {
@@ -325,8 +320,7 @@ impl<'lua> LuaTable<'lua> {
         }
     }
 
-    /// Returns the result of the Lua `#` operator, without invoking the
-    /// `__len` metamethod.
+    /// Returns the result of the Lua `#` operator, without invoking the `__len` metamethod.
     pub fn raw_len(&self) -> LuaInteger {
         let lua = self.0.lua;
         unsafe {
@@ -340,8 +334,8 @@ impl<'lua> LuaTable<'lua> {
         }
     }
 
-    /// Consume this table and return an iterator over the pairs of the table,
-    /// works like the Lua 'pairs' function.
+    /// Consume this table and return an iterator over the pairs of the table, works like the Lua
+    /// 'pairs' function.
     pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(self) -> LuaTablePairs<'lua, K, V> {
         let next_key = Some(LuaRef {
             lua: self.0.lua,
@@ -355,9 +349,9 @@ impl<'lua> LuaTable<'lua> {
         }
     }
 
-    /// Consume this table and return an iterator over the values of this table,
-    /// which should be a sequence.  Works like the Lua 'ipairs' function, but
-    /// doesn't return the indexes, only the values in order.
+    /// Consume this table and return an iterator over the values of this table, which should be a
+    /// sequence.  Works like the Lua 'ipairs' function, but doesn't return the indexes, only the
+    /// values in order.
     pub fn sequence_values<V: FromLua<'lua>>(self) -> LuaTableSequence<'lua, V> {
         LuaTableSequence {
             table: self.0,
@@ -369,8 +363,7 @@ impl<'lua> LuaTable<'lua> {
 
 /// An iterator over the pairs of a Lua table.
 ///
-/// Should behave exactly like the lua 'pairs' function.  Holds an internal
-/// reference to the table.
+/// Should behave exactly like the lua 'pairs' function.  Holds an internal reference to the table.
 pub struct LuaTablePairs<'lua, K, V> {
     table: LuaRef<'lua>,
     next_key: Option<LuaRef<'lua>>,
@@ -425,8 +418,8 @@ where
 
 /// An iterator over the sequence part of a Lua table.
 ///
-/// Should behave similarly to the lua 'ipairs" function, except only produces
-/// the values, not the indexes.  Holds an internal reference to the table.
+/// Should behave similarly to the lua 'ipairs" function, except only produces the values, not the
+/// indexes.  Holds an internal reference to the table.
 pub struct LuaTableSequence<'lua, V> {
     table: LuaRef<'lua>,
     index: Option<LuaInteger>,
@@ -582,9 +575,8 @@ impl<'lua> LuaFunction<'lua> {
 
 /// Status of a Lua thread (or coroutine).
 ///
-/// A `LuaThread` is `Active` before the coroutine function finishes, Dead after
-/// it finishes, and in Error state if error has been called inside the
-/// coroutine.
+/// A `LuaThread` is `Active` before the coroutine function finishes, Dead after it finishes, and in
+/// Error state if error has been called inside the coroutine.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum LuaThreadStatus {
     /// The thread has finished executing.
@@ -609,8 +601,8 @@ impl<'lua> LuaThread<'lua> {
     /// are passed to its main function.
     ///
     /// If the thread is no longer in `Active` state (meaning it has finished execution or
-    /// encountered an error), this will return Err(CoroutineInactive),
-    /// otherwise will return Ok as follows:
+    /// encountered an error), this will return Err(CoroutineInactive), otherwise will return Ok as
+    /// follows:
     ///
     /// If the thread calls `coroutine.yield`, returns the values passed to `yield`. If the thread
     /// `return`s values from its main function, returns those.
@@ -762,11 +754,10 @@ pub enum LuaMetaMethod {
 
 /// Stores methods of a userdata object.
 ///
-/// Methods added will be added to the `__index` table on the metatable for the
-/// userdata, so they can be called as `userdata:method(args)` as expected.  If
-/// there are any regular methods, and an `Index` metamethod is given, it will
-/// be called as a *fallback* if the index doesn't match an existing regular
-/// method.
+/// Methods added will be added to the `__index` table on the metatable for the userdata, so they
+/// can be called as `userdata:method(args)` as expected.  If there are any regular methods, and an
+/// `Index` metamethod is given, it will be called as a *fallback* if the index doesn't match an
+/// existing regular method.
 pub struct LuaUserDataMethods<T> {
     methods: HashMap<String, LuaCallback>,
     meta_methods: HashMap<LuaMetaMethod, LuaCallback>,
@@ -774,8 +765,7 @@ pub struct LuaUserDataMethods<T> {
 }
 
 impl<T: LuaUserDataType> LuaUserDataMethods<T> {
-    /// Add a regular method as a function which accepts a &T as the first
-    /// parameter.
+    /// Add a regular method as a function which accepts a &T as the first parameter.
     pub fn add_method<M>(&mut self, name: &str, method: M)
         where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -786,8 +776,7 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         );
     }
 
-    /// Add a regular method as a function which accepts a &mut T as the first
-    /// parameter.
+    /// Add a regular method as a function which accepts a &mut T as the first parameter.
     pub fn add_method_mut<M>(&mut self, name: &str, method: M)
         where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -798,8 +787,8 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         );
     }
 
-    /// Add a regular method as a function which accepts generic arguments, the
-    /// first argument will always be a LuaUserData of type T.
+    /// Add a regular method as a function which accepts generic arguments, the first argument will
+    /// always be a LuaUserData of type T.
     pub fn add_function<F>(&mut self, name: &str, function: F)
         where F: 'static + for<'a, 'lua> FnMut(&'lua Lua, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -807,9 +796,9 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         self.methods.insert(name.to_owned(), Box::new(function));
     }
 
-    /// Add a metamethod as a function which accepts a &T as the first
-    /// parameter.  This can cause an error with certain binary metamethods that
-    /// can trigger if ony the right side has a metatable.
+    /// Add a metamethod as a function which accepts a &T as the first parameter.  This can cause an
+    /// error with certain binary metamethods that can trigger if ony the right side has a
+    /// metatable.
     pub fn add_meta_method<M>(&mut self, meta: LuaMetaMethod, method: M)
         where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -817,9 +806,9 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
 
-    /// Add a metamethod as a function which accepts a &mut T as the first
-    /// parameter.  This can cause an error with certain binary metamethods that
-    /// can trigger if ony the right side has a metatable.
+    /// Add a metamethod as a function which accepts a &mut T as the first parameter.  This can
+    /// cause an error with certain binary metamethods that can trigger if ony the right side has a
+    /// metatable.
     pub fn add_meta_method_mut<M>(&mut self, meta: LuaMetaMethod, method: M)
         where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -827,10 +816,10 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
 
-    /// Add a metamethod as a function which accepts generic arguments.
-    /// Metamethods in Lua for binary operators can be triggered if either the
-    /// left or right argument to the binary operator has a metatable, so the
-    /// first argument here is not necessarily a userdata of type T.
+    /// Add a metamethod as a function which accepts generic arguments.  Metamethods in Lua for
+    /// binary operators can be triggered if either the left or right argument to the binary
+    /// operator has a metatable, so the first argument here is not necessarily a userdata of type
+    /// T.
     pub fn add_meta_function<F>(&mut self, meta: LuaMetaMethod, function: F)
         where F: 'static + for<'a, 'lua> FnMut(&'lua Lua, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
@@ -880,9 +869,8 @@ pub trait LuaUserDataType: 'static + Sized {
     fn add_methods(_methods: &mut LuaUserDataMethods<Self>) {}
 }
 
-/// Handle to an internal Lua userdata for a type that implements
-/// LuaUserDataType.  Internally, instances are stored in a `RefCell`, to best
-/// match the mutable semantics of the Lua language.
+/// Handle to an internal Lua userdata for a type that implements LuaUserDataType.  Internally,
+/// instances are stored in a `RefCell`, to best match the mutable semantics of the Lua language.
 #[derive(Clone, Debug)]
 pub struct LuaUserData<'lua>(LuaRef<'lua>);
 
@@ -901,8 +889,7 @@ impl<'lua> LuaUserData<'lua> {
         }).ok_or(LuaError::UserDataTypeMismatch)?
     }
 
-    /// Borrow mutably this userdata out of the internal RefCell that is held in
-    /// lua.
+    /// Borrow mutably this userdata out of the internal RefCell that is held in lua.
     pub fn borrow_mut<T: LuaUserDataType>(&self) -> LuaResult<RefMut<T>> {
         self.inspect(|cell| {
             Ok(cell.try_borrow_mut().map_err(
@@ -1045,8 +1032,8 @@ impl Lua {
 
     /// Loads a chunk of Lua code and returns it as a function.
     ///
-    /// The source can be named by setting the `name` parameter. This is
-    /// generally recommended as it results in better error traces.
+    /// The source can be named by setting the `name` parameter. This is generally recommended as it
+    /// results in better error traces.
     ///
     /// Equivalent to Lua's `load` function.
     pub fn load(&self, source: &str, name: Option<&str>) -> LuaResult<LuaFunction> {
@@ -1081,8 +1068,8 @@ impl Lua {
 
     /// Execute a chunk of Lua code.
     ///
-    /// This is equivalent to simply loading the source with `load` and then
-    /// calling the resulting function with no arguments.
+    /// This is equivalent to simply loading the source with `load` and then calling the resulting
+    /// function with no arguments.
     ///
     /// Returns the values returned by the chunk.
     pub fn exec<'lua, R: FromLuaMulti<'lua>>(
@@ -1095,8 +1082,8 @@ impl Lua {
 
     /// Evaluate the given expression or chunk inside this Lua state.
     ///
-    /// If `source` is an expression, returns the value it evaluates
-    /// to. Otherwise, returns the values returned by the chunk (if any).
+    /// If `source` is an expression, returns the value it evaluates to. Otherwise, returns the
+    /// values returned by the chunk (if any).
     pub fn eval<'lua, R: FromLuaMulti<'lua>>(&'lua self, source: &str) -> LuaResult<R> {
         unsafe {
             stack_err_guard(self.state, 0, || {
