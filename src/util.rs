@@ -237,8 +237,8 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> LuaResult<
             Err(match err {
                 ffi::LUA_ERRRUN => LuaError::RuntimeError(err_string),
                 ffi::LUA_ERRSYNTAX => {
-                    // This seems terrible, but as far as I can tell, this is exactly what the stock lua
-                    // repl does.
+                    // This seems terrible, but as far as I can tell, this is exactly what the stock
+                    // lua repl does.
                     if err_string.ends_with("<eof>") {
                         LuaError::IncompleteStatement(err_string)
                     } else {
