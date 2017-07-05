@@ -1,6 +1,6 @@
 [package]
 name = "rlua"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["kyren <catherine@chucklefish.org>"]
 description = "High level bindings to Lua 5.3"
 repository = "https://github.com/chucklefish/rlua"
@@ -9,8 +9,17 @@ readme = "README.md"
 keywords = ["lua"]
 license = "MIT"
 
+[features]
+default = ["builtin-lua"]
+# Builds the correct version of Lua 5.3 inside the crate. If you want to link a
+# specialized version of lua into your binary, you can disable this feature to
+# do that, but care must be taken.  `rlua` expects the linked lua to define
+# LUA_INTEGER as long long, and LUA_NUMBER as double, and may make other
+# assumptions about how lua is built.
+builtin-lua = ["gcc"]
+
 [build-dependencies]
-gcc = "0.3"
+gcc = { version = "0.3", optional = true }
 
 [dependencies]
 hlist-macro = "0.1"
