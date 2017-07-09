@@ -48,6 +48,7 @@ pub const LUA_TFUNCTION: c_int = 6;
 pub const LUA_TUSERDATA: c_int = 7;
 pub const LUA_TTHREAD: c_int = 8;
 
+#[link(name = "lua5.3")]
 extern "C" {
     pub fn lua_close(state: *mut lua_State);
     pub fn lua_callk(
