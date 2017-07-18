@@ -8,7 +8,7 @@ use std::os::raw::{c_char, c_int, c_void};
 use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
 
 use ffi;
-use error::{LuaResult, LuaError};
+use error::{Result, Error};
 
 macro_rules! cstr {
   ($s:expr) => (
@@ -114,9 +114,9 @@ pub unsafe fn stack_err_guard<F, R>(
     state: *mut ffi::lua_State,
     change: c_int,
     op: F,
-) -> LuaResult<R>
+) -> Result<R>
 where
-    F: FnOnce() -> LuaResult<R>,
+    F: FnOnce() -> Result<R>,
 {
     let expected = ffi::lua_gettop(state) + change;
     lua_assert!(
@@ -161,9 +161,9 @@ pub unsafe fn error_guard<F, R>(
     state: *mut ffi::lua_State,
     nargs: c_int,
     func: F,
-) -> LuaResult<R>
+) -> Result<R>
 where
-    F: FnOnce(*mut ffi::lua_State) -> LuaResult<R> + UnwindSafe,
+    F: FnOnce(*mut ffi::lua_State) -> Result<R> + UnwindSafe,
 {
     unsafe extern "C" fn call_impl<F>(state: *mut ffi::lua_State) -> c_int
     where
@@ -179,7 +179,7 @@ where
         state: *mut ffi::lua_State,
         nargs: c_int,
         mut func: F,
-    ) -> LuaResult<()>
+    ) -> Result<()>
     where
         F: FnOnce(*mut ffi::lua_State) -> c_int,
     {
@@ -209,7 +209,7 @@ where
 // stack continues the panic.  If the error on the top of the stack is actually
 // a WrappedError, just returns it.  Otherwise, interprets the error as the
 // appropriate lua error.
-pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> LuaResult<()> {
+pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()> {
     if err == ffi::LUA_OK || err == ffi::LUA_YIELD {
         Ok(())
     } else {
@@ -238,17 +238,17 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> LuaResult<
             ffi::lua_pop(state, 1);
 
             Err(match err {
-                ffi::LUA_ERRRUN => LuaError::RuntimeError(err_string),
+                ffi::LUA_ERRRUN => Error::RuntimeError(err_string),
                 ffi::LUA_ERRSYNTAX => {
                     // This seems terrible, but as far as I can tell, this is exactly what the stock
                     // lua repl does.
                     if err_string.ends_with("<eof>") {
-                        LuaError::IncompleteStatement(err_string)
+                        Error::IncompleteStatement(err_string)
                     } else {
-                        LuaError::SyntaxError(err_string)
+                        Error::SyntaxError(err_string)
                     }
                 }
-                ffi::LUA_ERRERR => LuaError::ErrorError(err_string),
+                ffi::LUA_ERRERR => Error::ErrorError(err_string),
                 ffi::LUA_ERRMEM => {
                     // This is not impossible to hit, but this library is not set up
                     // to handle this properly.  Lua does a longjmp on out of memory
@@ -310,7 +310,7 @@ pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c
 // the rust side, it will resume the panic.
 pub unsafe fn callback_error<R, F>(state: *mut ffi::lua_State, f: F) -> R
 where
-    F: FnOnce() -> LuaResult<R> + UnwindSafe,
+    F: FnOnce() -> Result<R> + UnwindSafe,
 {
     match catch_unwind(f) {
         Ok(Ok(r)) => r,
@@ -326,7 +326,7 @@ where
 }
 
 // ffi::lua_pcall with a message handler that gives a nice traceback.  If the
-// caught error is actually a LuaError, will simply pass the error along.  Does
+// caught error is actually a Error, will simply pass the error along.  Does
 // not call checkstack, and uses 2 extra stack spaces.
 pub unsafe fn pcall_with_traceback(
     state: *mut ffi::lua_State,
@@ -340,7 +340,7 @@ pub unsafe fn pcall_with_traceback(
                 .to_str()
                 .unwrap_or_else(|_| "<could not capture traceback>")
                 .to_owned();
-            push_wrapped_error(state, LuaError::CallbackError(traceback, Arc::new(error)));
+            push_wrapped_error(state, Error::CallbackError(traceback, Arc::new(error)));
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
             if !s.is_null() {
@@ -373,7 +373,7 @@ pub unsafe fn resume_with_traceback(
                 .to_str()
                 .unwrap_or_else(|_| "<could not capture traceback>")
                 .to_owned();
-            push_wrapped_error(from, LuaError::CallbackError(traceback, Arc::new(error)));
+            push_wrapped_error(from, Error::CallbackError(traceback, Arc::new(error)));
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
             if !s.is_null() {
@@ -443,11 +443,11 @@ pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
     state
 }
 
-pub struct WrappedError(pub LuaError);
+pub struct WrappedError(pub Error);
 pub struct WrappedPanic(pub Option<Box<Any + Send>>);
 
 // Pushes a WrappedError::Error to the top of the stack
-pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: LuaError) {
+pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
         callback_error(state, || if is_wrapped_error(state, -1) {
             let error = &*get_userdata::<WrappedError>(state, -1);
@@ -457,8 +457,8 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: LuaError) {
             Ok(1)
 
         } else {
-            Err(LuaError::FromLuaConversionError(
-                "internal error: userdata mismatch in LuaError metamethod"
+            Err(Error::FromLuaConversionError(
+                "internal error: userdata mismatch in Error metamethod"
                     .to_owned(),
             ))
         })
@@ -534,7 +534,7 @@ pub unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Se
 
 // Pops a WrappedError off of the top of the stack, if it is a WrappedError.  If
 // it is not a WrappedError, returns None and does not pop anything.
-pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<LuaError> {
+pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<Error> {
     if ffi::lua_gettop(state) == 0 || !is_wrapped_error(state, -1) {
         None
     } else {

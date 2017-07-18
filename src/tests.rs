@@ -1,6 +1,5 @@
 use std::fmt;
-use std::result::Result;
-use std::error::Error;
+use std::error;
 use std::panic::catch_unwind;
 use std::os::raw::c_void;
 
@@ -38,7 +37,7 @@ fn test_exec() {
     ).unwrap();
     assert_eq!(globals.get::<_, String>("res").unwrap(), "foobar");
 
-    let module: LuaTable = lua.exec(
+    let module: Table = lua.exec(
         r#"
             local module = {}
 
@@ -53,7 +52,7 @@ fn test_exec() {
     assert!(module.contains_key("func").unwrap());
     assert_eq!(
         module
-            .get::<_, LuaFunction>("func")
+            .get::<_, Function>("func")
             .unwrap()
             .call::<_, String>(())
             .unwrap(),
@@ -68,7 +67,7 @@ fn test_eval() {
     assert_eq!(lua.eval::<bool>("false == false", None).unwrap(), true);
     assert_eq!(lua.eval::<i32>("return 1 + 2", None).unwrap(), 3);
     match lua.eval::<()>("if true then", None) {
-        Err(LuaError::IncompleteStatement(_)) => {}
+        Err(Error::IncompleteStatement(_)) => {}
         r => panic!("expected IncompleteStatement, got {:?}", r),
     }
 }
@@ -79,8 +78,8 @@ fn test_table() {
     let globals = lua.globals();
 
     globals.set("table", lua.create_table()).unwrap();
-    let table1: LuaTable = globals.get("table").unwrap();
-    let table2: LuaTable = globals.get("table").unwrap();
+    let table1: Table = globals.get("table").unwrap();
+    let table2: Table = globals.get("table").unwrap();
 
     table1.set("foo", "bar").unwrap();
     table2.set("baz", "baf").unwrap();
@@ -97,16 +96,16 @@ fn test_table() {
         None,
     ).unwrap();
 
-    let table1 = globals.get::<_, LuaTable>("table1").unwrap();
-    let table2 = globals.get::<_, LuaTable>("table2").unwrap();
-    let table3 = globals.get::<_, LuaTable>("table3").unwrap();
+    let table1 = globals.get::<_, Table>("table1").unwrap();
+    let table2 = globals.get::<_, Table>("table2").unwrap();
+    let table3 = globals.get::<_, Table>("table3").unwrap();
 
     assert_eq!(table1.len().unwrap(), 5);
     assert_eq!(
         table1
             .clone()
             .pairs()
-            .collect::<LuaResult<Vec<(i64, i64)>>>()
+            .collect::<Result<Vec<(i64, i64)>>>()
             .unwrap(),
         vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
     );
@@ -114,7 +113,7 @@ fn test_table() {
         table1
             .clone()
             .sequence_values()
-            .collect::<LuaResult<Vec<i64>>>()
+            .collect::<Result<Vec<i64>>>()
             .unwrap(),
         vec![1, 2, 3, 4, 5]
     );
@@ -124,14 +123,14 @@ fn test_table() {
         table2
             .clone()
             .pairs()
-            .collect::<LuaResult<Vec<(i64, i64)>>>()
+            .collect::<Result<Vec<(i64, i64)>>>()
             .unwrap(),
         vec![]
     );
     assert_eq!(
         table2
             .sequence_values()
-            .collect::<LuaResult<Vec<i64>>>()
+            .collect::<Result<Vec<i64>>>()
             .unwrap(),
         vec![]
     );
@@ -140,7 +139,7 @@ fn test_table() {
     assert_eq!(
         table3
             .sequence_values()
-            .collect::<LuaResult<Vec<i64>>>()
+            .collect::<Result<Vec<i64>>>()
             .unwrap(),
         vec![1, 2]
     );
@@ -151,11 +150,11 @@ fn test_table() {
             lua.create_sequence_from(vec![1, 2, 3, 4, 5]).unwrap(),
         )
         .unwrap();
-    let table4 = globals.get::<_, LuaTable>("table4").unwrap();
+    let table4 = globals.get::<_, Table>("table4").unwrap();
     assert_eq!(
         table4
             .pairs()
-            .collect::<LuaResult<Vec<(i64, i64)>>>()
+            .collect::<Result<Vec<(i64, i64)>>>()
             .unwrap(),
         vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
     );
@@ -174,7 +173,7 @@ fn test_function() {
         None,
     ).unwrap();
 
-    let concat = globals.get::<_, LuaFunction>("concat").unwrap();
+    let concat = globals.get::<_, Function>("concat").unwrap();
     assert_eq!(
         concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
         "foobar"
@@ -198,7 +197,7 @@ fn test_bind() {
         None,
     ).unwrap();
 
-    let mut concat = globals.get::<_, LuaFunction>("concat").unwrap();
+    let mut concat = globals.get::<_, Function>("concat").unwrap();
     concat = concat.bind("foo").unwrap();
     concat = concat.bind("bar").unwrap();
     concat = concat.bind(hlist!["baz", "baf"]).unwrap();
@@ -226,7 +225,7 @@ fn test_rust_function() {
             None,
         ).unwrap();
 
-        let lua_function = globals.get::<_, LuaFunction>("lua_function").unwrap();
+        let lua_function = globals.get::<_, Function>("lua_function").unwrap();
         let rust_function = lua.create_function(|lua, _| {
             captured_var = 42;
             lua.pack("hello")
@@ -243,8 +242,8 @@ fn test_user_data() {
     struct UserData1(i64);
     struct UserData2(Box<i64>);
 
-    impl LuaUserDataType for UserData1 {};
-    impl LuaUserDataType for UserData2 {};
+    impl UserData for UserData1 {};
+    impl UserData for UserData2 {};
 
     let lua = Lua::new();
 
@@ -262,10 +261,10 @@ fn test_user_data() {
 
 #[test]
 fn test_methods() {
-    struct UserData(i64);
+    struct MyUserData(i64);
 
-    impl LuaUserDataType for UserData {
-        fn add_methods(methods: &mut LuaUserDataMethods<Self>) {
+    impl UserData for MyUserData {
+        fn add_methods(methods: &mut UserDataMethods<Self>) {
             methods.add_method("get_value", |lua, data, _| lua.pack(data.0));
             methods.add_method_mut("set_value", |lua, data, args| {
                 data.0 = lua.unpack(args)?;
@@ -276,7 +275,7 @@ fn test_methods() {
 
     let lua = Lua::new();
     let globals = lua.globals();
-    let userdata = lua.create_userdata(UserData(42));
+    let userdata = lua.create_userdata(MyUserData(42));
     globals.set("userdata", userdata.clone()).unwrap();
     lua.exec::<()>(
         r#"
@@ -290,10 +289,10 @@ fn test_methods() {
         "#,
         None,
     ).unwrap();
-    let get = globals.get::<_, LuaFunction>("get_it").unwrap();
-    let set = globals.get::<_, LuaFunction>("set_it").unwrap();
+    let get = globals.get::<_, Function>("get_it").unwrap();
+    let set = globals.get::<_, Function>("set_it").unwrap();
     assert_eq!(get.call::<_, i64>(()).unwrap(), 42);
-    userdata.borrow_mut::<UserData>().unwrap().0 = 64;
+    userdata.borrow_mut::<MyUserData>().unwrap().0 = 64;
     assert_eq!(get.call::<_, i64>(()).unwrap(), 64);
     set.call::<_, ()>(100).unwrap();
     assert_eq!(get.call::<_, i64>(()).unwrap(), 100);
@@ -302,20 +301,20 @@ fn test_methods() {
 #[test]
 fn test_metamethods() {
     #[derive(Copy, Clone)]
-    struct UserData(i64);
+    struct MyUserData(i64);
 
-    impl LuaUserDataType for UserData {
-        fn add_methods(methods: &mut LuaUserDataMethods<Self>) {
+    impl UserData for MyUserData {
+        fn add_methods(methods: &mut UserDataMethods<Self>) {
             methods.add_method("get", |lua, data, _| lua.pack(data.0));
-            methods.add_meta_function(LuaMetaMethod::Add, |lua, args| {
-                let hlist_pat![lhs, rhs] = lua.unpack::<HList![UserData, UserData]>(args)?;
-                lua.pack(UserData(lhs.0 + rhs.0))
+            methods.add_meta_function(MetaMethod::Add, |lua, args| {
+                let hlist_pat![lhs, rhs] = lua.unpack::<HList![MyUserData, MyUserData]>(args)?;
+                lua.pack(MyUserData(lhs.0 + rhs.0))
             });
-            methods.add_meta_function(LuaMetaMethod::Sub, |lua, args| {
-                let hlist_pat![lhs, rhs] = lua.unpack::<HList![UserData, UserData]>(args)?;
-                lua.pack(UserData(lhs.0 - rhs.0))
+            methods.add_meta_function(MetaMethod::Sub, |lua, args| {
+                let hlist_pat![lhs, rhs] = lua.unpack::<HList![MyUserData, MyUserData]>(args)?;
+                lua.pack(MyUserData(lhs.0 - rhs.0))
             });
-            methods.add_meta_method(LuaMetaMethod::Index, |lua, data, args| {
+            methods.add_meta_method(MetaMethod::Index, |lua, data, args| {
                 let index = lua.unpack::<LuaString>(args)?;
                 if index.to_str()? == "inner" {
                     lua.pack(data.0)
@@ -328,16 +327,16 @@ fn test_metamethods() {
 
     let lua = Lua::new();
     let globals = lua.globals();
-    globals.set("userdata1", UserData(7)).unwrap();
-    globals.set("userdata2", UserData(3)).unwrap();
+    globals.set("userdata1", MyUserData(7)).unwrap();
+    globals.set("userdata2", MyUserData(3)).unwrap();
     assert_eq!(
-        lua.eval::<UserData>("userdata1 + userdata2", None)
+        lua.eval::<MyUserData>("userdata1 + userdata2", None)
             .unwrap()
             .0,
         10
     );
     assert_eq!(
-        lua.eval::<UserData>("userdata1 - userdata2", None)
+        lua.eval::<MyUserData>("userdata1 - userdata2", None)
             .unwrap()
             .0,
         4
@@ -363,8 +362,8 @@ fn test_scope() {
     // Make sure that table gets do not borrow the table, but instead just borrow lua.
     let tin;
     {
-        let touter = globals.get::<_, LuaTable>("touter").unwrap();
-        tin = touter.get::<_, LuaTable>("tin").unwrap();
+        let touter = globals.get::<_, Table>("touter").unwrap();
+        tin = touter.get::<_, Table>("tin").unwrap();
     }
 
     assert_eq!(tin.get::<_, i64>(1).unwrap(), 1);
@@ -373,10 +372,10 @@ fn test_scope() {
 
     // Should not compile, don't know how to test that
     // struct UserData;
-    // impl LuaUserDataType for UserData {};
+    // impl UserData for UserData {};
     // let userdata_ref;
     // {
-    //     let touter = globals.get::<_, LuaTable>("touter").unwrap();
+    //     let touter = globals.get::<_, Table>("touter").unwrap();
     //     touter.set("userdata", lua.create_userdata(UserData).unwrap()).unwrap();
     //     let userdata = touter.get::<_, LuaUserData>("userdata").unwrap();
     //     userdata_ref = userdata.borrow::<UserData>();
@@ -400,8 +399,8 @@ fn test_lua_multi() {
         None,
     ).unwrap();
 
-    let concat = globals.get::<_, LuaFunction>("concat").unwrap();
-    let mreturn = globals.get::<_, LuaFunction>("mreturn").unwrap();
+    let concat = globals.get::<_, Function>("concat").unwrap();
+    let mreturn = globals.get::<_, Function>("mreturn").unwrap();
 
     assert_eq!(
         concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
@@ -409,8 +408,8 @@ fn test_lua_multi() {
     );
     let hlist_pat![a, b] = mreturn.call::<_, HList![u64, u64]>(hlist![]).unwrap();
     assert_eq!((a, b), (1, 2));
-    let hlist_pat![a, b, LuaVariadic(v)] =
-        mreturn.call::<_, HList![u64, u64, LuaVariadic<u64>]>(hlist![]).unwrap();
+    let hlist_pat![a, b, Variadic(v)] =
+        mreturn.call::<_, HList![u64, u64, Variadic<u64>]>(hlist![]).unwrap();
     assert_eq!((a, b), (1, 2));
     assert_eq!(v, vec![3, 4, 5, 6]);
 }
@@ -439,17 +438,17 @@ fn test_error() {
     pub struct TestError;
 
     impl fmt::Display for TestError {
-        fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
             write!(fmt, "test error")
         }
     }
 
-    impl Error for TestError {
+    impl error::Error for TestError {
         fn description(&self) -> &str {
             "test error"
         }
 
-        fn cause(&self) -> Option<&Error> {
+        fn cause(&self) -> Option<&error::Error> {
             None
         }
     }
@@ -514,44 +513,44 @@ fn test_error() {
         .set("rust_error_function", rust_error_function)
         .unwrap();
 
-    let no_error = globals.get::<_, LuaFunction>("no_error").unwrap();
-    let lua_error = globals.get::<_, LuaFunction>("lua_error").unwrap();
-    let rust_error = globals.get::<_, LuaFunction>("rust_error").unwrap();
-    let return_error = globals.get::<_, LuaFunction>("return_error").unwrap();
+    let no_error = globals.get::<_, Function>("no_error").unwrap();
+    let lua_error = globals.get::<_, Function>("lua_error").unwrap();
+    let rust_error = globals.get::<_, Function>("rust_error").unwrap();
+    let return_error = globals.get::<_, Function>("return_error").unwrap();
     let return_string_error = globals
-        .get::<_, LuaFunction>("return_string_error")
+        .get::<_, Function>("return_string_error")
         .unwrap();
-    let test_pcall = globals.get::<_, LuaFunction>("test_pcall").unwrap();
+    let test_pcall = globals.get::<_, Function>("test_pcall").unwrap();
     let understand_recursion = globals
-        .get::<_, LuaFunction>("understand_recursion")
+        .get::<_, Function>("understand_recursion")
         .unwrap();
 
     assert!(no_error.call::<_, ()>(()).is_ok());
     match lua_error.call::<_, ()>(()) {
-        Err(LuaError::RuntimeError(_)) => {}
+        Err(Error::RuntimeError(_)) => {}
         Err(_) => panic!("error is not RuntimeError kind"),
         _ => panic!("error not returned"),
     }
     match rust_error.call::<_, ()>(()) {
-        Err(LuaError::CallbackError(_, _)) => {}
+        Err(Error::CallbackError(_, _)) => {}
         Err(_) => panic!("error is not CallbackError kind"),
         _ => panic!("error not returned"),
     }
 
-    match return_error.call::<_, LuaValue>(()) {
-        Ok(LuaValue::Error(_)) => {}
-        _ => panic!("LuaValue::Error not returned"),
+    match return_error.call::<_, Value>(()) {
+        Ok(Value::Error(_)) => {}
+        _ => panic!("Value::Error not returned"),
     }
 
-    assert!(return_string_error.call::<_, LuaError>(()).is_ok());
+    assert!(return_string_error.call::<_, Error>(()).is_ok());
 
     match lua.eval::<()>("if youre happy and you know it syntax error", None) {
-        Err(LuaError::SyntaxError(_)) => {}
+        Err(Error::SyntaxError(_)) => {}
         Err(_) => panic!("error is not LuaSyntaxError::Syntax kind"),
         _ => panic!("error not returned"),
     }
     match lua.eval::<()>("function i_will_finish_what_i()", None) {
-        Err(LuaError::IncompleteStatement(_)) => {}
+        Err(Error::IncompleteStatement(_)) => {}
         Err(_) => panic!("error is not LuaSyntaxError::IncompleteStatement kind"),
         _ => panic!("error not returned"),
     }
@@ -560,7 +559,7 @@ fn test_error() {
 
     assert!(understand_recursion.call::<_, ()>(()).is_err());
 
-    match catch_unwind(|| -> LuaResult<()> {
+    match catch_unwind(|| -> Result<()> {
         let lua = Lua::new();
         let globals = lua.globals();
 
@@ -577,7 +576,7 @@ fn test_error() {
         });
         globals.set("rust_panic_function", rust_panic_function)?;
 
-        let rust_panic = globals.get::<_, LuaFunction>("rust_panic")?;
+        let rust_panic = globals.get::<_, Function>("rust_panic")?;
 
         rust_panic.call::<_, ()>(())
     }) {
@@ -586,7 +585,7 @@ fn test_error() {
         Err(_) => {}
     };
 
-    match catch_unwind(|| -> LuaResult<()> {
+    match catch_unwind(|| -> Result<()> {
         let lua = Lua::new();
         let globals = lua.globals();
 
@@ -603,7 +602,7 @@ fn test_error() {
         });
         globals.set("rust_panic_function", rust_panic_function)?;
 
-        let rust_panic = globals.get::<_, LuaFunction>("rust_panic")?;
+        let rust_panic = globals.get::<_, Function>("rust_panic")?;
 
         rust_panic.call::<_, ()>(())
     }) {
@@ -617,7 +616,7 @@ fn test_error() {
 fn test_thread() {
     let lua = Lua::new();
     let thread = lua.create_thread(
-        lua.eval::<LuaFunction>(
+        lua.eval::<Function>(
             r#"
                 function (s)
                     local sum = s
@@ -631,20 +630,20 @@ fn test_thread() {
         ).unwrap(),
     );
 
-    assert_eq!(thread.status(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(0).unwrap(), 0);
-    assert_eq!(thread.status(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(1).unwrap(), 1);
-    assert_eq!(thread.status(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(2).unwrap(), 3);
-    assert_eq!(thread.status(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(3).unwrap(), 6);
-    assert_eq!(thread.status(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(4).unwrap(), 10);
-    assert_eq!(thread.status(), LuaThreadStatus::Dead);
+    assert_eq!(thread.status(), ThreadStatus::Dead);
 
     let accumulate = lua.create_thread(
-        lua.eval::<LuaFunction>(
+        lua.eval::<Function>(
             r#"
                 function (sum)
                     while true do
@@ -660,11 +659,11 @@ fn test_thread() {
         accumulate.resume::<_, ()>(i).unwrap();
     }
     assert_eq!(accumulate.resume::<_, i64>(4).unwrap(), 10);
-    assert_eq!(accumulate.status(), LuaThreadStatus::Active);
+    assert_eq!(accumulate.status(), ThreadStatus::Active);
     assert!(accumulate.resume::<_, ()>("error").is_err());
-    assert_eq!(accumulate.status(), LuaThreadStatus::Error);
+    assert_eq!(accumulate.status(), ThreadStatus::Error);
 
-    let thread = lua.eval::<LuaThread>(
+    let thread = lua.eval::<Thread>(
         r#"
             coroutine.create(function ()
                 while true do
@@ -674,10 +673,10 @@ fn test_thread() {
         "#,
         None,
     ).unwrap();
-    assert_eq!(thread.status(), LuaThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(()).unwrap(), 42);
 
-    let thread: LuaThread = lua.eval(
+    let thread: Thread = lua.eval(
         r#"
             coroutine.create(function(arg)
                 assert(arg == 42)
@@ -693,7 +692,7 @@ fn test_thread() {
     assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);
 
     match thread.resume::<_, u32>(()) {
-        Err(LuaError::CoroutineInactive) => {}
+        Err(Error::CoroutineInactive) => {}
         Err(_) => panic!("resuming dead coroutine error is not CoroutineInactive kind"),
         _ => panic!("resuming dead coroutine did not return error"),
     }
@@ -712,11 +711,11 @@ fn test_lightuserdata() {
         None,
     ).unwrap();
     let res = globals
-        .get::<_, LuaFunction>("id")
+        .get::<_, Function>("id")
         .unwrap()
-        .call::<_, LuaLightUserData>(LuaLightUserData(42 as *mut c_void))
+        .call::<_, LightUserData>(LightUserData(42 as *mut c_void))
         .unwrap();
-    assert_eq!(res, LuaLightUserData(42 as *mut c_void));
+    assert_eq!(res, LightUserData(42 as *mut c_void));
 }
 
 #[test]
@@ -741,7 +740,7 @@ fn test_table_error() {
         None,
     ).unwrap();
 
-    let bad_table: LuaTable = globals.get("table").unwrap();
+    let bad_table: Table = globals.get("table").unwrap();
     assert!(bad_table.set(1, 1).is_err());
     assert!(bad_table.get::<_, i32>(1).is_err());
     assert!(bad_table.len().is_err());
@@ -756,11 +755,11 @@ fn test_result_conversions() {
     let globals = lua.globals();
 
     let err = lua.create_function(|lua, _| {
-        lua.pack(Result::Err::<String, _>(
+        lua.pack(Err::<String, _>(
             "only through failure can we succeed".to_lua_err(),
         ))
     });
-    let ok = lua.create_function(|lua, _| lua.pack(Result::Ok::<_, LuaError>("!".to_owned())));
+    let ok = lua.create_function(|lua, _| lua.pack(Ok::<_, Error>("!".to_owned())));
 
     globals.set("err", err).unwrap();
     globals.set("ok", ok).unwrap();

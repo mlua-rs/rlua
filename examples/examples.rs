@@ -6,7 +6,7 @@ use std::f32;
 
 use rlua::*;
 
-fn examples() -> LuaResult<()> {
+fn examples() -> Result<()> {
     // Create a Lua context with Lua::new().  Eventually, this will allow
     // further control on the lua std library, and will specifically allow
     // limiting Lua to a subset of "safe" functionality.
@@ -56,7 +56,7 @@ fn examples() -> LuaResult<()> {
     let v: i64 = map_table.get("two")?;
     assert_eq!(v, 2);
 
-    // You can pass values like LuaTable back into Lua
+    // You can pass values like Table back into Lua
 
     globals.set("array_table", array_table)?;
     globals.set("map_table", map_table)?;
@@ -76,7 +76,7 @@ fn examples() -> LuaResult<()> {
 
     // You can load lua functions
 
-    let print: LuaFunction = globals.get("print")?;
+    let print: Function = globals.get("print")?;
     print.call::<_, ()>("hello from rust")?;
 
     // This API handles variadics using Heterogeneous Lists.  This is one way to
@@ -90,8 +90,8 @@ fn examples() -> LuaResult<()> {
 
     let check_equal = lua.create_function(|lua, args| {
         // Functions wrapped in lua receive their arguments packed together as
-        // LuaMultiValue.  The first thing that most wrapped functions will do
-        // is "unpack" this LuaMultiValue into its parts.  Due to lifetime type
+        // MultiValue.  The first thing that most wrapped functions will do
+        // is "unpack" this MultiValue into its parts.  Due to lifetime type
         // signature limitations, this cannot be done automatically from the
         // function signature, but this will be fixed with ATCs.  Notice the use
         // of the hlist macros again.
@@ -99,7 +99,7 @@ fn examples() -> LuaResult<()> {
 
         // This function just checks whether two string lists are equal, and in
         // an inefficient way.  Results are returned with lua.pack, which takes
-        // any number of values and turns them back into LuaMultiValue.  In this
+        // any number of values and turns them back into MultiValue.  In this
         // way, multiple values can also be returned to Lua.  Again, this cannot
         // be inferred as part of the function signature due to the same
         // lifetime type signature limitations.
@@ -110,7 +110,7 @@ fn examples() -> LuaResult<()> {
     // You can also accept variadic arguments to rust callbacks.
 
     let join = lua.create_function(|lua, args| {
-        let strings = lua.unpack::<LuaVariadic<String>>(args)?.0;
+        let strings = lua.unpack::<Variadic<String>>(args)?.0;
         // (This is quadratic!, it's just an example!)
         lua.pack(strings.iter().fold("".to_owned(), |a, b| a + b))
     });
@@ -139,14 +139,14 @@ fn examples() -> LuaResult<()> {
     #[derive(Copy, Clone)]
     struct Vec2(f32, f32);
 
-    impl LuaUserDataType for Vec2 {
-        fn add_methods(methods: &mut LuaUserDataMethods<Self>) {
+    impl UserData for Vec2 {
+        fn add_methods(methods: &mut UserDataMethods<Self>) {
             methods.add_method("magnitude", |lua, vec, _| {
                 let mag_squared = vec.0 * vec.0 + vec.1 * vec.1;
                 lua.pack(mag_squared.sqrt())
             });
 
-            methods.add_meta_function(LuaMetaMethod::Add, |lua, params| {
+            methods.add_meta_function(MetaMethod::Add, |lua, params| {
                 let hlist_pat![vec1, vec2] = lua.unpack::<HList![Vec2, Vec2]>(params)?;
                 lua.pack(Vec2(vec1.0 + vec2.0, vec1.1 + vec2.1))
             });
