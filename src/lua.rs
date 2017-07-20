@@ -124,8 +124,10 @@ pub trait FromLuaMulti<'a>: Sized {
     fn from_lua_multi(values: LuaMultiValue<'a>, lua: &'a Lua) -> LuaResult<Self>;
 }
 
-type LuaCallback<'lua> =
-    Box<'lua + FnMut(&'lua Lua, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>>;
+type LuaCallback<'lua> = Box<
+    FnMut(&'lua Lua, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>
+        + 'lua,
+>;
 
 struct LuaRef<'lua> {
     lua: &'lua Lua,
