@@ -2,7 +2,7 @@
 
 extern crate rlua;
 
-use rlua::*;
+use rlua::{Lua, MultiValue, Error};
 use std::io::prelude::*;
 use std::io::{stdin, stdout, stderr, BufReader};
 

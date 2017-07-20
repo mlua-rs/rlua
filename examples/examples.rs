@@ -4,7 +4,7 @@ extern crate rlua;
 
 use std::f32;
 
-use rlua::*;
+use rlua::{Lua, Result, Function, Variadic, UserData, UserDataMethods, MetaMethod};
 
 fn examples() -> Result<()> {
     // Create a Lua context with Lua::new().  Eventually, this will allow

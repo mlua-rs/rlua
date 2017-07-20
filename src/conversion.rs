@@ -1,5 +1,6 @@
 use std::collections::{HashMap, BTreeMap};
 use std::hash::Hash;
+use std::string::String as StdString;
 
 use error::*;
 use lua::*;
@@ -16,14 +17,14 @@ impl<'lua> FromLua<'lua> for Value<'lua> {
     }
 }
 
-impl<'lua> ToLua<'lua> for LuaString<'lua> {
+impl<'lua> ToLua<'lua> for String<'lua> {
     fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {
         Ok(Value::String(self))
     }
 }
 
-impl<'lua> FromLua<'lua> for LuaString<'lua> {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<LuaString<'lua>> {
+impl<'lua> FromLua<'lua> for String<'lua> {
+    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<String<'lua>> {
         lua.coerce_string(value)
     }
 }
@@ -165,13 +166,13 @@ impl<'lua> FromLua<'lua> for LightUserData {
     }
 }
 
-impl<'lua> ToLua<'lua> for String {
+impl<'lua> ToLua<'lua> for StdString {
     fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>> {
         Ok(Value::String(lua.create_string(&self)))
     }
 }
 
-impl<'lua> FromLua<'lua> for String {
+impl<'lua> FromLua<'lua> for StdString {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<Self> {
         Ok(lua.coerce_string(value)?.to_str()?.to_owned())
     }

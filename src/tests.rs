@@ -3,7 +3,11 @@ use std::error;
 use std::panic::catch_unwind;
 use std::os::raw::c_void;
 
-use super::*;
+use String as LuaString;
+use {
+    Lua, Result, LuaExternalError, LightUserData, UserDataMethods, UserData, Table, Thread,
+    ThreadStatus, Error, Function, Value, Variadic, MetaMethod
+};
 
 #[test]
 fn test_set_get() {

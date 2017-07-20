@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 use std::collections::{HashMap, VecDeque};
 use std::collections::hash_map::Entry as HashMapEntry;
 use std::os::raw::{c_char, c_int, c_void};
+use std::string::String as StdString;
 
 use ffi;
 use error::*;
@@ -32,7 +33,7 @@ pub enum Value<'lua> {
     /// An interned string, managed by Lua.
     ///
     /// Unlike Rust strings, Lua strings may not be valid UTF-8.
-    String(LuaString<'lua>),
+    String(String<'lua>),
     /// Reference to a Lua table.
     Table(Table<'lua>),
     /// Reference to a Lua function (or closure).
@@ -169,24 +170,24 @@ pub struct LightUserData(pub *mut c_void);
 ///
 /// Unlike Rust strings, Lua strings may not be valid UTF-8.
 #[derive(Clone, Debug)]
-pub struct LuaString<'lua>(LuaRef<'lua>);
+pub struct String<'lua>(LuaRef<'lua>);
 
-impl<'lua> LuaString<'lua> {
+impl<'lua> String<'lua> {
     /// Get a `&str` slice if the Lua string is valid UTF-8.
     ///
     /// # Example
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::*;
+    /// # use rlua::{Lua, String};
     /// # fn main() {
     /// let lua = Lua::new();
     /// let globals = lua.globals();
     ///
-    /// let version: LuaString = globals.get("_VERSION").unwrap();
+    /// let version: String = globals.get("_VERSION").unwrap();
     /// assert!(version.to_str().unwrap().contains("Lua"));
     ///
-    /// let non_utf8: LuaString = lua.eval(r#"  "test\xff"  "#, None).unwrap();
+    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None).unwrap();
     /// assert!(non_utf8.to_str().is_err());
     /// # }
     /// ```
@@ -512,7 +513,7 @@ impl<'lua> Function<'lua> {
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::*;
+    /// # use rlua::{Lua, Function};
     ///
     /// # fn main() {
     /// let lua = Lua::new();
@@ -754,7 +755,7 @@ pub enum MetaMethod {
 /// `Index` metamethod is given, it will be called as a *fallback* if the index doesn't match an
 /// existing regular method.
 pub struct UserDataMethods<'lua, T> {
-    methods: HashMap<String, LuaCallback<'lua>>,
+    methods: HashMap<StdString, LuaCallback<'lua>>,
     meta_methods: HashMap<MetaMethod, LuaCallback<'lua>>,
     _type: PhantomData<T>,
 }
@@ -1092,12 +1093,12 @@ impl Lua {
     }
 
     /// Pass a `&str` slice to Lua, creating and returning a interned Lua string.
-    pub fn create_string(&self, s: &str) -> LuaString {
+    pub fn create_string(&self, s: &str) -> String {
         unsafe {
             stack_guard(self.state, 0, || {
                 check_stack(self.state, 1);
                 ffi::lua_pushlstring(self.state, s.as_ptr() as *const c_char, s.len());
-                LuaString(self.pop_ref(self.state))
+                String(self.pop_ref(self.state))
             })
         }
     }
@@ -1206,7 +1207,7 @@ impl Lua {
     /// Coerces a Lua value to a string.
     ///
     /// The value must be a string (in which case this is a no-op) or a number.
-    pub fn coerce_string<'lua>(&'lua self, v: Value<'lua>) -> Result<LuaString<'lua>> {
+    pub fn coerce_string<'lua>(&'lua self, v: Value<'lua>) -> Result<String<'lua>> {
         match v {
             Value::String(s) => Ok(s),
             v => unsafe {
@@ -1219,7 +1220,7 @@ impl Lua {
                             "cannot convert lua value to string".to_owned(),
                         ))
                     } else {
-                        Ok(LuaString(self.pop_ref(self.state)))
+                        Ok(String(self.pop_ref(self.state)))
                     }
                 })
             },
@@ -1430,7 +1431,7 @@ impl Lua {
                 }
             }
 
-            ffi::LUA_TSTRING => Value::String(LuaString(self.pop_ref(state))),
+            ffi::LUA_TSTRING => Value::String(String(self.pop_ref(state))),
 
             ffi::LUA_TTABLE => Value::Table(Table(self.pop_ref(state))),
 
