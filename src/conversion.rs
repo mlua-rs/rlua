@@ -148,13 +148,13 @@ impl<'lua> FromLua<'lua> for bool {
     }
 }
 
-impl<'lua> ToLua<'lua> for LightUserData {
+impl<'lua> ToLua<'lua> for LuaLightUserData {
     fn to_lua(self, _: &'lua Lua) -> LuaResult<LuaValue<'lua>> {
         Ok(LuaValue::LightUserData(self))
     }
 }
 
-impl<'lua> FromLua<'lua> for LightUserData {
+impl<'lua> FromLua<'lua> for LuaLightUserData {
     fn from_lua(v: LuaValue, _: &'lua Lua) -> LuaResult<Self> {
         match v {
             LuaValue::LightUserData(ud) => Ok(ud),

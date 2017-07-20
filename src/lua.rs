@@ -23,7 +23,7 @@ pub enum LuaValue<'lua> {
     /// The Lua value `true` or `false`.
     Boolean(bool),
     /// A "light userdata" object, equivalent to a raw pointer.
-    LightUserData(LightUserData),
+    LightUserData(LuaLightUserData),
     /// An integer number.
     ///
     /// Any Lua number convertible to a `LuaInteger` will be represented as this variant.
@@ -164,7 +164,7 @@ pub type LuaNumber = ffi::lua_Number;
 
 /// A "light" userdata value. Equivalent to an unmanaged raw pointer.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct LightUserData(pub *mut c_void);
+pub struct LuaLightUserData(pub *mut c_void);
 
 /// Handle to an internal Lua string.
 ///
@@ -1427,7 +1427,7 @@ impl Lua {
             }
 
             ffi::LUA_TLIGHTUSERDATA => {
-                let ud = LuaValue::LightUserData(LightUserData(ffi::lua_touserdata(state, -1)));
+                let ud = LuaValue::LightUserData(LuaLightUserData(ffi::lua_touserdata(state, -1)));
                 ffi::lua_pop(state, 1);
                 ud
             }

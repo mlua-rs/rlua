@@ -707,9 +707,9 @@ fn test_lightuserdata() {
     let res = globals
         .get::<_, LuaFunction>("id")
         .unwrap()
-        .call::<_, LightUserData>(LightUserData(42 as *mut c_void))
+        .call::<_, LuaLightUserData>(LuaLightUserData(42 as *mut c_void))
         .unwrap();
-    assert_eq!(res, LightUserData(42 as *mut c_void));
+    assert_eq!(res, LuaLightUserData(42 as *mut c_void));
 }
 
 #[test]
