@@ -323,8 +323,18 @@ fn test_metamethods() {
     let globals = lua.globals();
     globals.set("userdata1", UserData(7)).unwrap();
     globals.set("userdata2", UserData(3)).unwrap();
-    assert_eq!(lua.eval::<UserData>("userdata1 + userdata2", None).unwrap().0, 10);
-    assert_eq!(lua.eval::<UserData>("userdata1 - userdata2", None).unwrap().0, 4);
+    assert_eq!(
+        lua.eval::<UserData>("userdata1 + userdata2", None)
+            .unwrap()
+            .0,
+        10
+    );
+    assert_eq!(
+        lua.eval::<UserData>("userdata1 - userdata2", None)
+            .unwrap()
+            .0,
+        4
+    );
     assert_eq!(lua.eval::<i64>("userdata1:get()", None).unwrap(), 7);
     assert_eq!(lua.eval::<i64>("userdata2.inner", None).unwrap(), 3);
     assert!(lua.eval::<()>("userdata2.nonexist_field", None).is_err());
@@ -610,7 +620,7 @@ fn test_thread() {
                     return sum
                 end
             "#,
-            None
+            None,
         ).unwrap(),
     );
 
@@ -635,7 +645,7 @@ fn test_thread() {
                     end
                 end
             "#,
-            None
+            None,
         ).unwrap(),
     );
 
@@ -655,7 +665,7 @@ fn test_thread() {
                 end
             end)
         "#,
-        None
+        None,
     ).unwrap();
     assert_eq!(thread.status(), LuaThreadStatus::Active);
     assert_eq!(thread.resume::<_, i64>(()).unwrap(), 42);
@@ -669,7 +679,7 @@ fn test_thread() {
                 return 987
             end)
         "#,
-        None
+        None,
     ).unwrap();
 
     assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);

@@ -1087,8 +1087,11 @@ impl Lua {
     pub fn eval<'lua, R: FromLuaMulti<'lua>>(
         &'lua self,
         source: &str,
-        name: Option<&str>
+        name: Option<&str>,
     ) -> LuaResult<R> {
+        // First, try interpreting the lua as an expression by adding
+        // "return", then as a statement.  This is the same thing the
+        // actual lua repl does.
         self.load(&format!("return {}", source), name)
             .or_else(|_| self.load(source, name))?
             .call(())
