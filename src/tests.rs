@@ -210,25 +210,32 @@ fn test_bind() {
 
 #[test]
 fn test_rust_function() {
-    let lua = Lua::new();
-    let globals = lua.globals();
-    lua.exec::<()>(
-        r#"
-            function lua_function()
-                return rust_function()
-            end
+    let mut captured_var = 2;
+    {
+        let lua = Lua::new();
+        let globals = lua.globals();
+        lua.exec::<()>(
+            r#"
+                function lua_function()
+                    return rust_function()
+                end
 
-            -- Test to make sure chunk return is ignored
-            return 1
-        "#,
-        None,
-    ).unwrap();
+                -- Test to make sure chunk return is ignored
+                return 1
+            "#,
+            None,
+        ).unwrap();
 
-    let lua_function = globals.get::<_, LuaFunction>("lua_function").unwrap();
-    let rust_function = lua.create_function(|lua, _| lua.pack("hello"));
+        let lua_function = globals.get::<_, LuaFunction>("lua_function").unwrap();
+        let rust_function = lua.create_function(|lua, _| {
+            captured_var = 42;
+            lua.pack("hello")
+        });
 
-    globals.set("rust_function", rust_function).unwrap();
-    assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
+        globals.set("rust_function", rust_function).unwrap();
+        assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
+    }
+    assert_eq!(captured_var, 42);
 }
 
 #[test]

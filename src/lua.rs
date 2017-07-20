@@ -124,10 +124,8 @@ pub trait FromLuaMulti<'a>: Sized {
     fn from_lua_multi(values: LuaMultiValue<'a>, lua: &'a Lua) -> LuaResult<Self>;
 }
 
-type LuaCallback = Box<
-    for<'lua> FnMut(&'lua Lua, LuaMultiValue<'lua>)
-                    -> LuaResult<LuaMultiValue<'lua>>,
->;
+type LuaCallback<'lua> =
+    Box<'lua + FnMut(&'lua Lua, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>>;
 
 struct LuaRef<'lua> {
     lua: &'lua Lua,
@@ -758,17 +756,17 @@ pub enum LuaMetaMethod {
 /// can be called as `userdata:method(args)` as expected.  If there are any regular methods, and an
 /// `Index` metamethod is given, it will be called as a *fallback* if the index doesn't match an
 /// existing regular method.
-pub struct LuaUserDataMethods<T> {
-    methods: HashMap<String, LuaCallback>,
-    meta_methods: HashMap<LuaMetaMethod, LuaCallback>,
+pub struct LuaUserDataMethods<'lua, T> {
+    methods: HashMap<String, LuaCallback<'lua>>,
+    meta_methods: HashMap<LuaMetaMethod, LuaCallback<'lua>>,
     _type: PhantomData<T>,
 }
 
-impl<T: LuaUserDataType> LuaUserDataMethods<T> {
+impl<'lua, T: LuaUserDataType> LuaUserDataMethods<'lua, T> {
     /// Add a regular method as a function which accepts a &T as the first parameter.
     pub fn add_method<M>(&mut self, name: &str, method: M)
-        where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>)
-                                     -> LuaResult<LuaMultiValue<'lua>>
+    where
+        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -778,7 +776,7 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
 
     /// Add a regular method as a function which accepts a &mut T as the first parameter.
     pub fn add_method_mut<M>(&mut self, name: &str, method: M)
-        where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
+        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
     {
         self.methods.insert(
@@ -790,8 +788,8 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
     /// Add a regular method as a function which accepts generic arguments, the first argument will
     /// always be a LuaUserData of type T.
     pub fn add_function<F>(&mut self, name: &str, function: F)
-        where F: 'static + for<'a, 'lua> FnMut(&'lua Lua, LuaMultiValue<'lua>)
-                                     -> LuaResult<LuaMultiValue<'lua>>
+    where
+        F: 'lua + for<'a> FnMut(&'lua Lua, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
     {
         self.methods.insert(name.to_owned(), Box::new(function));
     }
@@ -800,8 +798,8 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
     /// error with certain binary metamethods that can trigger if ony the right side has a
     /// metatable.
     pub fn add_meta_method<M>(&mut self, meta: LuaMetaMethod, method: M)
-        where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>)
-                                     -> LuaResult<LuaMultiValue<'lua>>
+    where
+        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
     {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
@@ -810,7 +808,7 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
     /// cause an error with certain binary metamethods that can trigger if ony the right side has a
     /// metatable.
     pub fn add_meta_method_mut<M>(&mut self, meta: LuaMetaMethod, method: M)
-        where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
+        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
     {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
@@ -821,15 +819,15 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
     /// operator has a metatable, so the first argument here is not necessarily a userdata of type
     /// T.
     pub fn add_meta_function<F>(&mut self, meta: LuaMetaMethod, function: F)
-        where F: 'static + for<'a, 'lua> FnMut(&'lua Lua, LuaMultiValue<'lua>)
-                                     -> LuaResult<LuaMultiValue<'lua>>
+    where
+        F: 'lua + for<'a> FnMut(&'lua Lua, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
     {
         self.meta_methods.insert(meta, Box::new(function));
     }
 
-    fn box_method<M>(mut method: M) -> LuaCallback
-        where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>)
-                                     -> LuaResult<LuaMultiValue<'lua>>
+    fn box_method<M>(mut method: M) -> LuaCallback<'lua>
+    where
+        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = LuaUserData::from_lua(front, lua)?;
@@ -844,8 +842,8 @@ impl<T: LuaUserDataType> LuaUserDataMethods<T> {
 
     }
 
-    fn box_method_mut<M>(mut method: M) -> LuaCallback
-        where M: 'static + for<'a, 'lua> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
+    fn box_method_mut<M>(mut method: M) -> LuaCallback<'lua>
+        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
                                      -> LuaResult<LuaMultiValue<'lua>>
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
@@ -869,7 +867,7 @@ pub trait LuaUserDataType: 'static + Sized {
     fn add_methods(_methods: &mut LuaUserDataMethods<Self>) {}
 }
 
-/// Handle to an internal Lua userdata for a type that implements LuaUserDataType.  Internally,
+/// Handle to an internal Lua userdata for a type that implements `LuaUserDataType`.  Internally,
 /// instances are stored in a `RefCell`, to best match the mutable semantics of the Lua language.
 #[derive(Clone, Debug)]
 pub struct LuaUserData<'lua>(LuaRef<'lua>);
@@ -1120,7 +1118,7 @@ impl Lua {
     }
 
     /// Creates a table and fills it with values from an iterator.
-    pub fn create_table_from<'lua, K, V, I>(&'lua self, cont: I) -> LuaResult<LuaTable>
+    pub fn create_table_from<'lua, K, V, I>(&'lua self, cont: I) -> LuaResult<LuaTable<'lua>>
     where
         K: ToLua<'lua>,
         V: ToLua<'lua>,
@@ -1142,7 +1140,7 @@ impl Lua {
     }
 
     /// Creates a table from an iterator of values, using `1..` as the keys.
-    pub fn create_sequence_from<'lua, T, I>(&'lua self, cont: I) -> LuaResult<LuaTable>
+    pub fn create_sequence_from<'lua, T, I>(&'lua self, cont: I) -> LuaResult<LuaTable<'lua>>
     where
         T: ToLua<'lua>,
         I: IntoIterator<Item = T>,
@@ -1151,9 +1149,9 @@ impl Lua {
     }
 
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
-    pub fn create_function<F>(&self, func: F) -> LuaFunction
+    pub fn create_function<'lua, F>(&'lua self, func: F) -> LuaFunction<'lua>
     where
-        F: 'static + for<'a> FnMut(&'a Lua, LuaMultiValue<'a>) -> LuaResult<LuaMultiValue<'a>>,
+        F: 'lua + for<'a> FnMut(&'a Lua, LuaMultiValue<'a>) -> LuaResult<LuaMultiValue<'a>>,
     {
         self.create_callback_function(Box::new(func))
     }
@@ -1313,7 +1311,7 @@ impl Lua {
         T::from_lua_multi(value, self)
     }
 
-    fn create_callback_function(&self, func: LuaCallback) -> LuaFunction {
+    fn create_callback_function<'lua>(&'lua self, func: LuaCallback<'lua>) -> LuaFunction<'lua> {
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, || {
                 let lua = Lua {
