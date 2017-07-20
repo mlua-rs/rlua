@@ -37,9 +37,9 @@ fn examples() -> LuaResult<()> {
     )?;
     assert_eq!(globals.get::<_, String>("global")?, "foobar");
 
-    assert_eq!(lua.eval::<i32>("1 + 1")?, 2);
-    assert_eq!(lua.eval::<bool>("false == false")?, true);
-    assert_eq!(lua.eval::<i32>("return 1 + 2")?, 3);
+    assert_eq!(lua.eval::<i32>("1 + 1", None)?, 2);
+    assert_eq!(lua.eval::<bool>("false == false", None)?, true);
+    assert_eq!(lua.eval::<i32>("return 1 + 2", None)?, 3);
 
     // You can create and manage lua tables
 
@@ -70,7 +70,7 @@ fn examples() -> LuaResult<()> {
         for k, v in pairs(map_table) do
             print(k, v)
         end
-    "#,
+        "#, None
     )?;
 
     // You can load lua functions
@@ -118,16 +118,18 @@ fn examples() -> LuaResult<()> {
     assert_eq!(
         lua.eval::<bool>(
             r#"check_equal({"a", "b", "c"}, {"a", "b", "c"})"#,
+            None
         )?,
         true
     );
     assert_eq!(
         lua.eval::<bool>(
             r#"check_equal({"a", "b", "c"}, {"d", "e", "f"})"#,
+            None
         )?,
         false
     );
-    assert_eq!(lua.eval::<String>(r#"join("a", "b", "c")"#)?, "abc");
+    assert_eq!(lua.eval::<String>(r#"join("a", "b", "c")"#, None)?, "abc");
 
     // You can create userdata with methods and metamethods defined on them.
     // Here's a worked example that shows many of the features of this API
@@ -156,7 +158,7 @@ fn examples() -> LuaResult<()> {
     });
     globals.set("vec2", vec2_constructor)?;
 
-    assert!(lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()")? - 5.0 < f32::EPSILON);
+    assert!(lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()", None)? - 5.0 < f32::EPSILON);
 
     Ok(())
 }

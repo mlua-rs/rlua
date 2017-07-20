@@ -187,7 +187,7 @@ impl<'lua> LuaString<'lua> {
     /// let version: LuaString = globals.get("_VERSION").unwrap();
     /// assert!(version.to_str().unwrap().contains("Lua"));
     ///
-    /// let non_utf8: LuaString = lua.eval(r#"  "test\xff"  "#).unwrap();
+    /// let non_utf8: LuaString = lua.eval(r#"  "test\xff"  "#, None).unwrap();
     /// assert!(non_utf8.to_str().is_err());
     /// # }
     /// ```
@@ -622,7 +622,7 @@ impl<'lua> LuaThread<'lua> {
     ///         assert(yieldarg == 43)
     ///         return 987
     ///     end)
-    /// "#).unwrap();
+    /// "#, None).unwrap();
     ///
     /// assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);
     /// assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);
@@ -1084,33 +1084,14 @@ impl Lua {
     ///
     /// If `source` is an expression, returns the value it evaluates to. Otherwise, returns the
     /// values returned by the chunk (if any).
-    pub fn eval<'lua, R: FromLuaMulti<'lua>>(&'lua self, source: &str) -> LuaResult<R> {
-        unsafe {
-            stack_err_guard(self.state, 0, || {
-                // First, try interpreting the lua as an expression by adding
-                // "return", then as a statement.  This is the same thing the
-                // actual lua repl does.
-                let return_source = "return ".to_owned() + source;
-                let mut res = ffi::luaL_loadbuffer(
-                    self.state,
-                    return_source.as_ptr() as *const c_char,
-                    return_source.len(),
-                    ptr::null(),
-                );
-                if res == ffi::LUA_ERRSYNTAX {
-                    ffi::lua_pop(self.state, 1);
-                    res = ffi::luaL_loadbuffer(
-                        self.state,
-                        source.as_ptr() as *const c_char,
-                        source.len(),
-                        ptr::null(),
-                    );
-                }
-
-                handle_error(self.state, res)?;
-                LuaFunction(self.pop_ref(self.state)).call(())
-            })
-        }
+    pub fn eval<'lua, R: FromLuaMulti<'lua>>(
+        &'lua self,
+        source: &str,
+        name: Option<&str>
+    ) -> LuaResult<R> {
+        self.load(&format!("return {}", source), name)
+            .or_else(|_| self.load(source, name))?
+            .call(())
     }
 
     /// Pass a `&str` slice to Lua, creating and returning a interned Lua string.

@@ -20,7 +20,7 @@ fn main() {
         loop {
             stdin.read_line(&mut line).unwrap();
 
-            match lua.eval::<LuaMultiValue>(&line) {
+            match lua.eval::<LuaMultiValue>(&line, None) {
                 Ok(values) => {
                     println!(
                         "{}",
