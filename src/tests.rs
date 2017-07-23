@@ -809,12 +809,12 @@ fn test_num_conversion() {
 #[test]
 #[should_panic]
 fn test_expired_userdata() {
-    struct Userdata {
+    struct MyUserdata {
         id: u8,
     }
 
-    impl LuaUserDataType for Userdata {
-        fn add_methods(methods: &mut LuaUserDataMethods<Self>) {
+    impl UserData for MyUserdata {
+        fn add_methods(methods: &mut UserDataMethods<Self>) {
             methods.add_method("access", |lua, this, _| {
                 assert!(this.id == 123);
                 lua.pack(())
@@ -825,7 +825,7 @@ fn test_expired_userdata() {
     let lua = Lua::new();
     {
         let globals = lua.globals();
-        globals.set("userdata", Userdata { id: 123 }).unwrap();
+        globals.set("userdata", MyUserdata { id: 123 }).unwrap();
     }
 
     lua.eval::<()>(r#"
@@ -849,11 +849,11 @@ fn detroys_userdata() {
 
     static DROPPED: AtomicBool = ATOMIC_BOOL_INIT;
 
-    struct Userdata;
+    struct MyUserdata;
 
-    impl LuaUserDataType for Userdata {}
+    impl UserData for MyUserdata {}
 
-    impl Drop for Userdata {
+    impl Drop for MyUserdata {
         fn drop(&mut self) {
             DROPPED.store(true, Ordering::SeqCst);
         }
@@ -862,7 +862,7 @@ fn detroys_userdata() {
     let lua = Lua::new();
     {
         let globals = lua.globals();
-        globals.set("userdata", Userdata).unwrap();
+        globals.set("userdata", MyUserdata).unwrap();
     }
 
     assert_eq!(DROPPED.load(Ordering::SeqCst), false);
