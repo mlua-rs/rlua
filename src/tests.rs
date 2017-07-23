@@ -844,3 +844,30 @@ fn test_expired_userdata() {
         hatch:access()
     "#, None).unwrap();
 }
+
+#[test]
+fn detroys_userdata() {
+    use std::sync::atomic::{Ordering, AtomicBool, ATOMIC_BOOL_INIT};
+
+    static DROPPED: AtomicBool = ATOMIC_BOOL_INIT;
+
+    struct Userdata;
+
+    impl LuaUserDataType for Userdata {}
+
+    impl Drop for Userdata {
+        fn drop(&mut self) {
+            DROPPED.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let lua = Lua::new();
+    {
+        let globals = lua.globals();
+        globals.set("userdata", Userdata).unwrap();
+    }
+
+    assert_eq!(DROPPED.load(Ordering::SeqCst), false);
+    drop(lua);  // should destroy all objects
+    assert_eq!(DROPPED.load(Ordering::SeqCst), true);
+}
