@@ -20,7 +20,7 @@ macro_rules! cstr {
 macro_rules! lua_panic {
     ($state:expr) => {
         {
-            $crate::ffi::lua_settop($state, 0);
+            $crate::ffi::lua_settor($state, 0);
             panic!("rlua internal error");
         }
     };
@@ -151,16 +151,15 @@ where
     res
 }
 
-// Call the given rust function in a protected lua context, similar to pcall.
-// The stack given to the protected function is a separate protected stack. This
-// catches all calls to lua_error, but ffi functions that can call lua_error are
-// still longjmps, and have all the same dangers as longjmps, so extreme care
-// must still be taken in code that uses this function.  Does not call
-// lua_checkstack, and uses 2 extra stack spaces.
+// Call the given rust function in a protected lua context, similar to pcall.  The stack given to
+// the protected function is a separate protected stack. This catches all calls to lua_error, but
+// ffi functions that can call lua_error are still longjmps, and have all the same dangers as
+// longjmps, so extreme care must still be taken in code that uses this function.  Does not call
+// lua_checkstack, and uses 2 extra stack spaces.  On error, the stack position is set to just below
+// the given arguments.
 pub unsafe fn error_guard<F, R>(
     state: *mut ffi::lua_State,
     nargs: c_int,
-    nresults: c_int,
     func: F,
 ) -> LuaResult<R>
 where
@@ -179,7 +178,6 @@ where
     unsafe fn cpcall<F>(
         state: *mut ffi::lua_State,
         nargs: c_int,
-        nresults: c_int,
         mut func: F,
     ) -> LuaResult<()>
     where
@@ -189,15 +187,21 @@ where
         ffi::lua_insert(state, -(nargs + 1));
         ffi::lua_pushlightuserdata(state, &mut func as *mut F as *mut c_void);
         mem::forget(func);
-        handle_error(state, pcall_with_traceback(state, nargs + 1, nresults))
+        handle_error(state, pcall_with_traceback(state, nargs + 1, ffi::LUA_MULTRET))
     }
 
     let mut res = None;
-    cpcall(state, nargs, nresults, |state| {
+    let top = ffi::lua_gettop(state);
+    if let Err(err) = cpcall(state, nargs, |state| {
         res = Some(callback_error(state, || func(state)));
-        ffi::lua_gettop(state)
-    })?;
-    Ok(res.unwrap())
+        let c = ffi::lua_gettop(state);
+        c
+    }) {
+        ffi::lua_settop(state, top - nargs);
+        Err(err)
+    } else {
+        Ok(res.unwrap())
+    }
 }
 
 // If the return code indicates an error, pops the error off of the stack and

@@ -810,16 +810,10 @@ fn test_expired_userdata() {
         id: u8,
     }
 
-    impl Drop for Userdata {
-        fn drop(&mut self) {
-            println!("dropping {}", self.id);
-        }
-    }
-
     impl LuaUserDataType for Userdata {
         fn add_methods(methods: &mut LuaUserDataMethods<Self>) {
             methods.add_method("access", |lua, this, _| {
-                println!("accessing userdata {}", this.id);
+                assert!(this.id == 123);
                 lua.pack(())
             });
         }

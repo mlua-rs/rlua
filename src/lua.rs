@@ -223,12 +223,13 @@ impl<'lua> LuaTable<'lua> {
         let key = key.to_lua(lua)?;
         let value = value.to_lua(lua)?;
         unsafe {
-            check_stack(lua.state, 3);
+            check_stack(lua.state, 5);
             lua.push_ref(lua.state, &self.0);
             lua.push_value(lua.state, key);
             lua.push_value(lua.state, value);
-            error_guard(lua.state, 3, 0, |state| {
+            error_guard(lua.state, 3, |state| {
                 ffi::lua_settable(state, -3);
+                ffi::lua_pop(state, 1);
                 Ok(())
             })
         }
@@ -243,15 +244,15 @@ impl<'lua> LuaTable<'lua> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         unsafe {
-            check_stack(lua.state, 2);
+            check_stack(lua.state, 4);
             lua.push_ref(lua.state, &self.0);
             lua.push_value(lua.state, key.to_lua(lua)?);
-            let res = error_guard(lua.state, 2, 0, |state| {
+            error_guard(lua.state, 2, |state| {
                 ffi::lua_gettable(state, -2);
-                let res = lua.pop_value(state);
-                ffi::lua_pop(state, 1);
-                Ok(res)
+                Ok(())
             })?;
+            let res = lua.pop_value(lua.state);
+            ffi::lua_pop(lua.state, 1);
             V::from_lua(res, lua)
         }
     }
@@ -261,15 +262,16 @@ impl<'lua> LuaTable<'lua> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         unsafe {
-            check_stack(lua.state, 2);
+            check_stack(lua.state, 4);
             lua.push_ref(lua.state, &self.0);
             lua.push_value(lua.state, key);
-            error_guard(lua.state, 2, 0, |state| {
+            error_guard(lua.state, 2, |state| {
                 ffi::lua_gettable(state, -2);
-                let has = ffi::lua_isnil(state, -1) == 0;
-                ffi::lua_pop(state, 2);
-                Ok(has)
-            })
+                Ok(())
+            })?;
+            let has = ffi::lua_isnil(lua.state, -1) == 0;
+            ffi::lua_pop(lua.state, 2);
+            Ok(has)
         }
     }
 
@@ -311,10 +313,12 @@ impl<'lua> LuaTable<'lua> {
     pub fn len(&self) -> LuaResult<LuaInteger> {
         let lua = self.0.lua;
         unsafe {
-            error_guard(lua.state, 0, 0, |state| {
-                check_stack(state, 1);
-                lua.push_ref(state, &self.0);
-                Ok(ffi::luaL_len(state, -1))
+            check_stack(lua.state, 3);
+            lua.push_ref(lua.state, &self.0);
+            error_guard(lua.state, 1, |state| {
+                let len = ffi::luaL_len(state, -1);
+                ffi::lua_pop(state, 1);
+                Ok(len)
             })
         }
     }
@@ -381,31 +385,29 @@ where
             let lua = self.table.lua;
 
             unsafe {
-                check_stack(lua.state, 4);
+                check_stack(lua.state, 6);
 
                 lua.push_ref(lua.state, &self.table);
                 lua.push_ref(lua.state, &next_key);
 
-                match error_guard(lua.state, 2, 0, |state| if ffi::lua_next(state, -2) != 0 {
-                    ffi::lua_pushvalue(state, -2);
-                    let key = lua.pop_value(state);
-                    let value = lua.pop_value(state);
-                    let next_key = lua.pop_ref(lua.state);
-                    ffi::lua_pop(lua.state, 1);
-                    Ok(Some((key, value, next_key)))
-                } else {
-                    ffi::lua_pop(lua.state, 1);
-                    Ok(None)
-                }) {
-                    Ok(Some((key, value, next_key))) => {
-                        self.next_key = Some(next_key);
+                match error_guard(lua.state, 2, |state| Ok(ffi::lua_next(state, -2) != 0)) {
+                    Ok(true) => {
+                        ffi::lua_pushvalue(lua.state, -2);
+                        let key = lua.pop_value(lua.state);
+                        let value = lua.pop_value(lua.state);
+                        self.next_key = Some(lua.pop_ref(lua.state));
+                        ffi::lua_pop(lua.state, 1);
+
                         Some((|| {
-                             let key = K::from_lua(key, lua)?;
-                             let value = V::from_lua(value, lua)?;
-                             Ok((key, value))
-                         })())
+                            let key = K::from_lua(key, lua)?;
+                            let value = V::from_lua(value, lua)?;
+                            Ok((key, value))
+                        })())
                     }
-                    Ok(None) => None,
+                    Ok(false) => {
+                        ffi::lua_pop(lua.state, 1);
+                        None
+                    }
                     Err(e) => Some(Err(e)),
                 }
             }
@@ -436,27 +438,20 @@ where
             let lua = self.table.lua;
 
             unsafe {
-                check_stack(lua.state, 2);
+                check_stack(lua.state, 4);
 
                 lua.push_ref(lua.state, &self.table);
-                match error_guard(
-                    lua.state,
-                    1,
-                    0,
-                    |state| if ffi::lua_geti(state, -1, index) != ffi::LUA_TNIL {
-                        let value = lua.pop_value(state);
-                        ffi::lua_pop(state, 1);
-                        Ok(Some(value))
-                    } else {
-                        ffi::lua_pop(state, 2);
-                        Ok(None)
-                    },
-                ) {
-                    Ok(Some(r)) => {
+                match error_guard(lua.state, 1, |state| Ok(ffi::lua_geti(state, -1, index) != ffi::LUA_TNIL)) {
+                    Ok(true) => {
+                        let value = lua.pop_value(lua.state);
+                        ffi::lua_pop(lua.state, 1);
                         self.index = Some(index + 1);
-                        Some(V::from_lua(r, lua))
+                        Some(V::from_lua(value, lua))
                     }
-                    Ok(None) => None,
+                    Ok(false) => {
+                        ffi::lua_pop(lua.state, 2);
+                        None
+                    },
                     Err(e) => Some(Err(e)),
                 }
             }
