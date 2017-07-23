@@ -833,14 +833,9 @@ fn test_expired_userdata() {
             hatch = self.userdata
         end })
 
-        print("userdata = ", userdata)
-        print("hatch = ", hatch)
-        print "collecting..."
         tbl = nil
         userdata = nil  -- make table and userdata collectable
         collectgarbage("collect")
-        print("userdata = ", userdata)
-        print("hatch = ", hatch)
         hatch:access()
     "#, None).unwrap();
 }
