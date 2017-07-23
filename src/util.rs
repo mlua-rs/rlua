@@ -213,8 +213,7 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> LuaResult<
             Err(err)
 
         } else if is_wrapped_panic(state, -1) {
-            let userdata = ffi::lua_touserdata(state, -1);
-            let panic = &mut *(userdata as *mut WrappedPanic);
+            let panic = &mut *get_userdata::<WrappedPanic>(state, -1);
             if let Some(p) = panic.0.take() {
                 ffi::lua_settop(state, 0);
                 resume_unwind(p);
@@ -275,10 +274,22 @@ pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) {
     ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
 }
 
-pub unsafe extern "C" fn destructor<T>(state: *mut ffi::lua_State) -> c_int {
+pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> *mut T {
+    let ud = ffi::lua_newuserdata(state, mem::size_of::<Option<T>>()) as *mut Option<T>;
+    ptr::write(ud, None);
+    *ud = Some(t);
+    (*ud).as_mut().unwrap()
+}
+
+pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
+    let ud = ffi::lua_touserdata(state, index) as *mut Option<T>;
+    lua_assert!(state, !ud.is_null());
+    (*ud).as_mut().expect("access of expired userdata")
+}
+
+pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
     match catch_unwind(|| {
-        let obj = &mut *(ffi::lua_touserdata(state, 1) as *mut T);
-        mem::replace(obj, mem::uninitialized());
+        *(ffi::lua_touserdata(state, 1) as *mut Option<T>) = None;
         0
     }) {
         Ok(r) => r,
@@ -435,8 +446,7 @@ pub struct WrappedPanic(pub Option<Box<Any + Send>>);
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: LuaError) {
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
         callback_error(state, || if is_wrapped_error(state, -1) {
-            let userdata = ffi::lua_touserdata(state, -1);
-            let error = &*(userdata as *const WrappedError);
+            let error = &*get_userdata::<WrappedError>(state, -1);
             push_string(state, &error.0.to_string());
             ffi::lua_remove(state, -2);
 
@@ -452,10 +462,7 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: LuaError) {
 
     ffi::luaL_checkstack(state, 2, ptr::null());
 
-    let err_userdata = ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as
-        *mut WrappedError;
-
-    ptr::write(err_userdata, WrappedError(err));
+    push_userdata(state, WrappedError(err));
 
     get_error_metatable(state);
     if ffi::lua_isnil(state, -1) != 0 {
@@ -471,7 +478,7 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: LuaError) {
         ffi::lua_pushvalue(state, -2);
 
         push_string(state, "__gc");
-        ffi::lua_pushcfunction(state, destructor::<WrappedError>);
+        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedError>);
         ffi::lua_settable(state, -3);
 
         push_string(state, "__tostring");
@@ -492,10 +499,7 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: LuaError) {
 pub unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>) {
     ffi::luaL_checkstack(state, 2, ptr::null());
 
-    let panic_userdata = ffi::lua_newuserdata(state, mem::size_of::<WrappedPanic>()) as
-        *mut WrappedPanic;
-
-    ptr::write(panic_userdata, WrappedPanic(Some(panic)));
+    push_userdata(state, WrappedPanic(Some(panic)));
 
     get_panic_metatable(state);
     if ffi::lua_isnil(state, -1) != 0 {
@@ -511,7 +515,7 @@ pub unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Se
         ffi::lua_pushvalue(state, -2);
 
         push_string(state, "__gc");
-        ffi::lua_pushcfunction(state, destructor::<WrappedPanic>);
+        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
         ffi::lua_settable(state, -3);
 
         push_string(state, "__metatable");
@@ -530,8 +534,7 @@ pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<LuaError> 
     if ffi::lua_gettop(state) == 0 || !is_wrapped_error(state, -1) {
         None
     } else {
-        let userdata = ffi::lua_touserdata(state, -1);
-        let err = &*(userdata as *const WrappedError);
+        let err = &*get_userdata::<WrappedError>(state, -1);
         let err = err.0.clone();
         ffi::lua_pop(state, 1);
         Some(err)

@@ -3,7 +3,6 @@ use std::ops::{Deref, DerefMut};
 use std::iter::FromIterator;
 use std::cell::{RefCell, Ref, RefMut};
 use std::ptr;
-use std::mem;
 use std::ffi::{CStr, CString};
 use std::any::TypeId;
 use std::marker::PhantomData;
@@ -909,9 +908,7 @@ impl<'lua> LuaUserData<'lua> {
                 check_stack(lua.state, 3);
 
                 lua.push_ref(lua.state, &self.0);
-                let userdata = ffi::lua_touserdata(lua.state, -1);
 
-                lua_assert!(lua.state, !userdata.is_null());
                 lua_assert!(
                     lua.state,
                     ffi::lua_getmetatable(lua.state, -1) != 0,
@@ -928,7 +925,7 @@ impl<'lua> LuaUserData<'lua> {
                     ffi::lua_pop(lua.state, 3);
                     None
                 } else {
-                    let res = func(&*(userdata as *const RefCell<T>));
+                    let res = func(&*get_userdata::<RefCell<T>>(lua.state, -3));
                     ffi::lua_pop(lua.state, 3);
                     Some(res)
                 }
@@ -972,16 +969,12 @@ impl Lua {
                     &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
                 );
 
-                let registered_userdata = ffi::lua_newuserdata(
-                    state,
-                    mem::size_of::<RefCell<HashMap<TypeId, c_int>>>(),
-                ) as *mut RefCell<HashMap<TypeId, c_int>>;
-                ptr::write(registered_userdata, RefCell::new(HashMap::new()));
+                push_userdata::<RefCell<HashMap<TypeId, c_int>>>(state, RefCell::new(HashMap::new()));
 
                 ffi::lua_newtable(state);
 
                 push_string(state, "__gc");
-                ffi::lua_pushcfunction(state, destructor::<RefCell<HashMap<TypeId, c_int>>>);
+                ffi::lua_pushcfunction(state, userdata_destructor::<RefCell<HashMap<TypeId, c_int>>>);
                 ffi::lua_rawset(state, -3);
 
                 ffi::lua_setmetatable(state, -2);
@@ -998,7 +991,7 @@ impl Lua {
                 ffi::lua_newtable(state);
 
                 push_string(state, "__gc");
-                ffi::lua_pushcfunction(state, destructor::<LuaCallback>);
+                ffi::lua_pushcfunction(state, userdata_destructor::<LuaCallback>);
                 ffi::lua_rawset(state, -3);
 
                 push_string(state, "__metatable");
@@ -1183,11 +1176,7 @@ impl Lua {
             stack_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
 
-                let data = RefCell::new(data);
-                let data_userdata =
-                    ffi::lua_newuserdata(self.state, mem::size_of::<RefCell<T>>()) as
-                        *mut RefCell<T>;
-                ptr::write(data_userdata, data);
+                push_userdata::<RefCell<T>>(self.state, RefCell::new(data));
 
                 ffi::lua_rawgeti(
                     self.state,
@@ -1322,8 +1311,7 @@ impl Lua {
                     ephemeral: true,
                 };
 
-                let func = &mut *(ffi::lua_touserdata(state, ffi::lua_upvalueindex(1)) as
-                                      *mut LuaCallback);
+                let func = &mut *get_userdata::<LuaCallback>(state, ffi::lua_upvalueindex(1));
 
                 let nargs = ffi::lua_gettop(state);
                 let mut args = LuaMultiValue::new();
@@ -1346,10 +1334,7 @@ impl Lua {
             stack_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
 
-                let func_userdata =
-                    ffi::lua_newuserdata(self.state, mem::size_of::<LuaCallback>()) as
-                        *mut LuaCallback;
-                ptr::write(func_userdata, func);
+                push_userdata::<LuaCallback>(self.state, func);
 
                 ffi::lua_pushlightuserdata(
                     self.state,
@@ -1522,8 +1507,7 @@ impl Lua {
                 &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
             );
             ffi::lua_gettable(self.state, ffi::LUA_REGISTRYINDEX);
-            let registered_userdata = ffi::lua_touserdata(self.state, -1) as
-                *mut RefCell<HashMap<TypeId, c_int>>;
+            let registered_userdata = &mut *get_userdata::<RefCell<HashMap<TypeId, c_int>>>(self.state, -1);
             let mut map = (*registered_userdata).borrow_mut();
             ffi::lua_pop(self.state, 1);
 
@@ -1604,7 +1588,7 @@ impl Lua {
                     }
 
                     push_string(self.state, "__gc");
-                    ffi::lua_pushcfunction(self.state, destructor::<RefCell<T>>);
+                    ffi::lua_pushcfunction(self.state, userdata_destructor::<RefCell<T>>);
                     ffi::lua_rawset(self.state, -3);
 
                     push_string(self.state, "__metatable");

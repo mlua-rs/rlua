@@ -802,3 +802,51 @@ fn test_num_conversion() {
     lua.exec::<()>("a = math.huge", None).unwrap();
     assert!(globals.get::<_, i64>("n").is_err());
 }
+
+#[test]
+#[should_panic]
+fn test_expired_userdata() {
+    struct Userdata {
+        id: u8,
+    }
+
+    impl Drop for Userdata {
+        fn drop(&mut self) {
+            println!("dropping {}", self.id);
+        }
+    }
+
+    impl LuaUserDataType for Userdata {
+        fn add_methods(methods: &mut LuaUserDataMethods<Self>) {
+            methods.add_method("access", |lua, this, _| {
+                println!("accessing userdata {}", this.id);
+                lua.pack(())
+            });
+        }
+    }
+
+    let lua = Lua::new();
+    {
+        let globals = lua.globals();
+        globals.set("userdata", Userdata { id: 123 }).unwrap();
+    }
+
+    lua.eval::<()>(r#"
+        local tbl = setmetatable({
+            userdata = userdata
+        }, { __gc = function(self)
+            -- resurrect userdata
+            hatch = self.userdata
+        end })
+
+        print("userdata = ", userdata)
+        print("hatch = ", hatch)
+        print "collecting..."
+        tbl = nil
+        userdata = nil  -- make table and userdata collectable
+        collectgarbage("collect")
+        print("userdata = ", userdata)
+        print("hatch = ", hatch)
+        hatch:access()
+    "#, None).unwrap();
+}
