@@ -229,9 +229,10 @@ impl<'lua> LuaTable<'lua> {
             lua.push_value(lua.state, value);
             error_guard(lua.state, 3, |state| {
                 ffi::lua_settable(state, -3);
-                ffi::lua_pop(state, 1);
                 Ok(())
-            })
+            })?;
+            ffi::lua_pop(lua.state, 1);
+            Ok(())
         }
     }
 
@@ -315,11 +316,11 @@ impl<'lua> LuaTable<'lua> {
         unsafe {
             check_stack(lua.state, 3);
             lua.push_ref(lua.state, &self.0);
-            error_guard(lua.state, 1, |state| {
-                let len = ffi::luaL_len(state, -1);
-                ffi::lua_pop(state, 1);
-                Ok(len)
-            })
+            let len = error_guard(lua.state, 1, |state| {
+                Ok(ffi::luaL_len(state, -1))
+            })?;
+            ffi::lua_pop(lua.state, 1);
+            Ok(len)
         }
     }
 
