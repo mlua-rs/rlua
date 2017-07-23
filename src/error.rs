@@ -18,11 +18,11 @@ pub enum Error {
     FromLuaConversionError(String),
     /// A `Thread` was resumed and the coroutine was no longer active.
     CoroutineInactive,
-    /// A `LuaUserData` is not the expected type in a borrow.
+    /// An `AnyUserData` is not the expected type in a borrow.
     UserDataTypeMismatch,
-    /// A `LuaUserData` immutable borrow failed because it is already borrowed mutably.
+    /// An `AnyUserData` immutable borrow failed because it is already borrowed mutably.
     UserDataBorrowError,
-    /// A `LuaUserData` mutable borrow failed because it is already borrowed.
+    /// An `AnyUserData` mutable borrow failed because it is already borrowed.
     UserDataBorrowMutError,
     /// Lua error that originated as a Error in a callback.  The first field is the lua error as
     /// a string, the second field is the Arc holding the original Error.

@@ -784,7 +784,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     }
 
     /// Add a regular method as a function which accepts generic arguments, the first argument will
-    /// always be a LuaUserData of type T.
+    /// always be a `UserData` of type T.
     pub fn add_function<F>(&mut self, name: &str, function: F)
     where
         F: 'lua + for<'a> FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -914,7 +914,7 @@ impl<'lua> AnyUserData<'lua> {
                 lua_assert!(
                     lua.state,
                     ffi::lua_getmetatable(lua.state, -1) != 0,
-                    "LuaUserData missing metatable"
+                    "AnyUserData missing metatable"
                 );
 
                 ffi::lua_rawgeti(

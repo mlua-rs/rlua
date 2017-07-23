@@ -381,7 +381,7 @@ fn test_scope() {
     // {
     //     let touter = globals.get::<_, Table>("touter").unwrap();
     //     touter.set("userdata", lua.create_userdata(UserData).unwrap()).unwrap();
-    //     let userdata = touter.get::<_, LuaUserData>("userdata").unwrap();
+    //     let userdata = touter.get::<_, AnyUserData>("userdata").unwrap();
     //     userdata_ref = userdata.borrow::<UserData>();
     // }
 }
