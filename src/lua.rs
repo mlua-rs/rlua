@@ -176,16 +176,20 @@ impl<'lua> String<'lua> {
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::{Lua, String};
-    /// # fn main() {
+    /// # use rlua::{Lua, String, Result};
+    /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
     /// let globals = lua.globals();
     ///
-    /// let version: String = globals.get("_VERSION").unwrap();
+    /// let version: String = globals.get("_VERSION")?;
     /// assert!(version.to_str().unwrap().contains("Lua"));
     ///
-    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None).unwrap();
+    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None)?;
     /// assert!(non_utf8.to_str().is_err());
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn to_str(&self) -> Result<&str> {
@@ -509,19 +513,22 @@ impl<'lua> Function<'lua> {
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::{Lua, Function};
-    ///
-    /// # fn main() {
+    /// # use rlua::{Lua, Function, Result};
+    /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
     /// let globals = lua.globals();
     ///
     /// // Bind the argument `123` to Lua's `tostring` function
-    /// let tostring: Function = globals.get("tostring").unwrap();
-    /// let tostring_123: Function = tostring.bind(123i32).unwrap();
+    /// let tostring: Function = globals.get("tostring")?;
+    /// let tostring_123: Function = tostring.bind(123i32)?;
     ///
     /// // Now we can call `tostring_123` without arguments to get the result of `tostring(123)`
-    /// let result: String = tostring_123.call(()).unwrap();
+    /// let result: String = tostring_123.call(())?;
     /// assert_eq!(result, "123");
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> Result<Function<'lua>> {
@@ -603,9 +610,8 @@ impl<'lua> Thread<'lua> {
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::*;
-    ///
-    /// # fn main() {
+    /// # use rlua::{Lua, Thread, Error, Result};
+    /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
     /// let thread: Thread = lua.eval(r#"
     ///     coroutine.create(function(arg)
@@ -624,6 +630,10 @@ impl<'lua> Thread<'lua> {
     ///     Err(Error::CoroutineInactive) => {},
     ///     unexpected => panic!("unexpected result {:?}", unexpected),
     /// }
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn resume<A, R>(&self, args: A) -> Result<R>
