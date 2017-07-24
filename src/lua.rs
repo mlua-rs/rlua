@@ -501,14 +501,6 @@ impl<'lua> Function<'lua> {
     /// Returns a function that, when called with no arguments, calls `self`, passing `args` as
     /// arguments.
     ///
-    /// This is equivalent to this Lua code:
-    ///
-    /// ```notrust
-    /// function bind(f, ...)
-    ///     return function() f(...) end
-    /// end
-    /// ```
-    ///
     /// # Example
     ///
     /// ```
