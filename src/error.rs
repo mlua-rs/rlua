@@ -1,6 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
-use std::error;
+use std::error::Error as StdError;
+use std::result::Result as StdResult;
 
 #[derive(Debug, Clone)]
 pub enum Error {
@@ -29,10 +30,10 @@ pub enum Error {
     CallbackError(String, Arc<Error>),
     /// Any custom external error type, mostly useful for returning external error types from
     /// callbacks.
-    ExternalError(Arc<error::Error + Send + Sync>),
+    ExternalError(Arc<StdError + Send + Sync>),
 }
 
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = StdResult<T, Error>;
 
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
@@ -61,7 +62,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
+impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
             Error::SyntaxError(_) => "lua syntax error",
@@ -79,7 +80,7 @@ impl error::Error for Error {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&StdError> {
         match *self {
             Error::CallbackError(_, ref cause) => Some(cause.as_ref()),
             Error::ExternalError(ref err) => err.cause(),
@@ -89,7 +90,7 @@ impl error::Error for Error {
 }
 
 impl Error {
-    pub fn external<T: 'static + error::Error + Send + Sync>(err: T) -> Error {
+    pub fn external<T: 'static + StdError + Send + Sync>(err: T) -> Error {
         Error::ExternalError(Arc::new(err))
     }
 }
@@ -100,11 +101,11 @@ pub trait ExternalError {
 
 impl<E> ExternalError for E
 where
-    E: Into<Box<error::Error + Send + Sync>>,
+    E: Into<Box<StdError + Send + Sync>>,
 {
     fn to_lua_err(self) -> Error {
         #[derive(Debug)]
-        struct WrapError(Box<error::Error + Send + Sync>);
+        struct WrapError(Box<StdError + Send + Sync>);
 
         impl fmt::Display for WrapError {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -112,7 +113,7 @@ where
             }
         }
 
-        impl error::Error for WrapError {
+        impl StdError for WrapError {
             fn description(&self) -> &str {
                 self.0.description()
             }
@@ -126,7 +127,7 @@ pub trait ExternalResult<T> {
     fn to_lua_err(self) -> Result<T>;
 }
 
-impl<T, E> ExternalResult<T> for ::std::result::Result<T, E>
+impl<T, E> ExternalResult<T> for StdResult<T, E>
 where
     E: ExternalError,
 {

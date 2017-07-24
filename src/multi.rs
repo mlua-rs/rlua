@@ -1,3 +1,5 @@
+use std::result::{Result as StdResult};
+
 use hlist_macro::{HNil, HCons};
 
 use error::*;
@@ -17,7 +19,7 @@ impl<'lua> FromLuaMulti<'lua> for () {
 
 /// Result is convertible to `MultiValue` following the common lua idiom of returning the result
 /// on success, or in the case of an error, returning nil followed by the error
-impl<'lua, T: ToLua<'lua>, E: ToLua<'lua>> ToLuaMulti<'lua> for ::std::result::Result<T, E> {
+impl<'lua, T: ToLua<'lua>, E: ToLua<'lua>> ToLuaMulti<'lua> for StdResult<T, E> {
     fn to_lua_multi(self, lua: &'lua Lua) -> Result<MultiValue<'lua>> {
         let mut result = MultiValue::new();
 
