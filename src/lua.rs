@@ -498,8 +498,10 @@ impl<'lua> Function<'lua> {
         }
     }
 
-    /// Returns a function that, when called with no arguments, calls `self`, passing `args` as
+    /// Returns a function that, when called, calls `self`, passing `args` as the first set of
     /// arguments.
+    ///
+    /// If any arguments are passed to the returned function, they will be passed after `args`.
     ///
     /// # Example
     ///
@@ -508,15 +510,19 @@ impl<'lua> Function<'lua> {
     /// # use rlua::{Lua, Function, Result};
     /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
-    /// let globals = lua.globals();
     ///
-    /// // Bind the argument `123` to Lua's `tostring` function
-    /// let tostring: Function = globals.get("tostring")?;
-    /// let tostring_123: Function = tostring.bind(123i32)?;
+    /// let sum: Function = lua.eval(r#"
+    ///     function(a, b)
+    ///         return a + b
+    ///     end
+    /// "#, None)?;
     ///
-    /// // Now we can call `tostring_123` without arguments to get the result of `tostring(123)`
-    /// let result: String = tostring_123.call(())?;
-    /// assert_eq!(result, "123");
+    /// let bound_a = sum.bind(1)?;
+    /// assert_eq!(bound_a.call::<_, u32>(2)?, 1 + 2);
+    ///
+    /// let bound_a_and_b = sum.bind(13)?.bind(57)?;
+    /// assert_eq!(bound_a_and_b.call::<_, u32>(())?, 13 + 57);
+    ///
     /// # Ok(())
     /// # }
     /// # fn main() {
