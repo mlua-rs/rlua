@@ -110,11 +110,7 @@ where
 // operation results in an error and the stack is smaller than the value before
 // the call, then this is unrecoverable and this will panic.  If this function
 // panics, it will clear the stack before panicking.
-pub unsafe fn stack_err_guard<F, R>(
-    state: *mut ffi::lua_State,
-    change: c_int,
-    op: F,
-) -> Result<R>
+pub unsafe fn stack_err_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F) -> Result<R>
 where
     F: FnOnce() -> Result<R>,
 {
@@ -208,7 +204,11 @@ pub unsafe fn plen(state: *mut ffi::lua_State, index: c_int) -> Result<ffi::lua_
 }
 
 // Protected version of lua_geti, uses 3 stack spaces, does not call checkstack.
-pub unsafe fn pgeti(state: *mut ffi::lua_State, index: c_int, i: ffi::lua_Integer) -> Result<c_int> {
+pub unsafe fn pgeti(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    i: ffi::lua_Integer,
+) -> Result<c_int> {
     unsafe extern "C" fn geti(state: *mut ffi::lua_State) -> c_int {
         let i = ffi::lua_tointeger(state, -1);
         ffi::lua_geti(state, -2, i);
@@ -228,11 +228,7 @@ pub unsafe fn pgeti(state: *mut ffi::lua_State, index: c_int, i: ffi::lua_Intege
 // Protected version of lua_next, uses 3 stack spaces, does not call checkstack.
 pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
     unsafe extern "C" fn next(state: *mut ffi::lua_State) -> c_int {
-        if ffi::lua_next(state, -2) == 0 {
-            0
-        } else {
-            2
-        }
+        if ffi::lua_next(state, -2) == 0 { 0 } else { 2 }
     }
 
     let table_index = ffi::lua_absindex(state, index);
@@ -245,11 +241,7 @@ pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
     let stack_start = ffi::lua_gettop(state) - 3;
     handle_error(state, pcall_with_traceback(state, 2, ffi::LUA_MULTRET))?;
     let nresults = ffi::lua_gettop(state) - stack_start;
-    if nresults == 0 {
-        Ok(0)
-    } else {
-        Ok(1)
-    }
+    if nresults == 0 { Ok(0) } else { Ok(1) }
 }
 
 // If the return code indicates an error, pops the error off of the stack and

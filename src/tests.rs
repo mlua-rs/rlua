@@ -4,10 +4,8 @@ use std::panic::catch_unwind;
 use std::os::raw::c_void;
 
 use String as LuaString;
-use {
-    Lua, Result, ExternalError, LightUserData, UserDataMethods, UserData, Table, Thread,
-    ThreadStatus, Error, Function, Value, Variadic, MetaMethod
-};
+use {Lua, Result, ExternalError, LightUserData, UserDataMethods, UserData, Table, Thread,
+     ThreadStatus, Error, Function, Value, Variadic, MetaMethod};
 
 #[test]
 fn test_set_get() {
@@ -156,10 +154,7 @@ fn test_table() {
         .unwrap();
     let table4 = globals.get::<_, Table>("table4").unwrap();
     assert_eq!(
-        table4
-            .pairs()
-            .collect::<Result<Vec<(i64, i64)>>>()
-            .unwrap(),
+        table4.pairs().collect::<Result<Vec<(i64, i64)>>>().unwrap(),
         vec![(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
     );
 }
@@ -521,13 +516,9 @@ fn test_error() {
     let lua_error = globals.get::<_, Function>("lua_error").unwrap();
     let rust_error = globals.get::<_, Function>("rust_error").unwrap();
     let return_error = globals.get::<_, Function>("return_error").unwrap();
-    let return_string_error = globals
-        .get::<_, Function>("return_string_error")
-        .unwrap();
+    let return_string_error = globals.get::<_, Function>("return_string_error").unwrap();
     let test_pcall = globals.get::<_, Function>("test_pcall").unwrap();
-    let understand_recursion = globals
-        .get::<_, Function>("understand_recursion")
-        .unwrap();
+    let understand_recursion = globals.get::<_, Function>("understand_recursion").unwrap();
 
     assert!(no_error.call::<_, ()>(()).is_ok());
     match lua_error.call::<_, ()>(()) {
@@ -828,7 +819,8 @@ fn test_expired_userdata() {
         globals.set("userdata", MyUserdata { id: 123 }).unwrap();
     }
 
-    lua.eval::<()>(r#"
+    lua.eval::<()>(
+        r#"
         local tbl = setmetatable({
             userdata = userdata
         }, { __gc = function(self)
@@ -840,7 +832,9 @@ fn test_expired_userdata() {
         userdata = nil  -- make table and userdata collectable
         collectgarbage("collect")
         hatch:access()
-    "#, None).unwrap();
+    "#,
+        None,
+    ).unwrap();
 }
 
 #[test]
@@ -866,6 +860,6 @@ fn detroys_userdata() {
     }
 
     assert_eq!(DROPPED.load(Ordering::SeqCst), false);
-    drop(lua);  // should destroy all objects
+    drop(lua); // should destroy all objects
     assert_eq!(DROPPED.load(Ordering::SeqCst), true);
 }

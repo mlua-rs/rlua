@@ -54,9 +54,7 @@ impl fmt::Display for Error {
             Error::UserDataTypeMismatch => write!(fmt, "Userdata not expected type"),
             Error::UserDataBorrowError => write!(fmt, "Userdata already mutably borrowed"),
             Error::UserDataBorrowMutError => write!(fmt, "Userdata already borrowed"),
-            Error::CallbackError(ref msg, _) => {
-                write!(fmt, "Error during lua callback: {}", msg)
-            }
+            Error::CallbackError(ref msg, _) => write!(fmt, "Error during lua callback: {}", msg),
             Error::ExternalError(ref err) => err.fmt(fmt),
         }
     }

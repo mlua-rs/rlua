@@ -48,7 +48,7 @@ pub enum Value<'lua> {
     /// it is implicitly cloned.
     Error(Error),
 }
-pub use self::Value::Nil as Nil;
+pub use self::Value::Nil;
 
 /// Trait for types convertible to `Value`.
 pub trait ToLua<'a> {
@@ -398,10 +398,10 @@ where
                             ffi::lua_pop(lua.state, 1);
 
                             Some((|| {
-                                let key = K::from_lua(key, lua)?;
-                                let value = V::from_lua(value, lua)?;
-                                Ok((key, value))
-                            })())
+                                 let key = K::from_lua(key, lua)?;
+                                 let value = V::from_lua(value, lua)?;
+                                 Ok((key, value))
+                             })())
                         }
                         Err(e) => Some(Err(e)),
                     }
@@ -770,8 +770,8 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 
     /// Add a regular method as a function which accepts a &mut T as the first parameter.
     pub fn add_method_mut<M>(&mut self, name: &str, method: M)
-        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>)
-                                     -> Result<MultiValue<'lua>>
+    where
+        M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -802,8 +802,8 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// cause an error with certain binary metamethods that can trigger if ony the right side has a
     /// metatable.
     pub fn add_meta_method_mut<M>(&mut self, meta: MetaMethod, method: M)
-        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>)
-                                     -> Result<MultiValue<'lua>>
+    where
+        M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
@@ -837,8 +837,8 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     }
 
     fn box_method_mut<M>(mut method: M) -> Callback<'lua>
-        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>)
-                                     -> Result<MultiValue<'lua>>
+    where
+        M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = AnyUserData::from_lua(front, lua)?;
@@ -880,9 +880,7 @@ impl<'lua> AnyUserData<'lua> {
     /// Borrow this userdata out of the internal RefCell that is held in lua.
     pub fn borrow<T: UserData>(&self) -> Result<Ref<T>> {
         self.inspect(|cell| {
-            Ok(
-                cell.try_borrow().map_err(|_| Error::UserDataBorrowError)?,
-            )
+            Ok(cell.try_borrow().map_err(|_| Error::UserDataBorrowError)?)
         }).ok_or(Error::UserDataTypeMismatch)?
     }
 
@@ -967,12 +965,18 @@ impl Lua {
                     &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
                 );
 
-                push_userdata::<RefCell<HashMap<TypeId, c_int>>>(state, RefCell::new(HashMap::new()));
+                push_userdata::<RefCell<HashMap<TypeId, c_int>>>(
+                    state,
+                    RefCell::new(HashMap::new()),
+                );
 
                 ffi::lua_newtable(state);
 
                 push_string(state, "__gc");
-                ffi::lua_pushcfunction(state, userdata_destructor::<RefCell<HashMap<TypeId, c_int>>>);
+                ffi::lua_pushcfunction(
+                    state,
+                    userdata_destructor::<RefCell<HashMap<TypeId, c_int>>>,
+                );
                 ffi::lua_rawset(state, -3);
 
                 ffi::lua_setmetatable(state, -2);
@@ -1293,10 +1297,7 @@ impl Lua {
     /// Unpacks a `MultiValue` instance into a value that implements `FromLuaMulti`.
     ///
     /// This can be used to convert the arguments of a Rust function called by Lua.
-    pub fn unpack<'lua, T: FromLuaMulti<'lua>>(
-        &'lua self,
-        value: MultiValue<'lua>,
-    ) -> Result<T> {
+    pub fn unpack<'lua, T: FromLuaMulti<'lua>>(&'lua self, value: MultiValue<'lua>) -> Result<T> {
         T::from_lua_multi(value, self)
     }
 
@@ -1505,7 +1506,8 @@ impl Lua {
                 &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
             );
             ffi::lua_gettable(self.state, ffi::LUA_REGISTRYINDEX);
-            let registered_userdata = &mut *get_userdata::<RefCell<HashMap<TypeId, c_int>>>(self.state, -1);
+            let registered_userdata =
+                &mut *get_userdata::<RefCell<HashMap<TypeId, c_int>>>(self.state, -1);
             let mut map = (*registered_userdata).borrow_mut();
             ffi::lua_pop(self.state, 1);
 

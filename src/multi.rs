@@ -1,4 +1,4 @@
-use std::result::{Result as StdResult};
+use std::result::Result as StdResult;
 
 use hlist_macro::{HNil, HCons};
 
@@ -108,7 +108,8 @@ impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for HCons<T, HNil> {
 }
 
 impl<'lua, H: ToLua<'lua>, A, B> ToLuaMulti<'lua> for HCons<H, HCons<A, B>>
-    where HCons<A, B>: ToLuaMulti<'lua>
+where
+    HCons<A, B>: ToLuaMulti<'lua>,
 {
     fn to_lua_multi(self, lua: &'lua Lua) -> Result<MultiValue<'lua>> {
         let mut results = self.1.to_lua_multi(lua)?;
@@ -118,7 +119,8 @@ impl<'lua, H: ToLua<'lua>, A, B> ToLuaMulti<'lua> for HCons<H, HCons<A, B>>
 }
 
 impl<'lua, H: FromLua<'lua>, A, B> FromLuaMulti<'lua> for HCons<H, HCons<A, B>>
-    where HCons<A, B>: FromLuaMulti<'lua>
+where
+    HCons<A, B>: FromLuaMulti<'lua>,
 {
     fn from_lua_multi(mut values: MultiValue<'lua>, lua: &'lua Lua) -> Result<Self> {
         let val = H::from_lua(values.pop_front().unwrap_or(Nil), lua)?;
