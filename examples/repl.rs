@@ -2,7 +2,7 @@
 
 extern crate rlua;
 
-use rlua::*;
+use rlua::{Lua, MultiValue, Error};
 use std::io::prelude::*;
 use std::io::{stdin, stdout, stderr, BufReader};
 
@@ -20,7 +20,7 @@ fn main() {
         loop {
             stdin.read_line(&mut line).unwrap();
 
-            match lua.eval::<LuaMultiValue>(&line, None) {
+            match lua.eval::<MultiValue>(&line, None) {
                 Ok(values) => {
                     println!(
                         "{}",
@@ -32,7 +32,7 @@ fn main() {
                     );
                     break;
                 }
-                Err(LuaError::IncompleteStatement(_)) => {
+                Err(Error::IncompleteStatement(_)) => {
                     // continue reading input and append it to `line`
                     write!(stdout, ">> ").unwrap();
                     stdout.flush().unwrap();

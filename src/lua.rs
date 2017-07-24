@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 use std::collections::{HashMap, VecDeque};
 use std::collections::hash_map::Entry as HashMapEntry;
 use std::os::raw::{c_char, c_int, c_void};
+use std::string::String as StdString;
 
 use ffi;
 use error::*;
@@ -16,85 +17,85 @@ use util::*;
 
 /// A dynamically typed Lua value.
 #[derive(Debug, Clone)]
-pub enum LuaValue<'lua> {
+pub enum Value<'lua> {
     /// The Lua value `nil`.
     Nil,
     /// The Lua value `true` or `false`.
     Boolean(bool),
     /// A "light userdata" object, equivalent to a raw pointer.
-    LightUserData(LuaLightUserData),
+    LightUserData(LightUserData),
     /// An integer number.
     ///
-    /// Any Lua number convertible to a `LuaInteger` will be represented as this variant.
-    Integer(LuaInteger),
+    /// Any Lua number convertible to a `Integer` will be represented as this variant.
+    Integer(Integer),
     /// A floating point number.
-    Number(LuaNumber),
+    Number(Number),
     /// An interned string, managed by Lua.
     ///
     /// Unlike Rust strings, Lua strings may not be valid UTF-8.
-    String(LuaString<'lua>),
+    String(String<'lua>),
     /// Reference to a Lua table.
-    Table(LuaTable<'lua>),
+    Table(Table<'lua>),
     /// Reference to a Lua function (or closure).
-    Function(LuaFunction<'lua>),
+    Function(Function<'lua>),
     /// Reference to a Lua thread (or coroutine).
-    Thread(LuaThread<'lua>),
+    Thread(Thread<'lua>),
     /// Reference to a userdata object that holds a custom type which implements
-    /// `LuaUserDataType`.  Special builtin userdata types will be represented as
-    /// other `LuaValue` variants.
-    UserData(LuaUserData<'lua>),
-    /// `LuaError` is a special builtin userdata type.  When received from Lua
+    /// `UserData`.  Special builtin userdata types will be represented as
+    /// other `Value` variants.
+    UserData(AnyUserData<'lua>),
+    /// `Error` is a special builtin userdata type.  When received from Lua
     /// it is implicitly cloned.
-    Error(LuaError),
+    Error(Error),
 }
-pub use self::LuaValue::Nil as LuaNil;
+pub use self::Value::Nil as Nil;
 
-/// Trait for types convertible to `LuaValue`.
+/// Trait for types convertible to `Value`.
 pub trait ToLua<'a> {
     /// Performs the conversion.
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue<'a>>;
+    fn to_lua(self, lua: &'a Lua) -> Result<Value<'a>>;
 }
 
-/// Trait for types convertible from `LuaValue`.
+/// Trait for types convertible from `Value`.
 pub trait FromLua<'a>: Sized {
     /// Performs the conversion.
-    fn from_lua(lua_value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self>;
+    fn from_lua(lua_value: Value<'a>, lua: &'a Lua) -> Result<Self>;
 }
 
 /// Multiple Lua values used for both argument passing and also for multiple return values.
 #[derive(Debug, Clone)]
-pub struct LuaMultiValue<'lua>(VecDeque<LuaValue<'lua>>);
+pub struct MultiValue<'lua>(VecDeque<Value<'lua>>);
 
-impl<'lua> LuaMultiValue<'lua> {
-    pub fn new() -> LuaMultiValue<'lua> {
-        LuaMultiValue(VecDeque::new())
+impl<'lua> MultiValue<'lua> {
+    pub fn new() -> MultiValue<'lua> {
+        MultiValue(VecDeque::new())
     }
 }
 
-impl<'lua> FromIterator<LuaValue<'lua>> for LuaMultiValue<'lua> {
-    fn from_iter<I: IntoIterator<Item = LuaValue<'lua>>>(iter: I) -> Self {
-        LuaMultiValue(VecDeque::from_iter(iter))
+impl<'lua> FromIterator<Value<'lua>> for MultiValue<'lua> {
+    fn from_iter<I: IntoIterator<Item = Value<'lua>>>(iter: I) -> Self {
+        MultiValue(VecDeque::from_iter(iter))
     }
 }
 
-impl<'lua> IntoIterator for LuaMultiValue<'lua> {
-    type Item = LuaValue<'lua>;
-    type IntoIter = <VecDeque<LuaValue<'lua>> as IntoIterator>::IntoIter;
+impl<'lua> IntoIterator for MultiValue<'lua> {
+    type Item = Value<'lua>;
+    type IntoIter = <VecDeque<Value<'lua>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl<'lua> Deref for LuaMultiValue<'lua> {
-    type Target = VecDeque<LuaValue<'lua>>;
+impl<'lua> Deref for MultiValue<'lua> {
+    type Target = VecDeque<Value<'lua>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'lua> DerefMut for LuaMultiValue<'lua> {
+impl<'lua> DerefMut for MultiValue<'lua> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -106,7 +107,7 @@ impl<'lua> DerefMut for LuaMultiValue<'lua> {
 /// one. Any type that implements `ToLua` will automatically implement this trait.
 pub trait ToLuaMulti<'a> {
     /// Performs the conversion.
-    fn to_lua_multi(self, lua: &'a Lua) -> LuaResult<LuaMultiValue<'a>>;
+    fn to_lua_multi(self, lua: &'a Lua) -> Result<MultiValue<'a>>;
 }
 
 /// Trait for types that can be created from an arbitrary number of Lua values.
@@ -120,13 +121,10 @@ pub trait FromLuaMulti<'a>: Sized {
     /// values should be ignored. This reflects the semantics of Lua when calling a function or
     /// assigning values. Similarly, if not enough values are given, conversions should assume that
     /// any missing values are nil.
-    fn from_lua_multi(values: LuaMultiValue<'a>, lua: &'a Lua) -> LuaResult<Self>;
+    fn from_lua_multi(values: MultiValue<'a>, lua: &'a Lua) -> Result<Self>;
 }
 
-type LuaCallback<'lua> = Box<
-    FnMut(&'lua Lua, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>
-        + 'lua,
->;
+type Callback<'lua> = Box<FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'lua>;
 
 struct LuaRef<'lua> {
     lua: &'lua Lua,
@@ -157,40 +155,40 @@ impl<'lua> Drop for LuaRef<'lua> {
 }
 
 /// Type of Lua integer numbers.
-pub type LuaInteger = ffi::lua_Integer;
+pub type Integer = ffi::lua_Integer;
 /// Type of Lua floating point numbers.
-pub type LuaNumber = ffi::lua_Number;
+pub type Number = ffi::lua_Number;
 
 /// A "light" userdata value. Equivalent to an unmanaged raw pointer.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct LuaLightUserData(pub *mut c_void);
+pub struct LightUserData(pub *mut c_void);
 
 /// Handle to an internal Lua string.
 ///
 /// Unlike Rust strings, Lua strings may not be valid UTF-8.
 #[derive(Clone, Debug)]
-pub struct LuaString<'lua>(LuaRef<'lua>);
+pub struct String<'lua>(LuaRef<'lua>);
 
-impl<'lua> LuaString<'lua> {
+impl<'lua> String<'lua> {
     /// Get a `&str` slice if the Lua string is valid UTF-8.
     ///
     /// # Example
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::*;
+    /// # use rlua::{Lua, String};
     /// # fn main() {
     /// let lua = Lua::new();
     /// let globals = lua.globals();
     ///
-    /// let version: LuaString = globals.get("_VERSION").unwrap();
+    /// let version: String = globals.get("_VERSION").unwrap();
     /// assert!(version.to_str().unwrap().contains("Lua"));
     ///
-    /// let non_utf8: LuaString = lua.eval(r#"  "test\xff"  "#, None).unwrap();
+    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None).unwrap();
     /// assert!(non_utf8.to_str().is_err());
     /// # }
     /// ```
-    pub fn to_str(&self) -> LuaResult<&str> {
+    pub fn to_str(&self) -> Result<&str> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
@@ -199,7 +197,7 @@ impl<'lua> LuaString<'lua> {
                 assert_eq!(ffi::lua_type(lua.state, -1), ffi::LUA_TSTRING);
                 let s = CStr::from_ptr(ffi::lua_tostring(lua.state, -1))
                     .to_str()
-                    .map_err(|e| LuaError::FromLuaConversionError(e.to_string()))?;
+                    .map_err(|e| Error::FromLuaConversionError(e.to_string()))?;
                 ffi::lua_pop(lua.state, 1);
                 Ok(s)
             })
@@ -209,16 +207,16 @@ impl<'lua> LuaString<'lua> {
 
 /// Handle to an internal Lua table.
 #[derive(Clone, Debug)]
-pub struct LuaTable<'lua>(LuaRef<'lua>);
+pub struct Table<'lua>(LuaRef<'lua>);
 
-impl<'lua> LuaTable<'lua> {
+impl<'lua> Table<'lua> {
     /// Sets a key-value pair in the table.
     ///
     /// If the value is `nil`, this will effectively remove the pair.
     ///
     /// This might invoke the `__newindex` metamethod. Use the `raw_set` method if that is not
     /// desired.
-    pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> LuaResult<()> {
+    pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         let value = value.to_lua(lua)?;
@@ -238,7 +236,7 @@ impl<'lua> LuaTable<'lua> {
     /// If no value is associated to `key`, returns the `nil` value.
     ///
     /// This might invoke the `__index` metamethod. Use the `raw_get` method if that is not desired.
-    pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> LuaResult<V> {
+    pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         unsafe {
@@ -255,7 +253,7 @@ impl<'lua> LuaTable<'lua> {
     }
 
     /// Checks whether the table contains a non-nil value for `key`.
-    pub fn contains_key<K: ToLua<'lua>>(&self, key: K) -> LuaResult<bool> {
+    pub fn contains_key<K: ToLua<'lua>>(&self, key: K) -> Result<bool> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         unsafe {
@@ -272,7 +270,7 @@ impl<'lua> LuaTable<'lua> {
     }
 
     /// Sets a key-value pair without invoking metamethods.
-    pub fn raw_set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> LuaResult<()> {
+    pub fn raw_set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
@@ -288,7 +286,7 @@ impl<'lua> LuaTable<'lua> {
     }
 
     /// Gets the value associated to `key` without invoking metamethods.
-    pub fn raw_get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> LuaResult<V> {
+    pub fn raw_get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
@@ -306,7 +304,7 @@ impl<'lua> LuaTable<'lua> {
     /// Returns the result of the Lua `#` operator.
     ///
     /// This might invoke the `__len` metamethod. Use the `raw_len` method if that is not desired.
-    pub fn len(&self) -> LuaResult<LuaInteger> {
+    pub fn len(&self) -> Result<Integer> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
@@ -320,7 +318,7 @@ impl<'lua> LuaTable<'lua> {
     }
 
     /// Returns the result of the Lua `#` operator, without invoking the `__len` metamethod.
-    pub fn raw_len(&self) -> LuaInteger {
+    pub fn raw_len(&self) -> Integer {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {
@@ -328,20 +326,20 @@ impl<'lua> LuaTable<'lua> {
                 lua.push_ref(lua.state, &self.0);
                 let len = ffi::lua_rawlen(lua.state, -1);
                 ffi::lua_pop(lua.state, 1);
-                len as LuaInteger
+                len as Integer
             })
         }
     }
 
     /// Consume this table and return an iterator over the pairs of the table, works like the Lua
     /// 'pairs' function.
-    pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(self) -> LuaTablePairs<'lua, K, V> {
+    pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(self) -> TablePairs<'lua, K, V> {
         let next_key = Some(LuaRef {
             lua: self.0.lua,
             registry_id: ffi::LUA_REFNIL,
         });
 
-        LuaTablePairs {
+        TablePairs {
             table: self.0,
             next_key,
             _phantom: PhantomData,
@@ -351,8 +349,8 @@ impl<'lua> LuaTable<'lua> {
     /// Consume this table and return an iterator over the values of this table, which should be a
     /// sequence.  Works like the Lua 'ipairs' function, but doesn't return the indexes, only the
     /// values in order.
-    pub fn sequence_values<V: FromLua<'lua>>(self) -> LuaTableSequence<'lua, V> {
-        LuaTableSequence {
+    pub fn sequence_values<V: FromLua<'lua>>(self) -> TableSequence<'lua, V> {
+        TableSequence {
             table: self.0,
             index: Some(1),
             _phantom: PhantomData,
@@ -363,18 +361,18 @@ impl<'lua> LuaTable<'lua> {
 /// An iterator over the pairs of a Lua table.
 ///
 /// Should behave exactly like the lua 'pairs' function.  Holds an internal reference to the table.
-pub struct LuaTablePairs<'lua, K, V> {
+pub struct TablePairs<'lua, K, V> {
     table: LuaRef<'lua>,
     next_key: Option<LuaRef<'lua>>,
     _phantom: PhantomData<(K, V)>,
 }
 
-impl<'lua, K, V> Iterator for LuaTablePairs<'lua, K, V>
+impl<'lua, K, V> Iterator for TablePairs<'lua, K, V>
 where
     K: FromLua<'lua>,
     V: FromLua<'lua>,
 {
-    type Item = LuaResult<(K, V)>;
+    type Item = Result<(K, V)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next_key) = self.next_key.take() {
@@ -419,17 +417,17 @@ where
 ///
 /// Should behave similarly to the lua 'ipairs" function, except only produces the values, not the
 /// indexes.  Holds an internal reference to the table.
-pub struct LuaTableSequence<'lua, V> {
+pub struct TableSequence<'lua, V> {
     table: LuaRef<'lua>,
-    index: Option<LuaInteger>,
+    index: Option<Integer>,
     _phantom: PhantomData<V>,
 }
 
-impl<'lua, V> Iterator for LuaTableSequence<'lua, V>
+impl<'lua, V> Iterator for TableSequence<'lua, V>
 where
     V: FromLua<'lua>,
 {
-    type Item = LuaResult<V>;
+    type Item = Result<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(index) = self.index.take() {
@@ -463,13 +461,13 @@ where
 
 /// Handle to an internal Lua function.
 #[derive(Clone, Debug)]
-pub struct LuaFunction<'lua>(LuaRef<'lua>);
+pub struct Function<'lua>(LuaRef<'lua>);
 
-impl<'lua> LuaFunction<'lua> {
+impl<'lua> Function<'lua> {
     /// Calls the function, passing `args` as function arguments.
     ///
     /// The function's return values are converted to the generic type `R`.
-    pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> LuaResult<R> {
+    pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
@@ -487,7 +485,7 @@ impl<'lua> LuaFunction<'lua> {
                     pcall_with_traceback(lua.state, nargs, ffi::LUA_MULTRET),
                 )?;
                 let nresults = ffi::lua_gettop(lua.state) - stack_start;
-                let mut results = LuaMultiValue::new();
+                let mut results = MultiValue::new();
                 for _ in 0..nresults {
                     results.push_front(lua.pop_value(lua.state));
                 }
@@ -511,22 +509,22 @@ impl<'lua> LuaFunction<'lua> {
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::*;
+    /// # use rlua::{Lua, Function};
     ///
     /// # fn main() {
     /// let lua = Lua::new();
     /// let globals = lua.globals();
     ///
     /// // Bind the argument `123` to Lua's `tostring` function
-    /// let tostring: LuaFunction = globals.get("tostring").unwrap();
-    /// let tostring_123: LuaFunction = tostring.bind(123i32).unwrap();
+    /// let tostring: Function = globals.get("tostring").unwrap();
+    /// let tostring_123: Function = tostring.bind(123i32).unwrap();
     ///
     /// // Now we can call `tostring_123` without arguments to get the result of `tostring(123)`
     /// let result: String = tostring_123.call(()).unwrap();
     /// assert_eq!(result, "123");
     /// # }
     /// ```
-    pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> LuaResult<LuaFunction<'lua>> {
+    pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> Result<Function<'lua>> {
         unsafe extern "C" fn bind_call_impl(state: *mut ffi::lua_State) -> c_int {
             let nargs = ffi::lua_gettop(state);
 
@@ -561,7 +559,7 @@ impl<'lua> LuaFunction<'lua> {
 
                 ffi::lua_pushcclosure(lua.state, bind_call_impl, nargs + 2);
 
-                Ok(LuaFunction(lua.pop_ref(lua.state)))
+                Ok(Function(lua.pop_ref(lua.state)))
             })
         }
     }
@@ -569,10 +567,10 @@ impl<'lua> LuaFunction<'lua> {
 
 /// Status of a Lua thread (or coroutine).
 ///
-/// A `LuaThread` is `Active` before the coroutine function finishes, Dead after it finishes, and in
+/// A `Thread` is `Active` before the coroutine function finishes, Dead after it finishes, and in
 /// Error state if error has been called inside the coroutine.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum LuaThreadStatus {
+pub enum ThreadStatus {
     /// The thread has finished executing.
     Dead,
     /// The thread is currently running or suspended because it has called `coroutine.yield`.
@@ -583,9 +581,9 @@ pub enum LuaThreadStatus {
 
 /// Handle to an internal Lua thread (or coroutine).
 #[derive(Clone, Debug)]
-pub struct LuaThread<'lua>(LuaRef<'lua>);
+pub struct Thread<'lua>(LuaRef<'lua>);
 
-impl<'lua> LuaThread<'lua> {
+impl<'lua> Thread<'lua> {
     /// Resumes execution of this thread.
     ///
     /// Equivalent to `coroutine.resume`.
@@ -609,7 +607,7 @@ impl<'lua> LuaThread<'lua> {
     ///
     /// # fn main() {
     /// let lua = Lua::new();
-    /// let thread: LuaThread = lua.eval(r#"
+    /// let thread: Thread = lua.eval(r#"
     ///     coroutine.create(function(arg)
     ///         assert(arg == 42)
     ///         local yieldarg = coroutine.yield(123)
@@ -623,12 +621,12 @@ impl<'lua> LuaThread<'lua> {
     ///
     /// // The coroutine has now returned, so `resume` will fail
     /// match thread.resume::<_, u32>(()) {
-    ///     Err(LuaError::CoroutineInactive) => {},
+    ///     Err(Error::CoroutineInactive) => {},
     ///     unexpected => panic!("unexpected result {:?}", unexpected),
     /// }
     /// # }
     /// ```
-    pub fn resume<A, R>(&self, args: A) -> LuaResult<R>
+    pub fn resume<A, R>(&self, args: A) -> Result<R>
     where
         A: ToLuaMulti<'lua>,
         R: FromLuaMulti<'lua>,
@@ -643,7 +641,7 @@ impl<'lua> LuaThread<'lua> {
 
                 let status = ffi::lua_status(thread_state);
                 if status != ffi::LUA_YIELD && ffi::lua_gettop(thread_state) == 0 {
-                    return Err(LuaError::CoroutineInactive);
+                    return Err(Error::CoroutineInactive);
                 }
 
                 ffi::lua_pop(lua.state, 1);
@@ -662,7 +660,7 @@ impl<'lua> LuaThread<'lua> {
                 )?;
 
                 let nresults = ffi::lua_gettop(thread_state);
-                let mut results = LuaMultiValue::new();
+                let mut results = MultiValue::new();
                 for _ in 0..nresults {
                     results.push_front(lua.pop_value(thread_state));
                 }
@@ -672,7 +670,7 @@ impl<'lua> LuaThread<'lua> {
     }
 
     /// Gets the status of the thread.
-    pub fn status(&self) -> LuaThreadStatus {
+    pub fn status(&self) -> ThreadStatus {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {
@@ -684,11 +682,11 @@ impl<'lua> LuaThread<'lua> {
 
                 let status = ffi::lua_status(thread_state);
                 if status != ffi::LUA_OK && status != ffi::LUA_YIELD {
-                    LuaThreadStatus::Error
+                    ThreadStatus::Error
                 } else if status == ffi::LUA_YIELD || ffi::lua_gettop(thread_state) > 0 {
-                    LuaThreadStatus::Active
+                    ThreadStatus::Active
                 } else {
-                    LuaThreadStatus::Dead
+                    ThreadStatus::Dead
                 }
             })
         }
@@ -697,7 +695,7 @@ impl<'lua> LuaThread<'lua> {
 
 /// Kinds of metamethods that can be overridden.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum LuaMetaMethod {
+pub enum MetaMethod {
     /// The `+` operator.
     Add,
     /// The `-` operator.
@@ -752,17 +750,17 @@ pub enum LuaMetaMethod {
 /// can be called as `userdata:method(args)` as expected.  If there are any regular methods, and an
 /// `Index` metamethod is given, it will be called as a *fallback* if the index doesn't match an
 /// existing regular method.
-pub struct LuaUserDataMethods<'lua, T> {
-    methods: HashMap<String, LuaCallback<'lua>>,
-    meta_methods: HashMap<LuaMetaMethod, LuaCallback<'lua>>,
+pub struct UserDataMethods<'lua, T> {
+    methods: HashMap<StdString, Callback<'lua>>,
+    meta_methods: HashMap<MetaMethod, Callback<'lua>>,
     _type: PhantomData<T>,
 }
 
-impl<'lua, T: LuaUserDataType> LuaUserDataMethods<'lua, T> {
+impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// Add a regular method as a function which accepts a &T as the first parameter.
     pub fn add_method<M>(&mut self, name: &str, method: M)
     where
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
+        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -772,8 +770,8 @@ impl<'lua, T: LuaUserDataType> LuaUserDataMethods<'lua, T> {
 
     /// Add a regular method as a function which accepts a &mut T as the first parameter.
     pub fn add_method_mut<M>(&mut self, name: &str, method: M)
-        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
-                                     -> LuaResult<LuaMultiValue<'lua>>
+        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>)
+                                     -> Result<MultiValue<'lua>>
     {
         self.methods.insert(
             name.to_owned(),
@@ -782,10 +780,10 @@ impl<'lua, T: LuaUserDataType> LuaUserDataMethods<'lua, T> {
     }
 
     /// Add a regular method as a function which accepts generic arguments, the first argument will
-    /// always be a LuaUserData of type T.
+    /// always be a `UserData` of type T.
     pub fn add_function<F>(&mut self, name: &str, function: F)
     where
-        F: 'lua + for<'a> FnMut(&'lua Lua, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
+        F: 'lua + for<'a> FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.methods.insert(name.to_owned(), Box::new(function));
     }
@@ -793,9 +791,9 @@ impl<'lua, T: LuaUserDataType> LuaUserDataMethods<'lua, T> {
     /// Add a metamethod as a function which accepts a &T as the first parameter.  This can cause an
     /// error with certain binary metamethods that can trigger if ony the right side has a
     /// metatable.
-    pub fn add_meta_method<M>(&mut self, meta: LuaMetaMethod, method: M)
+    pub fn add_meta_method<M>(&mut self, meta: MetaMethod, method: M)
     where
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
+        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
@@ -803,9 +801,9 @@ impl<'lua, T: LuaUserDataType> LuaUserDataMethods<'lua, T> {
     /// Add a metamethod as a function which accepts a &mut T as the first parameter.  This can
     /// cause an error with certain binary metamethods that can trigger if ony the right side has a
     /// metatable.
-    pub fn add_meta_method_mut<M>(&mut self, meta: LuaMetaMethod, method: M)
-        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
-                                     -> LuaResult<LuaMultiValue<'lua>>
+    pub fn add_meta_method_mut<M>(&mut self, meta: MetaMethod, method: M)
+        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>)
+                                     -> Result<MultiValue<'lua>>
     {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
@@ -814,23 +812,23 @@ impl<'lua, T: LuaUserDataType> LuaUserDataMethods<'lua, T> {
     /// binary operators can be triggered if either the left or right argument to the binary
     /// operator has a metatable, so the first argument here is not necessarily a userdata of type
     /// T.
-    pub fn add_meta_function<F>(&mut self, meta: LuaMetaMethod, function: F)
+    pub fn add_meta_function<F>(&mut self, meta: MetaMethod, function: F)
     where
-        F: 'lua + for<'a> FnMut(&'lua Lua, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
+        F: 'lua + for<'a> FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.meta_methods.insert(meta, Box::new(function));
     }
 
-    fn box_method<M>(mut method: M) -> LuaCallback<'lua>
+    fn box_method<M>(mut method: M) -> Callback<'lua>
     where
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, LuaMultiValue<'lua>) -> LuaResult<LuaMultiValue<'lua>>,
+        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
-            let userdata = LuaUserData::from_lua(front, lua)?;
+            let userdata = AnyUserData::from_lua(front, lua)?;
             let userdata = userdata.borrow::<T>()?;
             method(lua, &userdata, args)
         } else {
-            Err(LuaError::FromLuaConversionError(
+            Err(Error::FromLuaConversionError(
                 "No userdata supplied as first argument to method"
                     .to_owned(),
             ))
@@ -838,17 +836,17 @@ impl<'lua, T: LuaUserDataType> LuaUserDataMethods<'lua, T> {
 
     }
 
-    fn box_method_mut<M>(mut method: M) -> LuaCallback<'lua>
-        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, LuaMultiValue<'lua>)
-                                     -> LuaResult<LuaMultiValue<'lua>>
+    fn box_method_mut<M>(mut method: M) -> Callback<'lua>
+        where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>)
+                                     -> Result<MultiValue<'lua>>
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
-            let userdata = LuaUserData::from_lua(front, lua)?;
+            let userdata = AnyUserData::from_lua(front, lua)?;
             let mut userdata = userdata.borrow_mut::<T>()?;
             method(lua, &mut userdata, args)
         } else {
             Err(
-                LuaError::FromLuaConversionError(
+                Error::FromLuaConversionError(
                     "No userdata supplied as first argument to method".to_owned(),
                 ).into(),
             )
@@ -858,43 +856,48 @@ impl<'lua, T: LuaUserDataType> LuaUserDataMethods<'lua, T> {
 }
 
 /// Trait for custom userdata types.
-pub trait LuaUserDataType: 'static + Sized {
+pub trait UserData: 'static + Sized {
     /// Adds custom methods and operators specific to this userdata.
-    fn add_methods(_methods: &mut LuaUserDataMethods<Self>) {}
+    fn add_methods(_methods: &mut UserDataMethods<Self>) {}
 }
 
-/// Handle to an internal Lua userdata for a type that implements `LuaUserDataType`.  Internally,
-/// instances are stored in a `RefCell`, to best match the mutable semantics of the Lua language.
+/// Handle to an internal Lua userdata for any type that implements `UserData`.
+///
+/// Similar to `std::any::Any`, this provides an interface for dynamic type checking via the `is`
+/// and `borrow` methods.
+///
+/// Internally, instances are stored in a `RefCell`, to best match the mutable semantics of the Lua
+/// language.
 #[derive(Clone, Debug)]
-pub struct LuaUserData<'lua>(LuaRef<'lua>);
+pub struct AnyUserData<'lua>(LuaRef<'lua>);
 
-impl<'lua> LuaUserData<'lua> {
+impl<'lua> AnyUserData<'lua> {
     /// Checks whether `T` is the type of this userdata.
-    pub fn is<T: LuaUserDataType>(&self) -> bool {
+    pub fn is<T: UserData>(&self) -> bool {
         self.inspect(|_: &RefCell<T>| ()).is_some()
     }
 
     /// Borrow this userdata out of the internal RefCell that is held in lua.
-    pub fn borrow<T: LuaUserDataType>(&self) -> LuaResult<Ref<T>> {
+    pub fn borrow<T: UserData>(&self) -> Result<Ref<T>> {
         self.inspect(|cell| {
             Ok(
-                cell.try_borrow().map_err(|_| LuaError::UserDataBorrowError)?,
+                cell.try_borrow().map_err(|_| Error::UserDataBorrowError)?,
             )
-        }).ok_or(LuaError::UserDataTypeMismatch)?
+        }).ok_or(Error::UserDataTypeMismatch)?
     }
 
     /// Borrow mutably this userdata out of the internal RefCell that is held in lua.
-    pub fn borrow_mut<T: LuaUserDataType>(&self) -> LuaResult<RefMut<T>> {
+    pub fn borrow_mut<T: UserData>(&self) -> Result<RefMut<T>> {
         self.inspect(|cell| {
             Ok(cell.try_borrow_mut().map_err(
-                |_| LuaError::UserDataBorrowMutError,
+                |_| Error::UserDataBorrowMutError,
             )?)
-        }).ok_or(LuaError::UserDataTypeMismatch)?
+        }).ok_or(Error::UserDataTypeMismatch)?
     }
 
     fn inspect<'a, T, R, F>(&'a self, func: F) -> Option<R>
     where
-        T: LuaUserDataType,
+        T: UserData,
         F: FnOnce(&'a RefCell<T>) -> R,
     {
         unsafe {
@@ -907,7 +910,7 @@ impl<'lua> LuaUserData<'lua> {
                 lua_assert!(
                     lua.state,
                     ffi::lua_getmetatable(lua.state, -1) != 0,
-                    "LuaUserData missing metatable"
+                    "AnyUserData missing metatable"
                 );
 
                 ffi::lua_rawgeti(
@@ -986,7 +989,7 @@ impl Lua {
                 ffi::lua_newtable(state);
 
                 push_string(state, "__gc");
-                ffi::lua_pushcfunction(state, userdata_destructor::<LuaCallback>);
+                ffi::lua_pushcfunction(state, userdata_destructor::<Callback>);
                 ffi::lua_rawset(state, -3);
 
                 push_string(state, "__metatable");
@@ -1024,14 +1027,14 @@ impl Lua {
     /// results in better error traces.
     ///
     /// Equivalent to Lua's `load` function.
-    pub fn load(&self, source: &str, name: Option<&str>) -> LuaResult<LuaFunction> {
+    pub fn load(&self, source: &str, name: Option<&str>) -> Result<Function> {
         unsafe {
             stack_err_guard(self.state, 0, || {
                 handle_error(
                     self.state,
                     if let Some(name) = name {
                         let name = CString::new(name.to_owned()).map_err(|e| {
-                            LuaError::ToLuaConversionError(e.to_string())
+                            Error::ToLuaConversionError(e.to_string())
                         })?;
                         ffi::luaL_loadbuffer(
                             self.state,
@@ -1049,7 +1052,7 @@ impl Lua {
                     },
                 )?;
 
-                Ok(LuaFunction(self.pop_ref(self.state)))
+                Ok(Function(self.pop_ref(self.state)))
             })
         }
     }
@@ -1064,7 +1067,7 @@ impl Lua {
         &'lua self,
         source: &str,
         name: Option<&str>,
-    ) -> LuaResult<R> {
+    ) -> Result<R> {
         self.load(source, name)?.call(())
     }
 
@@ -1076,7 +1079,7 @@ impl Lua {
         &'lua self,
         source: &str,
         name: Option<&str>,
-    ) -> LuaResult<R> {
+    ) -> Result<R> {
         // First, try interpreting the lua as an expression by adding
         // "return", then as a statement.  This is the same thing the
         // actual lua repl does.
@@ -1086,29 +1089,29 @@ impl Lua {
     }
 
     /// Pass a `&str` slice to Lua, creating and returning a interned Lua string.
-    pub fn create_string(&self, s: &str) -> LuaString {
+    pub fn create_string(&self, s: &str) -> String {
         unsafe {
             stack_guard(self.state, 0, || {
                 check_stack(self.state, 1);
                 ffi::lua_pushlstring(self.state, s.as_ptr() as *const c_char, s.len());
-                LuaString(self.pop_ref(self.state))
+                String(self.pop_ref(self.state))
             })
         }
     }
 
     /// Creates and returns a new table.
-    pub fn create_table(&self) -> LuaTable {
+    pub fn create_table(&self) -> Table {
         unsafe {
             stack_guard(self.state, 0, || {
                 check_stack(self.state, 1);
                 ffi::lua_newtable(self.state);
-                LuaTable(self.pop_ref(self.state))
+                Table(self.pop_ref(self.state))
             })
         }
     }
 
     /// Creates a table and fills it with values from an iterator.
-    pub fn create_table_from<'lua, K, V, I>(&'lua self, cont: I) -> LuaResult<LuaTable<'lua>>
+    pub fn create_table_from<'lua, K, V, I>(&'lua self, cont: I) -> Result<Table<'lua>>
     where
         K: ToLua<'lua>,
         V: ToLua<'lua>,
@@ -1124,13 +1127,13 @@ impl Lua {
                     self.push_value(self.state, v.to_lua(self)?);
                     ffi::lua_rawset(self.state, -3);
                 }
-                Ok(LuaTable(self.pop_ref(self.state)))
+                Ok(Table(self.pop_ref(self.state)))
             })
         }
     }
 
     /// Creates a table from an iterator of values, using `1..` as the keys.
-    pub fn create_sequence_from<'lua, T, I>(&'lua self, cont: I) -> LuaResult<LuaTable<'lua>>
+    pub fn create_sequence_from<'lua, T, I>(&'lua self, cont: I) -> Result<Table<'lua>>
     where
         T: ToLua<'lua>,
         I: IntoIterator<Item = T>,
@@ -1139,9 +1142,9 @@ impl Lua {
     }
 
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
-    pub fn create_function<'lua, F>(&'lua self, func: F) -> LuaFunction<'lua>
+    pub fn create_function<'lua, F>(&'lua self, func: F) -> Function<'lua>
     where
-        F: 'lua + for<'a> FnMut(&'a Lua, LuaMultiValue<'a>) -> LuaResult<LuaMultiValue<'a>>,
+        F: 'lua + for<'a> FnMut(&'a Lua, MultiValue<'a>) -> Result<MultiValue<'a>>,
     {
         self.create_callback_function(Box::new(func))
     }
@@ -1149,7 +1152,7 @@ impl Lua {
     /// Wraps a Lua function into a new thread (or coroutine).
     ///
     /// Equivalent to `coroutine.create`.
-    pub fn create_thread<'lua>(&'lua self, func: LuaFunction<'lua>) -> LuaThread<'lua> {
+    pub fn create_thread<'lua>(&'lua self, func: Function<'lua>) -> Thread<'lua> {
         unsafe {
             stack_guard(self.state, 0, move || {
                 check_stack(self.state, 1);
@@ -1157,15 +1160,15 @@ impl Lua {
                 let thread_state = ffi::lua_newthread(self.state);
                 self.push_ref(thread_state, &func.0);
 
-                LuaThread(self.pop_ref(self.state))
+                Thread(self.pop_ref(self.state))
             })
         }
     }
 
     /// Create a Lua userdata object from a custom userdata type.
-    pub fn create_userdata<T>(&self, data: T) -> LuaUserData
+    pub fn create_userdata<T>(&self, data: T) -> AnyUserData
     where
-        T: LuaUserDataType,
+        T: UserData,
     {
         unsafe {
             stack_guard(self.state, 0, move || {
@@ -1181,18 +1184,18 @@ impl Lua {
 
                 ffi::lua_setmetatable(self.state, -2);
 
-                LuaUserData(self.pop_ref(self.state))
+                AnyUserData(self.pop_ref(self.state))
             })
         }
     }
 
     /// Returns a handle to the global environment.
-    pub fn globals(&self) -> LuaTable {
+    pub fn globals(&self) -> Table {
         unsafe {
             stack_guard(self.state, 0, move || {
                 check_stack(self.state, 1);
                 ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
-                LuaTable(self.pop_ref(self.state))
+                Table(self.pop_ref(self.state))
             })
         }
     }
@@ -1200,20 +1203,20 @@ impl Lua {
     /// Coerces a Lua value to a string.
     ///
     /// The value must be a string (in which case this is a no-op) or a number.
-    pub fn coerce_string<'lua>(&'lua self, v: LuaValue<'lua>) -> LuaResult<LuaString<'lua>> {
+    pub fn coerce_string<'lua>(&'lua self, v: Value<'lua>) -> Result<String<'lua>> {
         match v {
-            LuaValue::String(s) => Ok(s),
+            Value::String(s) => Ok(s),
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1);
                     self.push_value(self.state, v);
                     if ffi::lua_tostring(self.state, -1).is_null() {
                         ffi::lua_pop(self.state, 1);
-                        Err(LuaError::FromLuaConversionError(
+                        Err(Error::FromLuaConversionError(
                             "cannot convert lua value to string".to_owned(),
                         ))
                     } else {
-                        Ok(LuaString(self.pop_ref(self.state)))
+                        Ok(String(self.pop_ref(self.state)))
                     }
                 })
             },
@@ -1224,9 +1227,9 @@ impl Lua {
     ///
     /// The value must be an integer, or a floating point number or a string that can be converted
     /// to an integer. Refer to the Lua manual for details.
-    pub fn coerce_integer(&self, v: LuaValue) -> LuaResult<LuaInteger> {
+    pub fn coerce_integer(&self, v: Value) -> Result<Integer> {
         match v {
-            LuaValue::Integer(i) => Ok(i),
+            Value::Integer(i) => Ok(i),
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1);
@@ -1235,7 +1238,7 @@ impl Lua {
                     let i = ffi::lua_tointegerx(self.state, -1, &mut isint);
                     ffi::lua_pop(self.state, 1);
                     if isint == 0 {
-                        Err(LuaError::FromLuaConversionError(
+                        Err(Error::FromLuaConversionError(
                             "cannot convert lua value to integer".to_owned(),
                         ))
                     } else {
@@ -1250,9 +1253,9 @@ impl Lua {
     ///
     /// The value must be a number or a string that can be converted to a number. Refer to the Lua
     /// manual for details.
-    pub fn coerce_number(&self, v: LuaValue) -> LuaResult<LuaNumber> {
+    pub fn coerce_number(&self, v: Value) -> Result<Number> {
         match v {
-            LuaValue::Number(n) => Ok(n),
+            Value::Number(n) => Ok(n),
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1);
@@ -1261,7 +1264,7 @@ impl Lua {
                     let n = ffi::lua_tonumberx(self.state, -1, &mut isnum);
                     ffi::lua_pop(self.state, 1);
                     if isnum == 0 {
-                        Err(LuaError::FromLuaConversionError(
+                        Err(Error::FromLuaConversionError(
                             "cannot convert lua value to number".to_owned(),
                         ))
                     } else {
@@ -1272,32 +1275,32 @@ impl Lua {
         }
     }
 
-    pub fn from<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> LuaResult<LuaValue<'lua>> {
+    pub fn from<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> Result<Value<'lua>> {
         t.to_lua(self)
     }
 
-    pub fn to<'lua, T: FromLua<'lua>>(&'lua self, value: LuaValue<'lua>) -> LuaResult<T> {
+    pub fn to<'lua, T: FromLua<'lua>>(&'lua self, value: Value<'lua>) -> Result<T> {
         T::from_lua(value, self)
     }
 
-    /// Packs up a value that implements `ToLuaMulti` into a `LuaMultiValue` instance.
+    /// Packs up a value that implements `ToLuaMulti` into a `MultiValue` instance.
     ///
     /// This can be used to return arbitrary Lua values from a Rust function back to Lua.
-    pub fn pack<'lua, T: ToLuaMulti<'lua>>(&'lua self, t: T) -> LuaResult<LuaMultiValue<'lua>> {
+    pub fn pack<'lua, T: ToLuaMulti<'lua>>(&'lua self, t: T) -> Result<MultiValue<'lua>> {
         t.to_lua_multi(self)
     }
 
-    /// Unpacks a `LuaMultiValue` instance into a value that implements `FromLuaMulti`.
+    /// Unpacks a `MultiValue` instance into a value that implements `FromLuaMulti`.
     ///
     /// This can be used to convert the arguments of a Rust function called by Lua.
     pub fn unpack<'lua, T: FromLuaMulti<'lua>>(
         &'lua self,
-        value: LuaMultiValue<'lua>,
-    ) -> LuaResult<T> {
+        value: MultiValue<'lua>,
+    ) -> Result<T> {
         T::from_lua_multi(value, self)
     }
 
-    fn create_callback_function<'lua>(&'lua self, func: LuaCallback<'lua>) -> LuaFunction<'lua> {
+    fn create_callback_function<'lua>(&'lua self, func: Callback<'lua>) -> Function<'lua> {
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, || {
                 let lua = Lua {
@@ -1306,10 +1309,10 @@ impl Lua {
                     ephemeral: true,
                 };
 
-                let func = &mut *get_userdata::<LuaCallback>(state, ffi::lua_upvalueindex(1));
+                let func = &mut *get_userdata::<Callback>(state, ffi::lua_upvalueindex(1));
 
                 let nargs = ffi::lua_gettop(state);
-                let mut args = LuaMultiValue::new();
+                let mut args = MultiValue::new();
                 for _ in 0..nargs {
                     args.push_front(lua.pop_value(state));
                 }
@@ -1329,7 +1332,7 @@ impl Lua {
             stack_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
 
-                push_userdata::<LuaCallback>(self.state, func);
+                push_userdata::<Callback>(self.state, func);
 
                 ffi::lua_pushlightuserdata(
                     self.state,
@@ -1340,109 +1343,109 @@ impl Lua {
 
                 ffi::lua_pushcclosure(self.state, callback_call_impl, 1);
 
-                LuaFunction(self.pop_ref(self.state))
+                Function(self.pop_ref(self.state))
             })
         }
     }
 
-    unsafe fn push_value(&self, state: *mut ffi::lua_State, value: LuaValue) {
+    unsafe fn push_value(&self, state: *mut ffi::lua_State, value: Value) {
         match value {
-            LuaValue::Nil => {
+            Value::Nil => {
                 ffi::lua_pushnil(state);
             }
 
-            LuaValue::Boolean(b) => {
+            Value::Boolean(b) => {
                 ffi::lua_pushboolean(state, if b { 1 } else { 0 });
             }
 
-            LuaValue::LightUserData(ud) => {
+            Value::LightUserData(ud) => {
                 ffi::lua_pushlightuserdata(state, ud.0);
             }
 
-            LuaValue::Integer(i) => {
+            Value::Integer(i) => {
                 ffi::lua_pushinteger(state, i);
             }
 
-            LuaValue::Number(n) => {
+            Value::Number(n) => {
                 ffi::lua_pushnumber(state, n);
             }
 
-            LuaValue::String(s) => {
+            Value::String(s) => {
                 self.push_ref(state, &s.0);
             }
 
-            LuaValue::Table(t) => {
+            Value::Table(t) => {
                 self.push_ref(state, &t.0);
             }
 
-            LuaValue::Function(f) => {
+            Value::Function(f) => {
                 self.push_ref(state, &f.0);
             }
 
-            LuaValue::Thread(t) => {
+            Value::Thread(t) => {
                 self.push_ref(state, &t.0);
             }
 
-            LuaValue::UserData(ud) => {
+            Value::UserData(ud) => {
                 self.push_ref(state, &ud.0);
             }
 
-            LuaValue::Error(e) => {
+            Value::Error(e) => {
                 push_wrapped_error(state, e);
             }
         }
     }
 
-    unsafe fn pop_value(&self, state: *mut ffi::lua_State) -> LuaValue {
+    unsafe fn pop_value(&self, state: *mut ffi::lua_State) -> Value {
         match ffi::lua_type(state, -1) {
             ffi::LUA_TNIL => {
                 ffi::lua_pop(state, 1);
-                LuaNil
+                Nil
             }
 
             ffi::LUA_TBOOLEAN => {
-                let b = LuaValue::Boolean(ffi::lua_toboolean(state, -1) != 0);
+                let b = Value::Boolean(ffi::lua_toboolean(state, -1) != 0);
                 ffi::lua_pop(state, 1);
                 b
             }
 
             ffi::LUA_TLIGHTUSERDATA => {
-                let ud = LuaValue::LightUserData(LuaLightUserData(ffi::lua_touserdata(state, -1)));
+                let ud = Value::LightUserData(LightUserData(ffi::lua_touserdata(state, -1)));
                 ffi::lua_pop(state, 1);
                 ud
             }
 
             ffi::LUA_TNUMBER => {
                 if ffi::lua_isinteger(state, -1) != 0 {
-                    let i = LuaValue::Integer(ffi::lua_tointeger(state, -1));
+                    let i = Value::Integer(ffi::lua_tointeger(state, -1));
                     ffi::lua_pop(state, 1);
                     i
                 } else {
-                    let n = LuaValue::Number(ffi::lua_tonumber(state, -1));
+                    let n = Value::Number(ffi::lua_tonumber(state, -1));
                     ffi::lua_pop(state, 1);
                     n
                 }
             }
 
-            ffi::LUA_TSTRING => LuaValue::String(LuaString(self.pop_ref(state))),
+            ffi::LUA_TSTRING => Value::String(String(self.pop_ref(state))),
 
-            ffi::LUA_TTABLE => LuaValue::Table(LuaTable(self.pop_ref(state))),
+            ffi::LUA_TTABLE => Value::Table(Table(self.pop_ref(state))),
 
-            ffi::LUA_TFUNCTION => LuaValue::Function(LuaFunction(self.pop_ref(state))),
+            ffi::LUA_TFUNCTION => Value::Function(Function(self.pop_ref(state))),
 
             ffi::LUA_TUSERDATA => {
                 // It should not be possible to interact with userdata types
-                // other than custom LuaUserDataType types OR a WrappedError.
+                // other than custom UserData types OR a WrappedError.
                 // WrappedPanic should never be able to be caught in lua, so it
                 // should never be here.
                 if let Some(err) = pop_wrapped_error(state) {
-                    LuaValue::Error(err)
+                    Value::Error(err)
                 } else {
-                    LuaValue::UserData(LuaUserData(self.pop_ref(state)))
+                    Value::UserData(AnyUserData(self.pop_ref(state)))
                 }
             }
 
-            ffi::LUA_TTHREAD => LuaValue::Thread(LuaThread(self.pop_ref(state))),
+            ffi::LUA_TTHREAD => Value::Thread(Thread(self.pop_ref(state))),
 
             _ => unreachable!("internal error: LUA_TNONE in pop_value"),
         }
@@ -1452,7 +1455,7 @@ impl Lua {
         assert_eq!(
             lref.lua.main_state,
             self.main_state,
-            "Lua instance passed LuaValue created from a different Lua"
+            "Lua instance passed Value created from a different Lua"
         );
 
         ffi::lua_rawgeti(
@@ -1475,7 +1478,7 @@ impl Lua {
         }
     }
 
-    unsafe fn userdata_metatable<T: LuaUserDataType>(&self) -> c_int {
+    unsafe fn userdata_metatable<T: UserData>(&self) -> c_int {
         // Used if both an __index metamethod is set and regular methods, checks methods table
         // first, then __index metamethod.
         unsafe extern "C" fn meta_index_impl(state: *mut ffi::lua_State) -> c_int {
@@ -1511,7 +1514,7 @@ impl Lua {
                 HashMapEntry::Vacant(entry) => {
                     ffi::lua_newtable(self.state);
 
-                    let mut methods = LuaUserDataMethods {
+                    let mut methods = UserDataMethods {
                         methods: HashMap::new(),
                         meta_methods: HashMap::new(),
                         _type: PhantomData,
@@ -1528,7 +1531,7 @@ impl Lua {
                             push_string(self.state, &k);
                             self.push_value(
                                 self.state,
-                                LuaValue::Function(self.create_callback_function(m)),
+                                Value::Function(self.create_callback_function(m)),
                             );
                             ffi::lua_rawset(self.state, -3);
                         }
@@ -1537,46 +1540,46 @@ impl Lua {
                     }
 
                     for (k, m) in methods.meta_methods {
-                        if k == LuaMetaMethod::Index && has_methods {
+                        if k == MetaMethod::Index && has_methods {
                             push_string(self.state, "__index");
                             ffi::lua_pushvalue(self.state, -1);
                             ffi::lua_gettable(self.state, -3);
                             self.push_value(
                                 self.state,
-                                LuaValue::Function(self.create_callback_function(m)),
+                                Value::Function(self.create_callback_function(m)),
                             );
                             ffi::lua_pushcclosure(self.state, meta_index_impl, 2);
                             ffi::lua_rawset(self.state, -3);
                         } else {
                             let name = match k {
-                                LuaMetaMethod::Add => "__add",
-                                LuaMetaMethod::Sub => "__sub",
-                                LuaMetaMethod::Mul => "__mul",
-                                LuaMetaMethod::Div => "__div",
-                                LuaMetaMethod::Mod => "__mod",
-                                LuaMetaMethod::Pow => "__pow",
-                                LuaMetaMethod::Unm => "__unm",
-                                LuaMetaMethod::IDiv => "__idiv",
-                                LuaMetaMethod::BAnd => "__band",
-                                LuaMetaMethod::BOr => "__bor",
-                                LuaMetaMethod::BXor => "__bxor",
-                                LuaMetaMethod::BNot => "__bnot",
-                                LuaMetaMethod::Shl => "__shl",
-                                LuaMetaMethod::Shr => "__shr",
-                                LuaMetaMethod::Concat => "__concat",
-                                LuaMetaMethod::Len => "__len",
-                                LuaMetaMethod::Eq => "__eq",
-                                LuaMetaMethod::Lt => "__lt",
-                                LuaMetaMethod::Le => "__le",
-                                LuaMetaMethod::Index => "__index",
-                                LuaMetaMethod::NewIndex => "__newIndex",
-                                LuaMetaMethod::Call => "__call",
-                                LuaMetaMethod::ToString => "__tostring",
+                                MetaMethod::Add => "__add",
+                                MetaMethod::Sub => "__sub",
+                                MetaMethod::Mul => "__mul",
+                                MetaMethod::Div => "__div",
+                                MetaMethod::Mod => "__mod",
+                                MetaMethod::Pow => "__pow",
+                                MetaMethod::Unm => "__unm",
+                                MetaMethod::IDiv => "__idiv",
+                                MetaMethod::BAnd => "__band",
+                                MetaMethod::BOr => "__bor",
+                                MetaMethod::BXor => "__bxor",
+                                MetaMethod::BNot => "__bnot",
+                                MetaMethod::Shl => "__shl",
+                                MetaMethod::Shr => "__shr",
+                                MetaMethod::Concat => "__concat",
+                                MetaMethod::Len => "__len",
+                                MetaMethod::Eq => "__eq",
+                                MetaMethod::Lt => "__lt",
+                                MetaMethod::Le => "__le",
+                                MetaMethod::Index => "__index",
+                                MetaMethod::NewIndex => "__newIndex",
+                                MetaMethod::Call => "__call",
+                                MetaMethod::ToString => "__tostring",
                             };
                             push_string(self.state, name);
                             self.push_value(
                                 self.state,
-                                LuaValue::Function(self.create_callback_function(m)),
+                                Value::Function(self.create_callback_function(m)),
                             );
                             ffi::lua_rawset(self.state, -3);
                         }

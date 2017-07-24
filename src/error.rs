@@ -1,10 +1,10 @@
 use std::fmt;
 use std::sync::Arc;
-use std::result::Result;
-use std::error::Error;
+use std::error::Error as StdError;
+use std::result::Result as StdResult;
 
 #[derive(Debug, Clone)]
-pub enum LuaError {
+pub enum Error {
     /// Lua syntax error, aka `LUA_ERRSYNTAX` that is NOT an incomplete statement.
     SyntaxError(String),
     /// Lua syntax error that IS an incomplete statement.  Useful for implementing a REPL.
@@ -17,95 +17,95 @@ pub enum LuaError {
     ToLuaConversionError(String),
     /// A generic Lua -> Rust conversion error.
     FromLuaConversionError(String),
-    /// A `LuaThread` was resumed and the coroutine was no longer active.
+    /// A `Thread` was resumed and the coroutine was no longer active.
     CoroutineInactive,
-    /// A `LuaUserData` is not the expected type in a borrow.
+    /// An `AnyUserData` is not the expected type in a borrow.
     UserDataTypeMismatch,
-    /// A `LuaUserData` immutable borrow failed because it is already borrowed mutably.
+    /// An `AnyUserData` immutable borrow failed because it is already borrowed mutably.
     UserDataBorrowError,
-    /// A `LuaUserData` mutable borrow failed because it is already borrowed.
+    /// An `AnyUserData` mutable borrow failed because it is already borrowed.
     UserDataBorrowMutError,
-    /// Lua error that originated as a LuaError in a callback.  The first field is the lua error as
-    /// a string, the second field is the Arc holding the original LuaError.
-    CallbackError(String, Arc<LuaError>),
+    /// Lua error that originated as a Error in a callback.  The first field is the lua error as
+    /// a string, the second field is the Arc holding the original Error.
+    CallbackError(String, Arc<Error>),
     /// Any custom external error type, mostly useful for returning external error types from
     /// callbacks.
-    ExternalError(Arc<Error + Send + Sync>),
+    ExternalError(Arc<StdError + Send + Sync>),
 }
 
-pub type LuaResult<T> = Result<T, LuaError>;
+pub type Result<T> = StdResult<T, Error>;
 
-impl fmt::Display for LuaError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
-            &LuaError::SyntaxError(ref msg) => write!(fmt, "Lua syntax error: {}", msg),
-            &LuaError::IncompleteStatement(ref msg) => {
+impl fmt::Display for Error {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::SyntaxError(ref msg) => write!(fmt, "Lua syntax error: {}", msg),
+            Error::IncompleteStatement(ref msg) => {
                 write!(fmt, "Lua syntax error (incomplete statement): {}", msg)
             }
-            &LuaError::RuntimeError(ref msg) => write!(fmt, "Lua runtime error: {}", msg),
-            &LuaError::ErrorError(ref msg) => write!(fmt, "Lua error in error handler: {}", msg),
-            &LuaError::ToLuaConversionError(ref msg) => {
+            Error::RuntimeError(ref msg) => write!(fmt, "Lua runtime error: {}", msg),
+            Error::ErrorError(ref msg) => write!(fmt, "Lua error in error handler: {}", msg),
+            Error::ToLuaConversionError(ref msg) => {
                 write!(fmt, "Error converting rust type to lua: {}", msg)
             }
-            &LuaError::FromLuaConversionError(ref msg) => {
+            Error::FromLuaConversionError(ref msg) => {
                 write!(fmt, "Error converting lua type to rust: {}", msg)
             }
-            &LuaError::CoroutineInactive => write!(fmt, "Cannot resume inactive coroutine"),
-            &LuaError::UserDataTypeMismatch => write!(fmt, "Userdata not expected type"),
-            &LuaError::UserDataBorrowError => write!(fmt, "Userdata already mutably borrowed"),
-            &LuaError::UserDataBorrowMutError => write!(fmt, "Userdata already borrowed"),
-            &LuaError::CallbackError(ref msg, _) => {
+            Error::CoroutineInactive => write!(fmt, "Cannot resume inactive coroutine"),
+            Error::UserDataTypeMismatch => write!(fmt, "Userdata not expected type"),
+            Error::UserDataBorrowError => write!(fmt, "Userdata already mutably borrowed"),
+            Error::UserDataBorrowMutError => write!(fmt, "Userdata already borrowed"),
+            Error::CallbackError(ref msg, _) => {
                 write!(fmt, "Error during lua callback: {}", msg)
             }
-            &LuaError::ExternalError(ref err) => err.fmt(fmt),
+            Error::ExternalError(ref err) => err.fmt(fmt),
         }
     }
 }
 
-impl Error for LuaError {
+impl StdError for Error {
     fn description(&self) -> &str {
-        match self {
-            &LuaError::SyntaxError(_) => "lua syntax error",
-            &LuaError::IncompleteStatement(_) => "lua incomplete statement",
-            &LuaError::RuntimeError(_) => "lua runtime error",
-            &LuaError::ErrorError(_) => "lua error handling error",
-            &LuaError::ToLuaConversionError(_) => "conversion error to lua",
-            &LuaError::FromLuaConversionError(_) => "conversion error from lua",
-            &LuaError::CoroutineInactive => "lua coroutine inactive",
-            &LuaError::UserDataTypeMismatch => "lua userdata type mismatch",
-            &LuaError::UserDataBorrowError => "lua userdata already mutably borrowed",
-            &LuaError::UserDataBorrowMutError => "lua userdata already borrowed",
-            &LuaError::CallbackError(_, _) => "lua callback error",
-            &LuaError::ExternalError(ref err) => err.description(),
+        match *self {
+            Error::SyntaxError(_) => "lua syntax error",
+            Error::IncompleteStatement(_) => "lua incomplete statement",
+            Error::RuntimeError(_) => "lua runtime error",
+            Error::ErrorError(_) => "lua error handling error",
+            Error::ToLuaConversionError(_) => "conversion error to lua",
+            Error::FromLuaConversionError(_) => "conversion error from lua",
+            Error::CoroutineInactive => "lua coroutine inactive",
+            Error::UserDataTypeMismatch => "lua userdata type mismatch",
+            Error::UserDataBorrowError => "lua userdata already mutably borrowed",
+            Error::UserDataBorrowMutError => "lua userdata already borrowed",
+            Error::CallbackError(_, _) => "lua callback error",
+            Error::ExternalError(ref err) => err.description(),
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
-        match self {
-            &LuaError::CallbackError(_, ref cause) => Some(cause.as_ref()),
-            &LuaError::ExternalError(ref err) => err.cause(),
+    fn cause(&self) -> Option<&StdError> {
+        match *self {
+            Error::CallbackError(_, ref cause) => Some(cause.as_ref()),
+            Error::ExternalError(ref err) => err.cause(),
             _ => None,
         }
     }
 }
 
-impl LuaError {
-    pub fn external<T: 'static + Error + Send + Sync>(err: T) -> LuaError {
-        LuaError::ExternalError(Arc::new(err))
+impl Error {
+    pub fn external<T: 'static + StdError + Send + Sync>(err: T) -> Error {
+        Error::ExternalError(Arc::new(err))
     }
 }
 
-pub trait LuaExternalError {
-    fn to_lua_err(self) -> LuaError;
+pub trait ExternalError {
+    fn to_lua_err(self) -> Error;
 }
 
-impl<E> LuaExternalError for E
+impl<E> ExternalError for E
 where
-    E: Into<Box<Error + Send + Sync>>,
+    E: Into<Box<StdError + Send + Sync>>,
 {
-    fn to_lua_err(self) -> LuaError {
+    fn to_lua_err(self) -> Error {
         #[derive(Debug)]
-        struct WrapError(Box<Error + Send + Sync>);
+        struct WrapError(Box<StdError + Send + Sync>);
 
         impl fmt::Display for WrapError {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -113,25 +113,25 @@ where
             }
         }
 
-        impl Error for WrapError {
+        impl StdError for WrapError {
             fn description(&self) -> &str {
                 self.0.description()
             }
         }
 
-        LuaError::external(WrapError(self.into()))
+        Error::external(WrapError(self.into()))
     }
 }
 
-pub trait LuaExternalResult<T> {
-    fn to_lua_err(self) -> LuaResult<T>;
+pub trait ExternalResult<T> {
+    fn to_lua_err(self) -> Result<T>;
 }
 
-impl<T, E> LuaExternalResult<T> for Result<T, E>
+impl<T, E> ExternalResult<T> for StdResult<T, E>
 where
-    E: LuaExternalError,
+    E: ExternalError,
 {
-    fn to_lua_err(self) -> LuaResult<T> {
+    fn to_lua_err(self) -> Result<T> {
         self.map_err(|e| e.to_lua_err())
     }
 }
