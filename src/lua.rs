@@ -48,7 +48,7 @@ pub enum Value<'lua> {
     /// it is implicitly cloned.
     Error(Error),
 }
-pub use self::Value::Nil as LuaNil;
+pub use self::Value::Nil as Nil;
 
 /// Trait for types convertible to `Value`.
 pub trait ToLua<'a> {
@@ -124,10 +124,7 @@ pub trait FromLuaMulti<'a>: Sized {
     fn from_lua_multi(values: MultiValue<'a>, lua: &'a Lua) -> Result<Self>;
 }
 
-type LuaCallback<'lua> = Box<
-    FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>
-        + 'lua,
->;
+type Callback<'lua> = Box<FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'lua>;
 
 struct LuaRef<'lua> {
     lua: &'lua Lua,
@@ -755,8 +752,8 @@ pub enum MetaMethod {
 /// `Index` metamethod is given, it will be called as a *fallback* if the index doesn't match an
 /// existing regular method.
 pub struct UserDataMethods<'lua, T> {
-    methods: HashMap<StdString, LuaCallback<'lua>>,
-    meta_methods: HashMap<MetaMethod, LuaCallback<'lua>>,
+    methods: HashMap<StdString, Callback<'lua>>,
+    meta_methods: HashMap<MetaMethod, Callback<'lua>>,
     _type: PhantomData<T>,
 }
 
@@ -823,7 +820,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         self.meta_methods.insert(meta, Box::new(function));
     }
 
-    fn box_method<M>(mut method: M) -> LuaCallback<'lua>
+    fn box_method<M>(mut method: M) -> Callback<'lua>
     where
         M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
@@ -840,7 +837,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 
     }
 
-    fn box_method_mut<M>(mut method: M) -> LuaCallback<'lua>
+    fn box_method_mut<M>(mut method: M) -> Callback<'lua>
         where M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>)
                                      -> Result<MultiValue<'lua>>
     {
@@ -993,7 +990,7 @@ impl Lua {
                 ffi::lua_newtable(state);
 
                 push_string(state, "__gc");
-                ffi::lua_pushcfunction(state, userdata_destructor::<LuaCallback>);
+                ffi::lua_pushcfunction(state, userdata_destructor::<Callback>);
                 ffi::lua_rawset(state, -3);
 
                 push_string(state, "__metatable");
@@ -1304,7 +1301,7 @@ impl Lua {
         T::from_lua_multi(value, self)
     }
 
-    fn create_callback_function<'lua>(&'lua self, func: LuaCallback<'lua>) -> Function<'lua> {
+    fn create_callback_function<'lua>(&'lua self, func: Callback<'lua>) -> Function<'lua> {
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, || {
                 let lua = Lua {
@@ -1313,7 +1310,7 @@ impl Lua {
                     ephemeral: true,
                 };
 
-                let func = &mut *get_userdata::<LuaCallback>(state, ffi::lua_upvalueindex(1));
+                let func = &mut *get_userdata::<Callback>(state, ffi::lua_upvalueindex(1));
 
                 let nargs = ffi::lua_gettop(state);
                 let mut args = MultiValue::new();
@@ -1336,7 +1333,7 @@ impl Lua {
             stack_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
 
-                push_userdata::<LuaCallback>(self.state, func);
+                push_userdata::<Callback>(self.state, func);
 
                 ffi::lua_pushlightuserdata(
                     self.state,
@@ -1404,7 +1401,7 @@ impl Lua {
         match ffi::lua_type(state, -1) {
             ffi::LUA_TNIL => {
                 ffi::lua_pop(state, 1);
-                LuaNil
+                Nil
             }
 
             ffi::LUA_TBOOLEAN => {

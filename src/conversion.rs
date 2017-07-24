@@ -288,7 +288,7 @@ impl<'lua, T: ToLua<'lua>> ToLua<'lua> for Option<T> {
     fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>> {
         match self {
             Some(val) => val.to_lua(lua),
-            None => Ok(LuaNil),
+            None => Ok(Nil),
         }
     }
 }
@@ -296,7 +296,7 @@ impl<'lua, T: ToLua<'lua>> ToLua<'lua> for Option<T> {
 impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Option<T> {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<Self> {
         match value {
-            LuaNil => Ok(None),
+            Nil => Ok(None),
             value => Ok(Some(T::from_lua(value, lua)?)),
         }
     }

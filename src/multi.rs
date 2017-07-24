@@ -24,7 +24,7 @@ impl<'lua, T: ToLua<'lua>, E: ToLua<'lua>> ToLuaMulti<'lua> for ::std::result::R
         match self {
             Ok(v) => result.push_back(v.to_lua(lua)?),
             Err(e) => {
-                result.push_back(LuaNil);
+                result.push_back(Nil);
                 result.push_back(e.to_lua(lua)?);
             }
         }
@@ -43,7 +43,7 @@ impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for T {
 
 impl<'lua, T: FromLua<'lua>> FromLuaMulti<'lua> for T {
     fn from_lua_multi(mut values: MultiValue<'lua>, lua: &'lua Lua) -> Result<Self> {
-        Ok(T::from_lua(values.pop_front().unwrap_or(LuaNil), lua)?)
+        Ok(T::from_lua(values.pop_front().unwrap_or(Nil), lua)?)
     }
 }
 
@@ -119,7 +119,7 @@ impl<'lua, H: FromLua<'lua>, A, B> FromLuaMulti<'lua> for HCons<H, HCons<A, B>>
     where HCons<A, B>: FromLuaMulti<'lua>
 {
     fn from_lua_multi(mut values: MultiValue<'lua>, lua: &'lua Lua) -> Result<Self> {
-        let val = H::from_lua(values.pop_front().unwrap_or(LuaNil), lua)?;
+        let val = H::from_lua(values.pop_front().unwrap_or(Nil), lua)?;
         let res = HCons::<A, B>::from_lua_multi(values, lua)?;
         Ok(HCons(val, res))
     }

@@ -5,7 +5,7 @@ use std::os::raw::c_void;
 
 use String as LuaString;
 use {
-    Lua, Result, LuaExternalError, LightUserData, UserDataMethods, UserData, Table, Thread,
+    Lua, Result, ExternalError, LightUserData, UserDataMethods, UserData, Table, Thread,
     ThreadStatus, Error, Function, Value, Variadic, MetaMethod
 };
 

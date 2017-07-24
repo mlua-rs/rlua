@@ -94,11 +94,11 @@ impl Error {
     }
 }
 
-pub trait LuaExternalError {
+pub trait ExternalError {
     fn to_lua_err(self) -> Error;
 }
 
-impl<E> LuaExternalError for E
+impl<E> ExternalError for E
 where
     E: Into<Box<error::Error + Send + Sync>>,
 {
@@ -122,13 +122,13 @@ where
     }
 }
 
-pub trait LuaExternalResult<T> {
+pub trait ExternalResult<T> {
     fn to_lua_err(self) -> Result<T>;
 }
 
-impl<T, E> LuaExternalResult<T> for ::std::result::Result<T, E>
+impl<T, E> ExternalResult<T> for ::std::result::Result<T, E>
 where
-    E: LuaExternalError,
+    E: ExternalError,
 {
     fn to_lua_err(self) -> Result<T> {
         self.map_err(|e| e.to_lua_err())
