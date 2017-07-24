@@ -218,8 +218,39 @@ impl<'lua> Table<'lua> {
     ///
     /// If the value is `nil`, this will effectively remove the pair.
     ///
-    /// This might invoke the `__newindex` metamethod. Use the `raw_set` method if that is not
+    /// This might invoke the `__newindex` metamethod. Use the [`raw_set`] method if that is not
     /// desired.
+    ///
+    /// # Examples
+    ///
+    /// Export a value as a global to make it usable from Lua:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// globals.set("assertions", cfg!(debug_assertions))?;
+    ///
+    /// lua.eval::<()>(r#"
+    ///     if assertions == true then
+    ///         -- ...
+    ///     elseif assertions == false then
+    ///         -- ...
+    ///     else
+    ///         error("assertions neither on nor off?")
+    ///     end
+    /// "#, None)?;
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`raw_set`]: #method.raw_set
     pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
@@ -239,7 +270,30 @@ impl<'lua> Table<'lua> {
     ///
     /// If no value is associated to `key`, returns the `nil` value.
     ///
-    /// This might invoke the `__index` metamethod. Use the `raw_get` method if that is not desired.
+    /// This might invoke the `__index` metamethod. Use the [`raw_get`] method if that is not
+    /// desired.
+    ///
+    /// # Examples
+    ///
+    /// Query the version of the Lua interpreter:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// let version: String = globals.get("_VERSION")?;
+    /// println!("Lua version: {}", version);
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`raw_get`]: #method.raw_get
     pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
@@ -307,7 +361,9 @@ impl<'lua> Table<'lua> {
 
     /// Returns the result of the Lua `#` operator.
     ///
-    /// This might invoke the `__len` metamethod. Use the `raw_len` method if that is not desired.
+    /// This might invoke the `__len` metamethod. Use the [`raw_len`] method if that is not desired.
+    ///
+    /// [`raw_len`]: #method.raw_len
     pub fn len(&self) -> Result<Integer> {
         let lua = self.0.lua;
         unsafe {
@@ -335,8 +391,42 @@ impl<'lua> Table<'lua> {
         }
     }
 
-    /// Consume this table and return an iterator over the pairs of the table, works like the Lua
-    /// 'pairs' function.
+    /// Consume this table and return an iterator over the pairs of the table.
+    ///
+    /// This works like the Lua `pairs` function, but does not invoke the `__pairs` metamethod.
+    ///
+    /// The pairs are wrapped in a [`Result`], since they are lazily converted to `K` and `V` types.
+    ///
+    /// # Note
+    ///
+    /// While this method consumes the `Table` object, it can not prevent code from mutating the
+    /// table while the iteration is in progress. Refer to the [Lua manual] for information about
+    /// the consequences of such mutation.
+    ///
+    /// # Examples
+    ///
+    /// Iterate over all globals:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result, Value};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// for pair in globals.pairs::<Value, Value>() {
+    ///     let (key, value) = pair?;
+    ///     // ...
+    /// }
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`Result`]: type.Result.html
+    /// [Lua manual]: http://www.lua.org/manual/5.3/manual.html#pdf-next
     pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(self) -> TablePairs<'lua, K, V> {
         let next_key = Some(LuaRef {
             lua: self.0.lua,
@@ -350,9 +440,44 @@ impl<'lua> Table<'lua> {
         }
     }
 
-    /// Consume this table and return an iterator over the values of this table, which should be a
-    /// sequence.  Works like the Lua 'ipairs' function, but doesn't return the indexes, only the
-    /// values in order.
+    /// Consume this table and return an iterator over all values in the sequence part of the table.
+    ///
+    /// The iterator will yield all values `t[1]`, `t[2]`, and so on, until a `nil` value is
+    /// encountered. This mirrors the behaviour of Lua's `ipairs` function and will invoke the
+    /// `__index` metamethod according to the usual rules. However, the deprecated `__ipairs`
+    /// metatable will not be called.
+    ///
+    /// Just like [`pairs`], the values are wrapped in a [`Result`].
+    ///
+    /// # Note
+    ///
+    /// While this method consumes the `Table` object, it can not prevent code from mutating the
+    /// table while the iteration is in progress. Refer to the [Lua manual] for information about
+    /// the consequences of such mutation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result, Table};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let my_table: Table = lua.eval("{ [1] = 4, [2] = 5, [4] = 7, key = 2 }", None)?;
+    ///
+    /// let expected = [4, 5];
+    /// for (&expected, got) in expected.iter().zip(my_table.sequence_values::<u32>()) {
+    ///     assert_eq!(expected, got?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`pairs`]: #method.pairs
+    /// [`Result`]: type.Result.html
+    /// [Lua manual]: http://www.lua.org/manual/5.3/manual.html#pdf-next
     pub fn sequence_values<V: FromLua<'lua>>(self) -> TableSequence<'lua, V> {
         TableSequence {
             table: self.0,
@@ -364,7 +489,9 @@ impl<'lua> Table<'lua> {
 
 /// An iterator over the pairs of a Lua table.
 ///
-/// Should behave exactly like the lua 'pairs' function.  Holds an internal reference to the table.
+/// This struct is created by the [`Table::pairs`] method.
+///
+/// [`Table::pairs`]: struct.Table.html#method.pairs
 pub struct TablePairs<'lua, K, V> {
     table: LuaRef<'lua>,
     next_key: Option<LuaRef<'lua>>,
@@ -419,8 +546,9 @@ where
 
 /// An iterator over the sequence part of a Lua table.
 ///
-/// Should behave similarly to the lua 'ipairs" function, except only produces the values, not the
-/// indexes.  Holds an internal reference to the table.
+/// This struct is created by the [`Table::sequence_values`] method.
+///
+/// [`Table::sequence_values`]: struct.Table.html#method.sequence_values
 pub struct TableSequence<'lua, V> {
     table: LuaRef<'lua>,
     index: Option<Integer>,
