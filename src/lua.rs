@@ -195,6 +195,21 @@ impl<'lua> String<'lua> {
     ///
     /// The returned slice will not contain the terminating null byte, but will contain any null
     /// bytes embedded into the Lua string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, String};
+    /// # fn main() {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None).unwrap();
+    /// assert!(non_utf8.to_str().is_err());    // oh no :(
+    /// assert_eq!(non_utf8.as_bytes(), &b"test\xff"[..]);
+    /// # }
+    /// ```
     pub fn as_bytes(&self) -> &[u8] {
         let lua = self.0.lua;
         unsafe {
