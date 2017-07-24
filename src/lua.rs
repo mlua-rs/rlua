@@ -172,7 +172,7 @@ pub struct String<'lua>(LuaRef<'lua>);
 impl<'lua> String<'lua> {
     /// Get a `&str` slice if the Lua string is valid UTF-8.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # extern crate rlua;
@@ -471,6 +471,52 @@ impl<'lua> Function<'lua> {
     /// Calls the function, passing `args` as function arguments.
     ///
     /// The function's return values are converted to the generic type `R`.
+    ///
+    /// # Examples
+    ///
+    /// Call Lua's built-in `tostring` function:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Function, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// let tostring: Function = globals.get("tostring")?;
+    ///
+    /// assert_eq!(tostring.call::<_, String>(123)?, "123");
+    ///
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// Call a function with multiple arguments:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # #[macro_use] extern crate hlist_macro;
+    /// # use rlua::{Lua, Function, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    ///
+    /// let sum: Function = lua.eval(r#"
+    ///     function(a, b)
+    ///         return a + b
+    ///     end
+    /// "#, None)?;
+    ///
+    /// assert_eq!(sum.call::<_, u32>(hlist![3, 4])?, 3 + 4);
+    ///
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
     pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
         let lua = self.0.lua;
         unsafe {
@@ -503,7 +549,7 @@ impl<'lua> Function<'lua> {
     ///
     /// If any arguments are passed to the returned function, they will be passed after `args`.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # extern crate rlua;
@@ -598,13 +644,13 @@ impl<'lua> Thread<'lua> {
     /// are passed to its main function.
     ///
     /// If the thread is no longer in `Active` state (meaning it has finished execution or
-    /// encountered an error), this will return Err(CoroutineInactive), otherwise will return Ok as
-    /// follows:
+    /// encountered an error), this will return `Err(CoroutineInactive)`, otherwise will return `Ok`
+    /// as follows:
     ///
     /// If the thread calls `coroutine.yield`, returns the values passed to `yield`. If the thread
     /// `return`s values from its main function, returns those.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # extern crate rlua;
