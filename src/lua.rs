@@ -926,12 +926,9 @@ pub enum MetaMethod {
     ToString,
 }
 
-/// Stores methods of a userdata object.
+/// Method registry for [`UserData`] implementors.
 ///
-/// Methods added will be added to the `__index` table on the metatable for the userdata, so they
-/// can be called as `userdata:method(args)` as expected.  If there are any regular methods, and an
-/// `Index` metamethod is given, it will be called as a *fallback* if the index doesn't match an
-/// existing regular method.
+/// [`UserData`]: trait.UserData.html
 pub struct UserDataMethods<'lua, T> {
     methods: HashMap<StdString, Callback<'lua>>,
     meta_methods: HashMap<MetaMethod, Callback<'lua>>,
@@ -939,7 +936,13 @@ pub struct UserDataMethods<'lua, T> {
 }
 
 impl<'lua, T: UserData> UserDataMethods<'lua, T> {
-    /// Add a regular method as a function which accepts a &T as the first parameter.
+    /// Add a method which accepts a `&T` as the first parameter.
+    ///
+    /// Regular methods are implemented by overriding the `__index` metamethod and returning the
+    /// accessed method. This allows them to be used with the expected `userdata:method()` syntax.
+    ///
+    /// If `add_meta_method` is used to override the `__index` metamethod, this approach will fall
+    /// back to the user-provided metamethod if no regular method was found.
     pub fn add_method<M>(&mut self, name: &str, method: M)
     where
         M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -950,7 +953,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         );
     }
 
-    /// Add a regular method as a function which accepts a &mut T as the first parameter.
+    /// Add a regular method which accepts a `&mut T` as the first parameter.
+    ///
+    /// Refer to [`add_method`] for more information about the implementation.
+    ///
+    /// [`add_method`]: #method.add_method
     pub fn add_method_mut<M>(&mut self, name: &str, method: M)
     where
         M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -963,6 +970,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 
     /// Add a regular method as a function which accepts generic arguments, the first argument will
     /// always be a `UserData` of type T.
+    ///
+    /// Prefer to use [`add_method`] or [`add_method_mut`] as they are easier to use.
+    ///
+    /// [`add_method`]: #method.add_method
+    /// [`add_method_mut`]: #method.add_method_mut
     pub fn add_function<F>(&mut self, name: &str, function: F)
     where
         F: 'lua + for<'a> FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -970,9 +982,14 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         self.methods.insert(name.to_owned(), Box::new(function));
     }
 
-    /// Add a metamethod as a function which accepts a &T as the first parameter.  This can cause an
-    /// error with certain binary metamethods that can trigger if ony the right side has a
-    /// metatable.
+    /// Add a metamethod which accepts a `&T` as the first parameter.
+    ///
+    /// # Note
+    ///
+    /// This can cause an error with certain binary metamethods that can trigger if only the right
+    /// side has a metatable. To prevent this, use [`add_meta_function`].
+    ///
+    /// [`add_meta_function`]: #method.add_meta_function
     pub fn add_meta_method<M>(&mut self, meta: MetaMethod, method: M)
     where
         M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -980,9 +997,14 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
 
-    /// Add a metamethod as a function which accepts a &mut T as the first parameter.  This can
-    /// cause an error with certain binary metamethods that can trigger if ony the right side has a
-    /// metatable.
+    /// Add a metamethod as a function which accepts a `&mut T` as the first parameter.
+    ///
+    /// # Note
+    ///
+    /// This can cause an error with certain binary metamethods that can trigger if only the right
+    /// side has a metatable. To prevent this, use [`add_meta_function`].
+    ///
+    /// [`add_meta_function`]: #method.add_meta_function
     pub fn add_meta_method_mut<M>(&mut self, meta: MetaMethod, method: M)
     where
         M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -990,10 +1012,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
 
-    /// Add a metamethod as a function which accepts generic arguments.  Metamethods in Lua for
-    /// binary operators can be triggered if either the left or right argument to the binary
-    /// operator has a metatable, so the first argument here is not necessarily a userdata of type
-    /// T.
+    /// Add a metamethod which accepts generic arguments.
+    ///
+    /// Metamethods for binary operators can be triggered if either the left or right argument to
+    /// the binary operator has a metatable, so the first argument here is not necessarily a
+    /// userdata of type `T`.
     pub fn add_meta_function<F>(&mut self, meta: MetaMethod, function: F)
     where
         F: 'lua + for<'a> FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -1015,7 +1038,6 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
                     .to_owned(),
             ))
         })
-
     }
 
     fn box_method_mut<M>(mut method: M) -> Callback<'lua>
