@@ -1457,6 +1457,51 @@ impl Lua {
     }
 
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
+    ///
+    /// # Examples
+    ///
+    /// Create a function which prints its argument:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    ///
+    /// let greet = lua.create_function(|lua, args| {
+    ///     let name: String = lua.unpack(args)?;
+    ///     println!("Hello, {}!", name);
+    ///     lua.pack(())
+    /// });
+    /// # let _ = greet;    // used
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// Use the `hlist_macro` crate to use multiple arguments:
+    ///
+    /// ```
+    /// #[macro_use] extern crate hlist_macro;
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    ///
+    /// let print_person = lua.create_function(|lua, args| {
+    ///     let hlist_pat![name, age]: HList![String, u8] = lua.unpack(args)?;
+    ///     println!("{} is {} years old!", name, age);
+    ///     lua.pack(())
+    /// });
+    /// # let _ = print_person;    // used
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
     pub fn create_function<'lua, F>(&'lua self, func: F) -> Function<'lua>
     where
         F: 'lua + for<'a> FnMut(&'a Lua, MultiValue<'a>) -> Result<MultiValue<'a>>,
