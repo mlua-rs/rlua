@@ -863,3 +863,22 @@ fn detroys_userdata() {
     drop(lua); // should destroy all objects
     assert_eq!(DROPPED.load(Ordering::SeqCst), true);
 }
+
+#[test]
+fn string_views() {
+    let lua = Lua::new();
+    lua.eval::<()>(r#"
+        ok = "null bytes are valid utf-8, wh\0 knew?"
+        err = "but \xff isn't :("
+    "#, None).unwrap();
+
+    let globals = lua.globals();
+    let ok: LuaString = globals.get("ok").unwrap();
+    let err: LuaString = globals.get("err").unwrap();
+
+    assert_eq!(ok.to_str().unwrap(), "null bytes are valid utf-8, wh\0 knew?");
+    assert_eq!(ok.as_bytes(), &b"null bytes are valid utf-8, wh\0 knew?"[..]);
+
+    assert!(err.to_str().is_err());
+    assert_eq!(err.as_bytes(), &b"but \xff isn't :("[..]);
+}

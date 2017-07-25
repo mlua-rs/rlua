@@ -1,9 +1,8 @@
-use std::fmt;
+use std::{fmt, ptr, slice, str};
 use std::ops::{Deref, DerefMut};
 use std::iter::FromIterator;
 use std::cell::{RefCell, Ref, RefMut};
-use std::ptr;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::any::TypeId;
 use std::marker::PhantomData;
 use std::collections::{HashMap, VecDeque};
@@ -189,18 +188,42 @@ impl<'lua> String<'lua> {
     /// # }
     /// ```
     pub fn to_str(&self) -> Result<&str> {
+        str::from_utf8(self.as_bytes()).map_err(|e| Error::FromLuaConversionError(e.to_string()))
+    }
+
+    /// Get the bytes that make up this string.
+    ///
+    /// The returned slice will not contain the terminating null byte, but will contain any null
+    /// bytes embedded into the Lua string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, String};
+    /// # fn main() {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None).unwrap();
+    /// assert!(non_utf8.to_str().is_err());    // oh no :(
+    /// assert_eq!(non_utf8.as_bytes(), &b"test\xff"[..]);
+    /// # }
+    /// ```
+    pub fn as_bytes(&self) -> &[u8] {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
                 check_stack(lua.state, 1);
                 lua.push_ref(lua.state, &self.0);
                 assert_eq!(ffi::lua_type(lua.state, -1), ffi::LUA_TSTRING);
-                let s = CStr::from_ptr(ffi::lua_tostring(lua.state, -1))
-                    .to_str()
-                    .map_err(|e| Error::FromLuaConversionError(e.to_string()))?;
+
+                let mut size = 0;
+                let data = ffi::lua_tolstring(lua.state, -1, &mut size);
+
                 ffi::lua_pop(lua.state, 1);
-                Ok(s)
-            })
+                Ok(slice::from_raw_parts(data as *const u8, size))
+            }).expect("infallible stack_err_guard failed")  // this conversion cannot fail
         }
     }
 }
