@@ -436,6 +436,7 @@ impl<'lua> Table<'lua> {
     ///
     /// for pair in globals.pairs::<Value, Value>() {
     ///     let (key, value) = pair?;
+    /// #   let _ = (key, value);   // used
     ///     // ...
     /// }
     /// # Ok(())
