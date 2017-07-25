@@ -1081,6 +1081,82 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 }
 
 /// Trait for custom userdata types.
+///
+/// By implementing this trait, a struct becomes eligible for use inside Lua code. Implementations
+/// of `ToLua` and `FromLua` are automatically provided.
+///
+/// # Examples
+///
+/// ```
+/// # extern crate rlua;
+/// # use rlua::{Lua, UserData, Result};
+/// # fn try_main() -> Result<()> {
+/// struct MyUserData(i32);
+///
+/// impl UserData for MyUserData {}
+///
+/// let lua = Lua::new();
+///
+/// // `MyUserData` now implements `ToLua`:
+/// lua.globals().set("myobject", MyUserData(123))?;
+///
+/// lua.exec::<()>("assert(type(myobject) == 'userdata')", None)?;
+/// # Ok(())
+/// # }
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
+/// ```
+///
+/// Custom methods and operators can be provided by implementing `add_methods` (refer to
+/// [`UserDataMethods`] for more information):
+///
+/// ```
+/// # #[macro_use] extern crate hlist_macro;
+/// # extern crate rlua;
+/// # use rlua::{Lua, MetaMethod, UserData, UserDataMethods, Integer, Result};
+/// # fn try_main() -> Result<()> {
+/// struct MyUserData(i32);
+///
+/// impl UserData for MyUserData {
+///     fn add_methods(methods: &mut UserDataMethods<Self>) {
+///         methods.add_method("get", |lua, this, args| {
+/// #           let _ = (lua, args);    // used
+///             lua.pack(this.0)
+///         });
+///
+///         methods.add_method_mut("add", |lua, this, args| {
+///             let hlist_pat![value]: HList![Integer] = lua.unpack(args)?;
+///
+///             this.0 += value as i32;
+///             lua.pack(())
+///         });
+///
+///         methods.add_meta_method(MetaMethod::Add, |lua, this, args| {
+///             let hlist_pat![value]: HList![Integer] = lua.unpack(args)?;
+///             lua.pack(this.0 + value as i32)
+///         });
+///     }
+/// }
+///
+/// let lua = Lua::new();
+///
+/// lua.globals().set("myobject", MyUserData(123))?;
+///
+/// lua.exec::<()>(r#"
+///     assert(myobject:get() == 123)
+///     myobject:add(7)
+///     assert(myobject:get() == 130)
+///     assert(myobject + 10 == 140)
+/// "#, None)?;
+/// # Ok(())
+/// # }
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
+/// ```
+///
+/// [`UserDataMethods`]: struct.UserDataMethods.html
 pub trait UserData: 'static + Sized {
     /// Adds custom methods and operators specific to this userdata.
     fn add_methods(_methods: &mut UserDataMethods<Self>) {}
