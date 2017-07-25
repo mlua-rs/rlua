@@ -171,20 +171,24 @@ pub struct String<'lua>(LuaRef<'lua>);
 impl<'lua> String<'lua> {
     /// Get a `&str` slice if the Lua string is valid UTF-8.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::{Lua, String};
-    /// # fn main() {
+    /// # use rlua::{Lua, String, Result};
+    /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
     /// let globals = lua.globals();
     ///
-    /// let version: String = globals.get("_VERSION").unwrap();
+    /// let version: String = globals.get("_VERSION")?;
     /// assert!(version.to_str().unwrap().contains("Lua"));
     ///
-    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None).unwrap();
+    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None)?;
     /// assert!(non_utf8.to_str().is_err());
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn to_str(&self) -> Result<&str> {
@@ -237,8 +241,39 @@ impl<'lua> Table<'lua> {
     ///
     /// If the value is `nil`, this will effectively remove the pair.
     ///
-    /// This might invoke the `__newindex` metamethod. Use the `raw_set` method if that is not
+    /// This might invoke the `__newindex` metamethod. Use the [`raw_set`] method if that is not
     /// desired.
+    ///
+    /// # Examples
+    ///
+    /// Export a value as a global to make it usable from Lua:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// globals.set("assertions", cfg!(debug_assertions))?;
+    ///
+    /// lua.exec::<()>(r#"
+    ///     if assertions == true then
+    ///         -- ...
+    ///     elseif assertions == false then
+    ///         -- ...
+    ///     else
+    ///         error("assertions neither on nor off?")
+    ///     end
+    /// "#, None)?;
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`raw_set`]: #method.raw_set
     pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         unsafe {
@@ -258,7 +293,30 @@ impl<'lua> Table<'lua> {
     ///
     /// If no value is associated to `key`, returns the `nil` value.
     ///
-    /// This might invoke the `__index` metamethod. Use the `raw_get` method if that is not desired.
+    /// This might invoke the `__index` metamethod. Use the [`raw_get`] method if that is not
+    /// desired.
+    ///
+    /// # Examples
+    ///
+    /// Query the version of the Lua interpreter:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// let version: String = globals.get("_VERSION")?;
+    /// println!("Lua version: {}", version);
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`raw_get`]: #method.raw_get
     pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         unsafe {
@@ -324,7 +382,9 @@ impl<'lua> Table<'lua> {
 
     /// Returns the result of the Lua `#` operator.
     ///
-    /// This might invoke the `__len` metamethod. Use the `raw_len` method if that is not desired.
+    /// This might invoke the `__len` metamethod. Use the [`raw_len`] method if that is not desired.
+    ///
+    /// [`raw_len`]: #method.raw_len
     pub fn len(&self) -> Result<Integer> {
         let lua = self.0.lua;
         unsafe {
@@ -352,8 +412,42 @@ impl<'lua> Table<'lua> {
         }
     }
 
-    /// Consume this table and return an iterator over the pairs of the table, works like the Lua
-    /// 'pairs' function.
+    /// Consume this table and return an iterator over the pairs of the table.
+    ///
+    /// This works like the Lua `pairs` function, but does not invoke the `__pairs` metamethod.
+    ///
+    /// The pairs are wrapped in a [`Result`], since they are lazily converted to `K` and `V` types.
+    ///
+    /// # Note
+    ///
+    /// While this method consumes the `Table` object, it can not prevent code from mutating the
+    /// table while the iteration is in progress. Refer to the [Lua manual] for information about
+    /// the consequences of such mutation.
+    ///
+    /// # Examples
+    ///
+    /// Iterate over all globals:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result, Value};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// for pair in globals.pairs::<Value, Value>() {
+    ///     let (key, value) = pair?;
+    ///     // ...
+    /// }
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`Result`]: type.Result.html
+    /// [Lua manual]: http://www.lua.org/manual/5.3/manual.html#pdf-next
     pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(self) -> TablePairs<'lua, K, V> {
         let next_key = Some(LuaRef {
             lua: self.0.lua,
@@ -367,9 +461,44 @@ impl<'lua> Table<'lua> {
         }
     }
 
-    /// Consume this table and return an iterator over the values of this table, which should be a
-    /// sequence.  Works like the Lua 'ipairs' function, but doesn't return the indexes, only the
-    /// values in order.
+    /// Consume this table and return an iterator over all values in the sequence part of the table.
+    ///
+    /// The iterator will yield all values `t[1]`, `t[2]`, and so on, until a `nil` value is
+    /// encountered. This mirrors the behaviour of Lua's `ipairs` function and will invoke the
+    /// `__index` metamethod according to the usual rules. However, the deprecated `__ipairs`
+    /// metatable will not be called.
+    ///
+    /// Just like [`pairs`], the values are wrapped in a [`Result`].
+    ///
+    /// # Note
+    ///
+    /// While this method consumes the `Table` object, it can not prevent code from mutating the
+    /// table while the iteration is in progress. Refer to the [Lua manual] for information about
+    /// the consequences of such mutation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result, Table};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let my_table: Table = lua.eval("{ [1] = 4, [2] = 5, [4] = 7, key = 2 }", None)?;
+    ///
+    /// let expected = [4, 5];
+    /// for (&expected, got) in expected.iter().zip(my_table.sequence_values::<u32>()) {
+    ///     assert_eq!(expected, got?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`pairs`]: #method.pairs
+    /// [`Result`]: type.Result.html
+    /// [Lua manual]: http://www.lua.org/manual/5.3/manual.html#pdf-next
     pub fn sequence_values<V: FromLua<'lua>>(self) -> TableSequence<'lua, V> {
         TableSequence {
             table: self.0,
@@ -381,7 +510,9 @@ impl<'lua> Table<'lua> {
 
 /// An iterator over the pairs of a Lua table.
 ///
-/// Should behave exactly like the lua 'pairs' function.  Holds an internal reference to the table.
+/// This struct is created by the [`Table::pairs`] method.
+///
+/// [`Table::pairs`]: struct.Table.html#method.pairs
 pub struct TablePairs<'lua, K, V> {
     table: LuaRef<'lua>,
     next_key: Option<LuaRef<'lua>>,
@@ -436,8 +567,9 @@ where
 
 /// An iterator over the sequence part of a Lua table.
 ///
-/// Should behave similarly to the lua 'ipairs" function, except only produces the values, not the
-/// indexes.  Holds an internal reference to the table.
+/// This struct is created by the [`Table::sequence_values`] method.
+///
+/// [`Table::sequence_values`]: struct.Table.html#method.sequence_values
 pub struct TableSequence<'lua, V> {
     table: LuaRef<'lua>,
     index: Option<Integer>,
@@ -488,6 +620,52 @@ impl<'lua> Function<'lua> {
     /// Calls the function, passing `args` as function arguments.
     ///
     /// The function's return values are converted to the generic type `R`.
+    ///
+    /// # Examples
+    ///
+    /// Call Lua's built-in `tostring` function:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Function, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// let globals = lua.globals();
+    ///
+    /// let tostring: Function = globals.get("tostring")?;
+    ///
+    /// assert_eq!(tostring.call::<_, String>(123)?, "123");
+    ///
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// Call a function with multiple arguments:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # #[macro_use] extern crate hlist_macro;
+    /// # use rlua::{Lua, Function, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    ///
+    /// let sum: Function = lua.eval(r#"
+    ///     function(a, b)
+    ///         return a + b
+    ///     end
+    /// "#, None)?;
+    ///
+    /// assert_eq!(sum.call::<_, u32>(hlist![3, 4])?, 3 + 4);
+    ///
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
     pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
         let lua = self.0.lua;
         unsafe {
@@ -515,34 +693,35 @@ impl<'lua> Function<'lua> {
         }
     }
 
-    /// Returns a function that, when called with no arguments, calls `self`, passing `args` as
+    /// Returns a function that, when called, calls `self`, passing `args` as the first set of
     /// arguments.
     ///
-    /// This is equivalent to this Lua code:
+    /// If any arguments are passed to the returned function, they will be passed after `args`.
     ///
-    /// ```notrust
-    /// function bind(f, ...)
-    ///     return function() f(...) end
-    /// end
-    /// ```
-    ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::{Lua, Function};
-    ///
-    /// # fn main() {
+    /// # use rlua::{Lua, Function, Result};
+    /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
-    /// let globals = lua.globals();
     ///
-    /// // Bind the argument `123` to Lua's `tostring` function
-    /// let tostring: Function = globals.get("tostring").unwrap();
-    /// let tostring_123: Function = tostring.bind(123i32).unwrap();
+    /// let sum: Function = lua.eval(r#"
+    ///     function(a, b)
+    ///         return a + b
+    ///     end
+    /// "#, None)?;
     ///
-    /// // Now we can call `tostring_123` without arguments to get the result of `tostring(123)`
-    /// let result: String = tostring_123.call(()).unwrap();
-    /// assert_eq!(result, "123");
+    /// let bound_a = sum.bind(1)?;
+    /// assert_eq!(bound_a.call::<_, u32>(2)?, 1 + 2);
+    ///
+    /// let bound_a_and_b = sum.bind(13)?.bind(57)?;
+    /// assert_eq!(bound_a_and_b.call::<_, u32>(())?, 13 + 57);
+    ///
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> Result<Function<'lua>> {
@@ -614,19 +793,18 @@ impl<'lua> Thread<'lua> {
     /// are passed to its main function.
     ///
     /// If the thread is no longer in `Active` state (meaning it has finished execution or
-    /// encountered an error), this will return Err(CoroutineInactive), otherwise will return Ok as
-    /// follows:
+    /// encountered an error), this will return `Err(CoroutineInactive)`, otherwise will return `Ok`
+    /// as follows:
     ///
     /// If the thread calls `coroutine.yield`, returns the values passed to `yield`. If the thread
     /// `return`s values from its main function, returns those.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::*;
-    ///
-    /// # fn main() {
+    /// # use rlua::{Lua, Thread, Error, Result};
+    /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
     /// let thread: Thread = lua.eval(r#"
     ///     coroutine.create(function(arg)
@@ -645,6 +823,10 @@ impl<'lua> Thread<'lua> {
     ///     Err(Error::CoroutineInactive) => {},
     ///     unexpected => panic!("unexpected result {:?}", unexpected),
     /// }
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
     /// # }
     /// ```
     pub fn resume<A, R>(&self, args: A) -> Result<R>
@@ -765,12 +947,9 @@ pub enum MetaMethod {
     ToString,
 }
 
-/// Stores methods of a userdata object.
+/// Method registry for [`UserData`] implementors.
 ///
-/// Methods added will be added to the `__index` table on the metatable for the userdata, so they
-/// can be called as `userdata:method(args)` as expected.  If there are any regular methods, and an
-/// `Index` metamethod is given, it will be called as a *fallback* if the index doesn't match an
-/// existing regular method.
+/// [`UserData`]: trait.UserData.html
 pub struct UserDataMethods<'lua, T> {
     methods: HashMap<StdString, Callback<'lua>>,
     meta_methods: HashMap<MetaMethod, Callback<'lua>>,
@@ -778,7 +957,13 @@ pub struct UserDataMethods<'lua, T> {
 }
 
 impl<'lua, T: UserData> UserDataMethods<'lua, T> {
-    /// Add a regular method as a function which accepts a &T as the first parameter.
+    /// Add a method which accepts a `&T` as the first parameter.
+    ///
+    /// Regular methods are implemented by overriding the `__index` metamethod and returning the
+    /// accessed method. This allows them to be used with the expected `userdata:method()` syntax.
+    ///
+    /// If `add_meta_method` is used to override the `__index` metamethod, this approach will fall
+    /// back to the user-provided metamethod if no regular method was found.
     pub fn add_method<M>(&mut self, name: &str, method: M)
     where
         M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -789,7 +974,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         );
     }
 
-    /// Add a regular method as a function which accepts a &mut T as the first parameter.
+    /// Add a regular method which accepts a `&mut T` as the first parameter.
+    ///
+    /// Refer to [`add_method`] for more information about the implementation.
+    ///
+    /// [`add_method`]: #method.add_method
     pub fn add_method_mut<M>(&mut self, name: &str, method: M)
     where
         M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -802,6 +991,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 
     /// Add a regular method as a function which accepts generic arguments, the first argument will
     /// always be a `UserData` of type T.
+    ///
+    /// Prefer to use [`add_method`] or [`add_method_mut`] as they are easier to use.
+    ///
+    /// [`add_method`]: #method.add_method
+    /// [`add_method_mut`]: #method.add_method_mut
     pub fn add_function<F>(&mut self, name: &str, function: F)
     where
         F: 'lua + for<'a> FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -809,9 +1003,14 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         self.methods.insert(name.to_owned(), Box::new(function));
     }
 
-    /// Add a metamethod as a function which accepts a &T as the first parameter.  This can cause an
-    /// error with certain binary metamethods that can trigger if ony the right side has a
-    /// metatable.
+    /// Add a metamethod which accepts a `&T` as the first parameter.
+    ///
+    /// # Note
+    ///
+    /// This can cause an error with certain binary metamethods that can trigger if only the right
+    /// side has a metatable. To prevent this, use [`add_meta_function`].
+    ///
+    /// [`add_meta_function`]: #method.add_meta_function
     pub fn add_meta_method<M>(&mut self, meta: MetaMethod, method: M)
     where
         M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -819,9 +1018,14 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
 
-    /// Add a metamethod as a function which accepts a &mut T as the first parameter.  This can
-    /// cause an error with certain binary metamethods that can trigger if ony the right side has a
-    /// metatable.
+    /// Add a metamethod as a function which accepts a `&mut T` as the first parameter.
+    ///
+    /// # Note
+    ///
+    /// This can cause an error with certain binary metamethods that can trigger if only the right
+    /// side has a metatable. To prevent this, use [`add_meta_function`].
+    ///
+    /// [`add_meta_function`]: #method.add_meta_function
     pub fn add_meta_method_mut<M>(&mut self, meta: MetaMethod, method: M)
     where
         M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -829,10 +1033,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
 
-    /// Add a metamethod as a function which accepts generic arguments.  Metamethods in Lua for
-    /// binary operators can be triggered if either the left or right argument to the binary
-    /// operator has a metatable, so the first argument here is not necessarily a userdata of type
-    /// T.
+    /// Add a metamethod which accepts generic arguments.
+    ///
+    /// Metamethods for binary operators can be triggered if either the left or right argument to
+    /// the binary operator has a metatable, so the first argument here is not necessarily a
+    /// userdata of type `T`.
     pub fn add_meta_function<F>(&mut self, meta: MetaMethod, function: F)
     where
         F: 'lua + for<'a> FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
@@ -854,7 +1059,6 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
                     .to_owned(),
             ))
         })
-
     }
 
     fn box_method_mut<M>(mut method: M) -> Callback<'lua>
@@ -893,19 +1097,29 @@ pub trait UserData: 'static + Sized {
 pub struct AnyUserData<'lua>(LuaRef<'lua>);
 
 impl<'lua> AnyUserData<'lua> {
-    /// Checks whether `T` is the type of this userdata.
+    /// Checks whether the type of this userdata is `T`.
     pub fn is<T: UserData>(&self) -> bool {
         self.inspect(|_: &RefCell<T>| ()).is_some()
     }
 
-    /// Borrow this userdata out of the internal RefCell that is held in lua.
+    /// Borrow this userdata immutably if it is of type `T`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `UserDataBorrowError` if the userdata is already mutably borrowed. Returns a
+    /// `UserDataTypeMismatch` if the userdata is not of type `T`.
     pub fn borrow<T: UserData>(&self) -> Result<Ref<T>> {
         self.inspect(|cell| {
             Ok(cell.try_borrow().map_err(|_| Error::UserDataBorrowError)?)
         }).ok_or(Error::UserDataTypeMismatch)?
     }
 
-    /// Borrow mutably this userdata out of the internal RefCell that is held in lua.
+    /// Borrow this userdata mutably if it is of type `T`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `UserDataBorrowMutError` if the userdata is already borrowed. Returns a
+    /// `UserDataTypeMismatch` if the userdata is not of type `T`.
     pub fn borrow_mut<T: UserData>(&self) -> Result<RefMut<T>> {
         self.inspect(|cell| {
             Ok(cell.try_borrow_mut().map_err(
@@ -1113,7 +1327,7 @@ impl Lua {
             .call(())
     }
 
-    /// Pass a `&str` slice to Lua, creating and returning a interned Lua string.
+    /// Pass a `&str` slice to Lua, creating and returning an interned Lua string.
     pub fn create_string(&self, s: &str) -> String {
         unsafe {
             stack_guard(self.state, 0, || {
