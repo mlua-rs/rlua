@@ -1076,19 +1076,29 @@ pub trait UserData: 'static + Sized {
 pub struct AnyUserData<'lua>(LuaRef<'lua>);
 
 impl<'lua> AnyUserData<'lua> {
-    /// Checks whether `T` is the type of this userdata.
+    /// Checks whether the type of this userdata is `T`.
     pub fn is<T: UserData>(&self) -> bool {
         self.inspect(|_: &RefCell<T>| ()).is_some()
     }
 
-    /// Borrow this userdata out of the internal RefCell that is held in lua.
+    /// Borrow this userdata immutably if it is of type `T`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `UserDataBorrowError` if the userdata is already mutably borrowed. Returns a
+    /// `UserDataTypeMismatch` if the userdata is not of type `T`.
     pub fn borrow<T: UserData>(&self) -> Result<Ref<T>> {
         self.inspect(|cell| {
             Ok(cell.try_borrow().map_err(|_| Error::UserDataBorrowError)?)
         }).ok_or(Error::UserDataTypeMismatch)?
     }
 
-    /// Borrow mutably this userdata out of the internal RefCell that is held in lua.
+    /// Borrow this userdata mutably if it is of type `T`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `UserDataBorrowMutError` if the userdata is already borrowed. Returns a
+    /// `UserDataTypeMismatch` if the userdata is not of type `T`.
     pub fn borrow_mut<T: UserData>(&self) -> Result<RefMut<T>> {
         self.inspect(|cell| {
             Ok(cell.try_borrow_mut().map_err(
