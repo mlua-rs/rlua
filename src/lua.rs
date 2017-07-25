@@ -234,7 +234,7 @@ impl<'lua> Table<'lua> {
     ///
     /// globals.set("assertions", cfg!(debug_assertions))?;
     ///
-    /// lua.eval::<()>(r#"
+    /// lua.exec::<()>(r#"
     ///     if assertions == true then
     ///         -- ...
     ///     elseif assertions == false then
