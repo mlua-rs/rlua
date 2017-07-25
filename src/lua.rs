@@ -213,7 +213,7 @@ impl<'lua> String<'lua> {
     pub fn as_bytes(&self) -> &[u8] {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_guard(lua.state, 0, || {
                 check_stack(lua.state, 1);
                 lua.push_ref(lua.state, &self.0);
                 assert_eq!(ffi::lua_type(lua.state, -1), ffi::LUA_TSTRING);
@@ -222,8 +222,8 @@ impl<'lua> String<'lua> {
                 let data = ffi::lua_tolstring(lua.state, -1, &mut size);
 
                 ffi::lua_pop(lua.state, 1);
-                Ok(slice::from_raw_parts(data as *const u8, size))
-            }).expect("infallible stack_err_guard failed")  // this conversion cannot fail
+                slice::from_raw_parts(data as *const u8, size)
+            })
         }
     }
 }
@@ -241,16 +241,16 @@ impl<'lua> Table<'lua> {
     /// desired.
     pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
-        let key = key.to_lua(lua)?;
-        let value = value.to_lua(lua)?;
         unsafe {
-            check_stack(lua.state, 7);
-            lua.push_ref(lua.state, &self.0);
-            lua.push_value(lua.state, key);
-            lua.push_value(lua.state, value);
-            psettable(lua.state, -3)?;
-            ffi::lua_pop(lua.state, 1);
-            Ok(())
+            stack_err_guard(lua.state, 0, || {
+                check_stack(lua.state, 7);
+                lua.push_ref(lua.state, &self.0);
+                lua.push_value(lua.state, key.to_lua(lua)?);
+                lua.push_value(lua.state, value.to_lua(lua)?);
+                psettable(lua.state, -3)?;
+                ffi::lua_pop(lua.state, 1);
+                Ok(())
+            })
         }
     }
 
@@ -261,7 +261,6 @@ impl<'lua> Table<'lua> {
     /// This might invoke the `__index` metamethod. Use the `raw_get` method if that is not desired.
     pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
-        let key = key.to_lua(lua)?;
         unsafe {
             stack_err_guard(lua.state, 0, || {
                 check_stack(lua.state, 5);
@@ -278,12 +277,11 @@ impl<'lua> Table<'lua> {
     /// Checks whether the table contains a non-nil value for `key`.
     pub fn contains_key<K: ToLua<'lua>>(&self, key: K) -> Result<bool> {
         let lua = self.0.lua;
-        let key = key.to_lua(lua)?;
         unsafe {
             stack_err_guard(lua.state, 0, || {
                 check_stack(lua.state, 5);
                 lua.push_ref(lua.state, &self.0);
-                lua.push_value(lua.state, key);
+                lua.push_value(lua.state, key.to_lua(lua)?);
                 pgettable(lua.state, -2)?;
                 let has = ffi::lua_isnil(lua.state, -1) == 0;
                 ffi::lua_pop(lua.state, 2);
