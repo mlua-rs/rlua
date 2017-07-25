@@ -207,7 +207,6 @@ impl<'lua> String<'lua> {
     /// # use rlua::{Lua, String};
     /// # fn main() {
     /// let lua = Lua::new();
-    /// let globals = lua.globals();
     ///
     /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None).unwrap();
     /// assert!(non_utf8.to_str().is_err());    // oh no :(
@@ -437,6 +436,7 @@ impl<'lua> Table<'lua> {
     ///
     /// for pair in globals.pairs::<Value, Value>() {
     ///     let (key, value) = pair?;
+    /// #   let _ = (key, value);   // used
     ///     // ...
     /// }
     /// # Ok(())
