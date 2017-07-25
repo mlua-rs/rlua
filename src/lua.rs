@@ -1306,7 +1306,7 @@ impl Lua {
             .call(())
     }
 
-    /// Pass a `&str` slice to Lua, creating and returning a interned Lua string.
+    /// Pass a `&str` slice to Lua, creating and returning an interned Lua string.
     pub fn create_string(&self, s: &str) -> String {
         unsafe {
             stack_guard(self.state, 0, || {
