@@ -998,7 +998,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// [`add_method_mut`]: #method.add_method_mut
     pub fn add_function<F>(&mut self, name: &str, function: F)
     where
-        F: 'lua + for<'a> FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        F: 'lua + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.methods.insert(name.to_owned(), Box::new(function));
     }
@@ -1040,7 +1040,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// userdata of type `T`.
     pub fn add_meta_function<F>(&mut self, meta: MetaMethod, function: F)
     where
-        F: 'lua + for<'a> FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        F: 'lua + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.meta_methods.insert(meta, Box::new(function));
     }
@@ -1383,7 +1383,7 @@ impl Lua {
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
     pub fn create_function<'lua, F>(&'lua self, func: F) -> Function<'lua>
     where
-        F: 'lua + for<'a> FnMut(&'a Lua, MultiValue<'a>) -> Result<MultiValue<'a>>,
+        F: 'lua + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.create_callback_function(Box::new(func))
     }
