@@ -1809,7 +1809,7 @@ impl Lua {
                                 MetaMethod::Lt => "__lt",
                                 MetaMethod::Le => "__le",
                                 MetaMethod::Index => "__index",
-                                MetaMethod::NewIndex => "__newIndex",
+                                MetaMethod::NewIndex => "__newindex",
                                 MetaMethod::Call => "__call",
                                 MetaMethod::ToString => "__tostring",
                             };
