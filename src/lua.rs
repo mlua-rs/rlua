@@ -1112,9 +1112,8 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 /// [`UserDataMethods`] for more information):
 ///
 /// ```
-/// # #[macro_use] extern crate hlist_macro;
 /// # extern crate rlua;
-/// # use rlua::{Lua, MetaMethod, UserData, UserDataMethods, Integer, Result};
+/// # use rlua::{Lua, MetaMethod, UserData, UserDataMethods, Result};
 /// # fn try_main() -> Result<()> {
 /// struct MyUserData(i32);
 ///
@@ -1126,15 +1125,15 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 ///         });
 ///
 ///         methods.add_method_mut("add", |lua, this, args| {
-///             let hlist_pat![value]: HList![Integer] = lua.unpack(args)?;
+///             let value: i32 = lua.unpack(args)?;
 ///
-///             this.0 += value as i32;
+///             this.0 += value;
 ///             lua.pack(())
 ///         });
 ///
 ///         methods.add_meta_method(MetaMethod::Add, |lua, this, args| {
-///             let hlist_pat![value]: HList![Integer] = lua.unpack(args)?;
-///             lua.pack(this.0 + value as i32)
+///             let value: i32 = lua.unpack(args)?;
+///             lua.pack(this.0 + value)
 ///         });
 ///     }
 /// }
