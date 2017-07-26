@@ -1081,6 +1081,81 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 }
 
 /// Trait for custom userdata types.
+///
+/// By implementing this trait, a struct becomes eligible for use inside Lua code. Implementations
+/// of `ToLua` and `FromLua` are automatically provided.
+///
+/// # Examples
+///
+/// ```
+/// # extern crate rlua;
+/// # use rlua::{Lua, UserData, Result};
+/// # fn try_main() -> Result<()> {
+/// struct MyUserData(i32);
+///
+/// impl UserData for MyUserData {}
+///
+/// let lua = Lua::new();
+///
+/// // `MyUserData` now implements `ToLua`:
+/// lua.globals().set("myobject", MyUserData(123))?;
+///
+/// lua.exec::<()>("assert(type(myobject) == 'userdata')", None)?;
+/// # Ok(())
+/// # }
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
+/// ```
+///
+/// Custom methods and operators can be provided by implementing `add_methods` (refer to
+/// [`UserDataMethods`] for more information):
+///
+/// ```
+/// # extern crate rlua;
+/// # use rlua::{Lua, MetaMethod, UserData, UserDataMethods, Result};
+/// # fn try_main() -> Result<()> {
+/// struct MyUserData(i32);
+///
+/// impl UserData for MyUserData {
+///     fn add_methods(methods: &mut UserDataMethods<Self>) {
+///         methods.add_method("get", |lua, this, args| {
+/// #           let _ = (lua, args);    // used
+///             lua.pack(this.0)
+///         });
+///
+///         methods.add_method_mut("add", |lua, this, args| {
+///             let value: i32 = lua.unpack(args)?;
+///
+///             this.0 += value;
+///             lua.pack(())
+///         });
+///
+///         methods.add_meta_method(MetaMethod::Add, |lua, this, args| {
+///             let value: i32 = lua.unpack(args)?;
+///             lua.pack(this.0 + value)
+///         });
+///     }
+/// }
+///
+/// let lua = Lua::new();
+///
+/// lua.globals().set("myobject", MyUserData(123))?;
+///
+/// lua.exec::<()>(r#"
+///     assert(myobject:get() == 123)
+///     myobject:add(7)
+///     assert(myobject:get() == 130)
+///     assert(myobject + 10 == 140)
+/// "#, None)?;
+/// # Ok(())
+/// # }
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
+/// ```
+///
+/// [`UserDataMethods`]: struct.UserDataMethods.html
 pub trait UserData: 'static + Sized {
     /// Adds custom methods and operators specific to this userdata.
     fn add_methods(_methods: &mut UserDataMethods<Self>) {}
@@ -1381,6 +1456,51 @@ impl Lua {
     }
 
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
+    ///
+    /// # Examples
+    ///
+    /// Create a function which prints its argument:
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    ///
+    /// let greet = lua.create_function(|lua, args| {
+    ///     let name: String = lua.unpack(args)?;
+    ///     println!("Hello, {}!", name);
+    ///     lua.pack(())
+    /// });
+    /// # let _ = greet;    // used
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
+    ///
+    /// Use the `hlist_macro` crate to use multiple arguments:
+    ///
+    /// ```
+    /// #[macro_use] extern crate hlist_macro;
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, Result};
+    /// # fn try_main() -> Result<()> {
+    /// let lua = Lua::new();
+    ///
+    /// let print_person = lua.create_function(|lua, args| {
+    ///     let hlist_pat![name, age]: HList![String, u8] = lua.unpack(args)?;
+    ///     println!("{} is {} years old!", name, age);
+    ///     lua.pack(())
+    /// });
+    /// # let _ = print_person;    // used
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// #     try_main().unwrap();
+    /// # }
+    /// ```
     pub fn create_function<'lua, F>(&'lua self, func: F) -> Function<'lua>
     where
         F: 'lua + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
