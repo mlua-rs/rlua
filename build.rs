@@ -1,10 +1,11 @@
+#[cfg(feature = "builtin-lua")]
 extern crate gcc;
-
-use std::env;
 
 fn main() {
     #[cfg(feature = "builtin-lua")]
     {
+        use std::env;
+
         let mut config = gcc::Config::new();
 
         let target_os = env::var("CARGO_CFG_TARGET_OS");
