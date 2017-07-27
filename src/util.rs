@@ -381,6 +381,7 @@ pub unsafe fn pcall_with_traceback(
                 .unwrap_or_else(|_| "<could not capture traceback>")
                 .to_owned();
             push_wrapped_error(state, Error::CallbackError(traceback, Arc::new(error)));
+            ffi::lua_remove(state, -2);
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
             if !s.is_null() {
@@ -388,6 +389,7 @@ pub unsafe fn pcall_with_traceback(
             } else {
                 ffi::luaL_traceback(state, state, cstr!("<unprintable lua error>"), 0);
             }
+            ffi::lua_remove(state, -2);
         }
         1
     }
@@ -408,19 +410,21 @@ pub unsafe fn resume_with_traceback(
     let res = ffi::lua_resume(state, from, nargs);
     if res != ffi::LUA_OK && res != ffi::LUA_YIELD {
         if let Some(error) = pop_wrapped_error(state) {
-            ffi::luaL_traceback(from, state, ptr::null(), 0);
-            let traceback = CStr::from_ptr(ffi::lua_tolstring(from, -1, ptr::null_mut()))
+            ffi::luaL_traceback(state, state, ptr::null(), 0);
+            let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
                 .to_str()
                 .unwrap_or_else(|_| "<could not capture traceback>")
                 .to_owned();
-            push_wrapped_error(from, Error::CallbackError(traceback, Arc::new(error)));
+            push_wrapped_error(state, Error::CallbackError(traceback, Arc::new(error)));
+            ffi::lua_remove(state, -2);
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
             if !s.is_null() {
-                ffi::luaL_traceback(from, state, s, 0);
+                ffi::luaL_traceback(state, state, s, 0);
             } else {
-                ffi::luaL_traceback(from, state, cstr!("<unprintable lua error>"), 0);
+                ffi::luaL_traceback(state, state, cstr!("<unprintable lua error>"), 0);
             }
+            ffi::lua_remove(state, -2);
         }
     }
     res

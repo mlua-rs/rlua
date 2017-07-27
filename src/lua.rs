@@ -858,7 +858,7 @@ impl<'lua> Thread<'lua> {
                 }
 
                 handle_error(
-                    lua.state,
+                    thread_state,
                     resume_with_traceback(thread_state, lua.state, nargs),
                 )?;
 

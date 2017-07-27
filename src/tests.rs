@@ -893,3 +893,17 @@ fn coroutine_from_closure() {
     let thrd: Thread = lua.eval("coroutine.create(main)", None).unwrap();
     thrd.resume::<_, ()>(()).unwrap();
 }
+
+#[test]
+#[should_panic]
+fn coroutine_panic() {
+    let lua = Lua::new();
+    let thrd_main = lua.create_function(|lua, _| {
+        // whoops, 'main' has a wrong type
+        let _coro: u32 = lua.globals().get("main").unwrap();
+        lua.pack(())
+    });
+    lua.globals().set("main", thrd_main.clone()).unwrap();
+    let thrd: Thread = lua.create_thread(thrd_main);
+    thrd.resume::<_, ()>(()).unwrap();
+}
