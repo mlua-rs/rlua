@@ -478,9 +478,9 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
 /// Does not call checkstack, uses 1 stack space
 pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
     ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_MAINTHREAD);
-    let state = ffi::lua_tothread(state, -1);
+    let main_state = ffi::lua_tothread(state, -1);
     ffi::lua_pop(state, 1);
-    state
+    main_state
 }
 
 pub struct WrappedError(pub Error);

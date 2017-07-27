@@ -882,3 +882,14 @@ fn string_views() {
     assert!(err.to_str().is_err());
     assert_eq!(err.as_bytes(), &b"but \xff isn't :("[..]);
 }
+
+#[test]
+fn coroutine_from_closure() {
+    let lua = Lua::new();
+    let thrd_main = lua.create_function(|lua, _| {
+        lua.pack(())
+    });
+    lua.globals().set("main", thrd_main).unwrap();
+    let thrd: Thread = lua.eval("coroutine.create(main)", None).unwrap();
+    thrd.resume::<_, ()>(()).unwrap();
+}
