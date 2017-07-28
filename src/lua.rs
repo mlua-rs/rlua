@@ -766,16 +766,18 @@ impl<'lua> Function<'lua> {
 }
 
 /// Status of a Lua thread (or coroutine).
-///
-/// A `Thread` is `Active` before the coroutine function finishes, Dead after it finishes, and in
-/// Error state if error has been called inside the coroutine.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ThreadStatus {
     /// The thread has finished executing.
     Dead,
-    /// The thread is currently running or suspended because it has called `coroutine.yield`.
+    /// The thread was just created, is currently running or is suspended because it has called
+    /// `coroutine.yield`.
+    ///
+    /// If a thread is in this state, it can be resumed by calling [`Thread::resume`].
+    ///
+    /// [`Thread::resume`]: struct.Thread.html#method.resume
     Active,
-    /// The thread has thrown an error during execution.
+    /// The thread has raised a Lua error during execution.
     Error,
 }
 
@@ -1161,13 +1163,22 @@ pub trait UserData: 'static + Sized {
     fn add_methods(_methods: &mut UserDataMethods<Self>) {}
 }
 
-/// Handle to an internal Lua userdata for any type that implements `UserData`.
+/// Handle to an internal Lua userdata for any type that implements [`UserData`].
 ///
-/// Similar to `std::any::Any`, this provides an interface for dynamic type checking via the `is`
-/// and `borrow` methods.
+/// Similar to `std::any::Any`, this provides an interface for dynamic type checking via the [`is`]
+/// and [`borrow`] methods.
 ///
 /// Internally, instances are stored in a `RefCell`, to best match the mutable semantics of the Lua
 /// language.
+///
+/// # Note
+///
+/// This API should only be used when necessary. Implementing [`UserData`] already allows defining
+/// methods which check the type and acquire a borrow behind the scenes.
+///
+/// [`UserData`]: trait.UserData.html
+/// [`is`]: #method.is
+/// [`borrow`]: #method.borrow
 #[derive(Clone, Debug)]
 pub struct AnyUserData<'lua>(LuaRef<'lua>);
 

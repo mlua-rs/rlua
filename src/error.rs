@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::error::Error as StdError;
 use std::result::Result as StdResult;
 
+/// Error type returned by rlua methods.
 #[derive(Debug, Clone)]
 pub enum Error {
     /// Lua syntax error, aka `LUA_ERRSYNTAX` that is NOT an incomplete statement.
@@ -10,29 +11,73 @@ pub enum Error {
     /// Lua syntax error that IS an incomplete statement.  Useful for implementing a REPL.
     IncompleteStatement(String),
     /// Lua runtime error, aka `LUA_ERRRUN`.
+    ///
+    /// The Lua VM returns this error when a builtin operation is performed on incompatible typed.
+    /// Among other things, this includes invoking operators on wrong types (such as calling or
+    /// indexing a `nil` value).
     RuntimeError(String),
     /// Lua error from inside an error handler, aka `LUA_ERRERR`.
+    ///
+    /// To prevent an infinite recursion when invoking an error handler, this error will be returned
+    /// instead of invoking the error handler.
     ErrorError(String),
-    /// A generic Rust -> Lua conversion error.
+    /// A Rust value could not be converted to a Lua value.
     ToLuaConversionError(String),
-    /// A generic Lua -> Rust conversion error.
+    /// A Lua value could not be converted to the expected Rust type.
     FromLuaConversionError(String),
-    /// A `Thread` was resumed and the coroutine was no longer active.
+    /// [`Thread::resume`] was called on an inactive coroutine.
+    ///
+    /// A coroutine is inactive if its main function has returned or if an error has occured inside
+    /// the coroutine.
+    ///
+    /// [`Thread::status`] can be used to check if the coroutine can be resumed without causing this
+    /// error.
+    ///
+    /// [`Thread::resume`]: struct.Thread.html#method.resume
+    /// [`Thread::status`]: struct.Thread.html#method.status
     CoroutineInactive,
-    /// An `AnyUserData` is not the expected type in a borrow.
+    /// An [`AnyUserData`] is not the expected type in a borrow.
+    ///
+    /// This error can only happen when manually using [`AnyUserData`], or when implementing
+    /// metamethods for binary operators. Refer to the documentation of [`UserDataMethods`] for
+    /// details.
+    ///
+    /// [`AnyUserData`]: struct.AnyUserData.html
+    /// [`UserDataMethods`]: struct.UserDataMethods.html
     UserDataTypeMismatch,
-    /// An `AnyUserData` immutable borrow failed because it is already borrowed mutably.
+    /// An [`AnyUserData`] immutable borrow failed because it is already borrowed mutably.
+    ///
+    /// This error can occur when a method on a [`UserData`] type calls back into Lua, which then
+    /// tries to call a method on the same [`UserData`] type. Consider restructuring your API to
+    /// prevent these errors.
+    ///
+    /// [`AnyUserData`]: struct.AnyUserData.html
+    /// [`UserData`]: trait.UserData.html
     UserDataBorrowError,
-    /// An `AnyUserData` mutable borrow failed because it is already borrowed.
+    /// An [`AnyUserData`] mutable borrow failed because it is already borrowed.
+    ///
+    /// This error can occur when a method on a [`UserData`] type calls back into Lua, which then
+    /// tries to call a method on the same [`UserData`] type. Consider restructuring your API to
+    /// prevent these errors.
+    ///
+    /// [`AnyUserData`]: struct.AnyUserData.html
+    /// [`UserData`]: trait.UserData.html
     UserDataBorrowMutError,
-    /// Lua error that originated as a Error in a callback.  The first field is the lua error as
-    /// a string, the second field is the Arc holding the original Error.
+    /// A Rust callback returned `Err`, raising the contained `Error` as a Lua error.
+    ///
+    /// The first field is the Lua traceback, the second field holds the original error.
     CallbackError(String, Arc<Error>),
-    /// Any custom external error type, mostly useful for returning external error types from
-    /// callbacks.
+    /// A custom error.
+    ///
+    /// This can be used for returning user-defined errors from callbacks.
+    ///
+    /// Returning `Err(ExternalError(...))` from a Rust callback will raise the error as a Lua
+    /// error. The Rust code that originally invoked the Lua code then receives a `CallbackError`,
+    /// from which the original error (and a stack traceback) can be recovered.
     ExternalError(Arc<StdError + Send + Sync>),
 }
 
+/// A specialized `Result` type used by rlua's API.
 pub type Result<T> = StdResult<T, Error>;
 
 impl fmt::Display for Error {
