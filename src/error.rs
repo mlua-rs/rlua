@@ -12,7 +12,7 @@ pub enum Error {
     IncompleteStatement(String),
     /// Lua runtime error, aka `LUA_ERRRUN`.
     ///
-    /// The Lua VM returns this error when a builtin operation is performed on incompatible typed.
+    /// The Lua VM returns this error when a builtin operation is performed on incompatible types.
     /// Among other things, this includes invoking operators on wrong types (such as calling or
     /// indexing a `nil` value).
     RuntimeError(String),
