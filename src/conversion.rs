@@ -103,10 +103,10 @@ impl<'lua, T: UserData> ToLua<'lua> for T {
     }
 }
 
-impl<'lua, T: UserData + Copy> FromLua<'lua> for T {
+impl<'lua, T: UserData + Clone> FromLua<'lua> for T {
     fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<T> {
         match value {
-            Value::UserData(ud) => Ok(*ud.borrow::<T>()?),
+            Value::UserData(ud) => Ok(ud.borrow::<T>()?.clone()),
             _ => Err(Error::FromLuaConversionError(
                 "cannot convert lua value to userdata".to_owned(),
             )),
