@@ -84,31 +84,22 @@ fn examples() -> Result<()> {
 
     // You can bind rust functions to lua as well
 
-    let check_equal = lua.create_function(|lua, args| {
-        // Functions wrapped in lua receive their arguments packed together as
-        // MultiValue.  The first thing that most wrapped functions will do
-        // is "unpack" this MultiValue into its parts.  Due to lifetime type
-        // signature limitations, this cannot be done automatically from the
-        // function signature, but this will be fixed with ATCs.  Notice the use
-        // of the hlist macros again.
-        let (list1, list2) = lua.unpack::<(Vec<String>, Vec<String>)>(args)?;
-
+    let check_equal = lua.create_function(|_, (list1, list2): (Vec<String>, Vec<String>)| {
         // This function just checks whether two string lists are equal, and in
         // an inefficient way.  Results are returned with lua.pack, which takes
         // any number of values and turns them back into MultiValue.  In this
         // way, multiple values can also be returned to Lua.  Again, this cannot
         // be inferred as part of the function signature due to the same
         // lifetime type signature limitations.
-        lua.pack(list1 == list2)
+        Ok(list1 == list2)
     });
     globals.set("check_equal", check_equal)?;
 
     // You can also accept variadic arguments to rust callbacks.
 
-    let join = lua.create_function(|lua, args| {
-        let strings = lua.unpack::<Variadic<String>>(args)?.0;
+    let join = lua.create_function(|_, strings: Variadic<String>| {
         // (This is quadratic!, it's just an example!)
-        lua.pack(strings.iter().fold("".to_owned(), |a, b| a + b))
+        Ok(strings.0.iter().fold("".to_owned(), |a, b| a + b))
     });
     globals.set("join", join)?;
 
@@ -137,21 +128,19 @@ fn examples() -> Result<()> {
 
     impl UserData for Vec2 {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
-            methods.add_method("magnitude", |lua, vec, _: ()| {
+            methods.add_method("magnitude", |_, vec, _: ()| {
                 let mag_squared = vec.0 * vec.0 + vec.1 * vec.1;
-                lua.pack(mag_squared.sqrt())
+                Ok(mag_squared.sqrt())
             });
 
-            methods.add_meta_function(MetaMethod::Add, |lua, params| {
-                let (vec1, vec2) = lua.unpack::<(Vec2, Vec2)>(params)?;
-                lua.pack(Vec2(vec1.0 + vec2.0, vec1.1 + vec2.1))
+            methods.add_meta_function(MetaMethod::Add, |_, (vec1, vec2): (Vec2, Vec2)| {
+                Ok(Vec2(vec1.0 + vec2.0, vec1.1 + vec2.1))
             });
         }
     }
 
-    let vec2_constructor = lua.create_function(|lua, args| {
-        let (x, y) = lua.unpack::<(f32, f32)>(args)?;
-        lua.pack(Vec2(x, y))
+    let vec2_constructor = lua.create_function(|_, (x, y): (f32, f32)| {
+        Ok(Vec2(x, y))
     });
     globals.set("vec2", vec2_constructor)?;
 

@@ -1506,10 +1506,9 @@ impl Lua {
     /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
     ///
-    /// let greet = lua.create_function(|lua, args| {
-    ///     let name: String = lua.unpack(args)?;
+    /// let greet = lua.create_function(|_, name: String| {
     ///     println!("Hello, {}!", name);
-    ///     lua.pack(())
+    ///     Ok(())
     /// });
     /// # let _ = greet;    // used
     /// # Ok(())
@@ -1527,10 +1526,9 @@ impl Lua {
     /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
     ///
-    /// let print_person = lua.create_function(|lua, args| {
-    ///     let (name, age): (String, u8) = lua.unpack(args)?;
+    /// let print_person = lua.create_function(|_, (name, age): (String, u8)| {
     ///     println!("{} is {} years old!", name, age);
-    ///     lua.pack(())
+    ///     Ok(())
     /// });
     /// # let _ = print_person;    // used
     /// # Ok(())
