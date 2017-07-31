@@ -20,6 +20,3 @@ builtin-lua = ["gcc"]
 
 [build-dependencies]
 gcc = { version = "0.3", optional = true }
-
-[dependencies]
-hlist-macro = "0.1"
