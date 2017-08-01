@@ -112,8 +112,8 @@ impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Error::SyntaxError { ref message, .. } => write!(fmt, "syntax error: {}", message),
-            Error::RuntimeError(ref msg) => write!(fmt, "Lua runtime error: {}", msg),
-            Error::ErrorError(ref msg) => write!(fmt, "Lua error in error handler: {}", msg),
+            Error::RuntimeError(ref msg) => write!(fmt, "runtime error: {}", msg),
+            Error::ErrorError(ref msg) => write!(fmt, "error in error handler: {}", msg),
             Error::ToLuaConversionError { from, to, ref message } => {
                 write!(fmt, "error converting {} to Lua {}", from, to)?;
                 match *message {
@@ -131,10 +131,10 @@ impl fmt::Display for Error {
                         write!(fmt, " ({}; expected {})", message, expected),
                 }
             }
-            Error::CoroutineInactive => write!(fmt, "Cannot resume inactive coroutine"),
-            Error::UserDataTypeMismatch => write!(fmt, "Userdata not expected type"),
-            Error::UserDataBorrowError => write!(fmt, "Userdata already mutably borrowed"),
-            Error::UserDataBorrowMutError => write!(fmt, "Userdata already borrowed"),
+            Error::CoroutineInactive => write!(fmt, "cannot resume inactive coroutine"),
+            Error::UserDataTypeMismatch => write!(fmt, "userdata is not expected type"),
+            Error::UserDataBorrowError => write!(fmt, "userdata already mutably borrowed"),
+            Error::UserDataBorrowMutError => write!(fmt, "userdata already borrowed"),
             Error::CallbackError { ref cause, .. } => write!(fmt, "{}", cause),
             Error::ExternalError(ref err) => err.fmt(fmt),
         }
@@ -145,14 +145,14 @@ impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
             Error::SyntaxError { .. } => "syntax error",
-            Error::RuntimeError(_) => "lua runtime error",
-            Error::ErrorError(_) => "lua error handling error",
+            Error::RuntimeError(_) => "runtime error",
+            Error::ErrorError(_) => "error inside error handler",
             Error::ToLuaConversionError { .. } => "conversion error to lua",
             Error::FromLuaConversionError { .. } => "conversion error from lua",
-            Error::CoroutineInactive => "lua coroutine inactive",
-            Error::UserDataTypeMismatch => "lua userdata type mismatch",
-            Error::UserDataBorrowError => "lua userdata already mutably borrowed",
-            Error::UserDataBorrowMutError => "lua userdata already borrowed",
+            Error::CoroutineInactive => "attempt to resume inactive coroutine",
+            Error::UserDataTypeMismatch => "userdata type mismatch",
+            Error::UserDataBorrowError => "userdata already mutably borrowed",
+            Error::UserDataBorrowMutError => "userdata already borrowed",
             Error::CallbackError { ref cause, .. } => cause.description(),
             Error::ExternalError(ref err) => err.description(),
         }
