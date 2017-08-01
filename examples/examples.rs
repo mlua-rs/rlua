@@ -77,29 +77,28 @@ fn examples() -> Result<()> {
     let print: Function = globals.get("print")?;
     print.call::<_, ()>("hello from rust")?;
 
-    // This API handles variadics using Heterogeneous Lists.  This is one way to
-    // call a function with multiple parameters:
+    // This API handles variadics using tuples.  This is one way to call a function with multiple
+    // parameters:
 
     print.call::<_, ()>(("hello", "again", "from", "rust"))?;
 
-    // You can bind rust functions to lua as well
-
+    // You can bind rust functions to lua as well.  Callbacks receive the lua state itself as their
+    // first parameter, and the arguments given to the function as the second parameter.  The type
+    // of the arguments can be anything that is convertible from the set of parameters, in this
+    // case, the function expects two string sequences.
     let check_equal = lua.create_function(|_, (list1, list2): (Vec<String>, Vec<String>)| {
-        // This function just checks whether two string lists are equal, and in
-        // an inefficient way.  Results are returned with lua.pack, which takes
-        // any number of values and turns them back into MultiValue.  In this
-        // way, multiple values can also be returned to Lua.  Again, this cannot
-        // be inferred as part of the function signature due to the same
-        // lifetime type signature limitations.
+        // This function just checks whether two string lists are equal, and in an inefficient way.
+        // Lua callbacks return rlua::Result, an Ok value is a normal return, and an Err return
+        // turns into a Lua 'error'.  Again, any type that is convertible to lua may be returned.
         Ok(list1 == list2)
     });
     globals.set("check_equal", check_equal)?;
 
-    // You can also accept variadic arguments to rust callbacks.
+    // You can also accept runtime variadic arguments to rust callbacks.
 
     let join = lua.create_function(|_, strings: Variadic<String>| {
         // (This is quadratic!, it's just an example!)
-        Ok(strings.0.iter().fold("".to_owned(), |a, b| a + b))
+        Ok(strings.iter().fold("".to_owned(), |a, b| a + b))
     });
     globals.set("join", join)?;
 
@@ -139,9 +138,7 @@ fn examples() -> Result<()> {
         }
     }
 
-    let vec2_constructor = lua.create_function(|_, (x, y): (f32, f32)| {
-        Ok(Vec2(x, y))
-    });
+    let vec2_constructor = lua.create_function(|_, (x, y): (f32, f32)| Ok(Vec2(x, y)));
     globals.set("vec2", vec2_constructor)?;
 
     assert!(

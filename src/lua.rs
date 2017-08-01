@@ -39,12 +39,10 @@ pub enum Value<'lua> {
     Function(Function<'lua>),
     /// Reference to a Lua thread (or coroutine).
     Thread(Thread<'lua>),
-    /// Reference to a userdata object that holds a custom type which implements
-    /// `UserData`.  Special builtin userdata types will be represented as
-    /// other `Value` variants.
+    /// Reference to a userdata object that holds a custom type which implements `UserData`.
+    /// Special builtin userdata types will be represented as other `Value` variants.
     UserData(AnyUserData<'lua>),
-    /// `Error` is a special builtin userdata type.  When received from Lua
-    /// it is implicitly cloned.
+    /// `Error` is a special builtin userdata type.  When received from Lua it is implicitly cloned.
     Error(Error),
 }
 pub use self::Value::Nil;
@@ -1518,7 +1516,7 @@ impl Lua {
     /// # }
     /// ```
     ///
-    /// Use the `hlist_macro` crate to use multiple arguments:
+    /// Use tuples to accept multiple arguments:
     ///
     /// ```
     /// # extern crate rlua;
@@ -1674,25 +1672,26 @@ impl Lua {
         }
     }
 
-    pub fn from<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> Result<Value<'lua>> {
+    /// Converts a value that implements `ToLua` into a `Value` instance.
+    pub fn pack<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> Result<Value<'lua>> {
         t.to_lua(self)
     }
 
-    pub fn to<'lua, T: FromLua<'lua>>(&'lua self, value: Value<'lua>) -> Result<T> {
+    /// Converts a `Value` instance into a value that implements `FromLua`.
+    pub fn unpack<'lua, T: FromLua<'lua>>(&'lua self, value: Value<'lua>) -> Result<T> {
         T::from_lua(value, self)
     }
 
-    /// Packs up a value that implements `ToLuaMulti` into a `MultiValue` instance.
-    ///
-    /// This can be used to return arbitrary Lua values from a Rust function back to Lua.
-    pub fn pack<'lua, T: ToLuaMulti<'lua>>(&'lua self, t: T) -> Result<MultiValue<'lua>> {
+    /// Converts a value that implements `ToLuaMulti` into a `MultiValue` instance.
+    pub fn pack_multi<'lua, T: ToLuaMulti<'lua>>(&'lua self, t: T) -> Result<MultiValue<'lua>> {
         t.to_lua_multi(self)
     }
 
-    /// Unpacks a `MultiValue` instance into a value that implements `FromLuaMulti`.
-    ///
-    /// This can be used to convert the arguments of a Rust function called by Lua.
-    pub fn unpack<'lua, T: FromLuaMulti<'lua>>(&'lua self, value: MultiValue<'lua>) -> Result<T> {
+    /// Converts a `MultiValue` instance into a value that implements `FromLuaMulti`.
+    pub fn unpack_multi<'lua, T: FromLuaMulti<'lua>>(
+        &'lua self,
+        value: MultiValue<'lua>,
+    ) -> Result<T> {
         T::from_lua_multi(value, self)
     }
 

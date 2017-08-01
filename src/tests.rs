@@ -220,9 +220,7 @@ fn test_rust_function() {
     ).unwrap();
 
     let lua_function = globals.get::<_, Function>("lua_function").unwrap();
-    let rust_function = lua.create_function(|_, _: ()| {
-        Ok("hello")
-    });
+    let rust_function = lua.create_function(|_, _: ()| Ok("hello"));
 
     globals.set("rust_function", rust_function).unwrap();
     assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
@@ -303,13 +301,14 @@ fn test_metamethods() {
             methods.add_meta_function(MetaMethod::Sub, |_, (lhs, rhs): (MyUserData, MyUserData)| {
                 Ok(MyUserData(lhs.0 - rhs.0))
             });
-            methods.add_meta_method(MetaMethod::Index, |_, data, index: LuaString| {
-                if index.to_str()? == "inner" {
+            methods.add_meta_method(
+                MetaMethod::Index,
+                |_, data, index: LuaString| if index.to_str()? == "inner" {
                     Ok(data.0)
                 } else {
                     Err("no such custom index".to_lua_err())
-                }
-            });
+                },
+            );
         }
     }
 
@@ -382,9 +381,9 @@ fn test_lua_multi() {
     assert_eq!(concat.call::<_, String>(("foo", "bar")).unwrap(), "foobar");
     let (a, b) = mreturn.call::<_, (u64, u64)>(()).unwrap();
     assert_eq!((a, b), (1, 2));
-    let (a, b, Variadic(v)) = mreturn.call::<_, (u64, u64, Variadic<u64>)>(()).unwrap();
+    let (a, b, v) = mreturn.call::<_, (u64, u64, Variadic<u64>)>(()).unwrap();
     assert_eq!((a, b), (1, 2));
-    assert_eq!(v, vec![3, 4, 5, 6]);
+    assert_eq!(v[..], [3, 4, 5, 6]);
 }
 
 #[test]

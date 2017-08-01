@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+use std::iter::FromIterator;
 use std::result::Result as StdResult;
 
 use error::*;
@@ -49,9 +51,45 @@ impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
 
 /// Can be used to pass variadic values to or receive variadic values from Lua, where the type of
 /// the values is all the same and the number of values is defined at runtime.  This can be included
-/// in an hlist when unpacking, but must be the final entry, and will consume the rest of the
+/// in tuple when unpacking, but must be the final entry, and will consume the rest of the
 /// parameters given.
-pub struct Variadic<T>(pub Vec<T>);
+#[derive(Debug, Clone)]
+pub struct Variadic<T>(Vec<T>);
+
+impl<T> Variadic<T> {
+    pub fn new() -> Variadic<T> {
+        Variadic(Vec::new())
+    }
+}
+
+impl<T> FromIterator<T> for Variadic<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Variadic(Vec::from_iter(iter))
+    }
+}
+
+impl<T> IntoIterator for Variadic<T> {
+    type Item = T;
+    type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<T> Deref for Variadic<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for Variadic<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for Variadic<T> {
     fn to_lua_multi(self, lua: &'lua Lua) -> Result<MultiValue<'lua>> {
@@ -128,7 +166,7 @@ macro_rules! push_reverse {
     ($multi_value:expr,) => ();
 }
 
-impl_tuple! { }
+impl_tuple!{}
 impl_tuple! { A }
 impl_tuple! { A B }
 impl_tuple! { A B C }
