@@ -205,32 +205,27 @@ fn test_bind() {
 
 #[test]
 fn test_rust_function() {
-    let mut captured_var = 2;
-    {
-        let lua = Lua::new();
-        let globals = lua.globals();
-        lua.exec::<()>(
-            r#"
-                function lua_function()
-                    return rust_function()
-                end
+    let lua = Lua::new();
+    let globals = lua.globals();
+    lua.exec::<()>(
+        r#"
+            function lua_function()
+                return rust_function()
+            end
 
-                -- Test to make sure chunk return is ignored
-                return 1
-            "#,
-            None,
-        ).unwrap();
+            -- Test to make sure chunk return is ignored
+            return 1
+        "#,
+        None,
+    ).unwrap();
 
-        let lua_function = globals.get::<_, Function>("lua_function").unwrap();
-        let rust_function = lua.create_function(|_, _: ()| {
-            captured_var = 42;
-            Ok("hello")
-        });
+    let lua_function = globals.get::<_, Function>("lua_function").unwrap();
+    let rust_function = lua.create_function(|_, _: ()| {
+        Ok("hello")
+    });
 
-        globals.set("rust_function", rust_function).unwrap();
-        assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
-    }
-    assert_eq!(captured_var, 42);
+    globals.set("rust_function", rust_function).unwrap();
+    assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
 }
 
 #[test]
@@ -362,17 +357,6 @@ fn test_scope() {
     assert_eq!(tin.get::<_, i64>(1).unwrap(), 1);
     assert_eq!(tin.get::<_, i64>(2).unwrap(), 2);
     assert_eq!(tin.get::<_, i64>(3).unwrap(), 3);
-
-    // Should not compile, don't know how to test that
-    // struct UserData;
-    // impl UserData for UserData {};
-    // let userdata_ref;
-    // {
-    //     let touter = globals.get::<_, Table>("touter").unwrap();
-    //     touter.set("userdata", lua.create_userdata(UserData).unwrap()).unwrap();
-    //     let userdata = touter.get::<_, AnyUserData>("userdata").unwrap();
-    //     userdata_ref = userdata.borrow::<UserData>();
-    // }
 }
 
 #[test]
@@ -905,3 +889,29 @@ fn coroutine_panic() {
     let thrd: Thread = lua.create_thread(thrd_main);
     thrd.resume::<_, ()>(()).unwrap();
 }
+
+
+// Need to use compiletest-rs or similar to make sure these don't compile.
+/*
+#[test]
+fn should_not_compile() {
+    let lua = Lua::new();
+    let globals = lua.globals();
+
+    // Should not allow userdata borrow to outlive lifetime of AnyUserData handle
+    struct MyUserData;
+    impl UserData for MyUserData {};
+    let userdata_ref;
+    {
+        let touter = globals.get::<_, Table>("touter").unwrap();
+        touter.set("userdata", lua.create_userdata(MyUserData)).unwrap();
+        let userdata = touter.get::<_, AnyUserData>("userdata").unwrap();
+        userdata_ref = userdata.borrow::<MyUserData>();
+    }
+
+    // Should not allow self borrow of lua, it can change addresses
+    globals.set("boom", lua.create_function(|_, _| {
+        lua.pack(lua.eval::<i32>("1 + 1", None)?)
+    })).unwrap();
+}
+*/

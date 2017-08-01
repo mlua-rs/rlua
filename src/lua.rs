@@ -967,9 +967,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// back to the user-provided metamethod if no regular method was found.
     pub fn add_method<A, R, M>(&mut self, name: &str, method: M)
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -984,9 +984,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// [`add_method`]: #method.add_method
     pub fn add_method_mut<A, R, M>(&mut self, name: &str, method: M)
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -1003,9 +1003,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// [`add_method_mut`]: #method.add_method_mut
     pub fn add_function<A, R, F>(&mut self, name: &str, function: F)
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        F: 'lua + FnMut(&'lua Lua, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -1023,9 +1023,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// [`add_meta_function`]: #method.add_meta_function
     pub fn add_meta_method<A, R, M>(&mut self, meta: MetaMethod, method: M)
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
@@ -1040,9 +1040,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// [`add_meta_function`]: #method.add_meta_function
     pub fn add_meta_method_mut<A, R, M>(&mut self, meta: MetaMethod, method: M)
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
@@ -1054,18 +1054,18 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// userdata of type `T`.
     pub fn add_meta_function<A, R, F>(&mut self, meta: MetaMethod, function: F)
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        F: 'lua + FnMut(&'lua Lua, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_function(function));
     }
 
     fn box_function<A, R, F>(mut function: F) -> Callback<'lua>
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        F: 'lua + for<'a> FnMut(&'lua Lua, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + for<'a> FnMut(&'lua Lua, A) -> Result<R>,
     {
         Box::new(move |lua, args| {
             function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(
@@ -1076,9 +1076,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 
     fn box_method<A, R, M>(mut method: M) -> Callback<'lua>
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = AnyUserData::from_lua(front, lua)?;
@@ -1095,9 +1095,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 
     fn box_method_mut<A, R, M>(mut method: M) -> Callback<'lua>
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = AnyUserData::from_lua(front, lua)?;
@@ -1539,9 +1539,9 @@ impl Lua {
     /// ```
     pub fn create_function<'lua, A, R, F>(&'lua self, mut func: F) -> Function<'lua>
     where
-        A: 'lua + FromLuaMulti<'lua>,
-        R: 'lua + ToLuaMulti<'lua>,
-        F: 'lua + FnMut(&'lua Lua, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
         self.create_callback_function(Box::new(move |lua, args| {
             func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
