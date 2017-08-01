@@ -501,10 +501,7 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
             Ok(1)
 
         } else {
-            Err(Error::FromLuaConversionError(
-                "internal error: userdata mismatch in Error metamethod"
-                    .to_owned(),
-            ))
+            panic!("internal error: userdata mismatch in Error metamethod");
         })
     }
 

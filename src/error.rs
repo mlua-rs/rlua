@@ -22,9 +22,28 @@ pub enum Error {
     /// instead of invoking the error handler.
     ErrorError(String),
     /// A Rust value could not be converted to a Lua value.
-    ToLuaConversionError(String),
+    ToLuaConversionError {
+        /// Name of the Rust type that could not be converted.
+        from: &'static str,
+        /// Name of the Lua type that could not be created.
+        to: &'static str,
+        /// A message indicating why the conversion failed in more detail.
+        message: Option<String>,
+    },
     /// A Lua value could not be converted to the expected Rust type.
-    FromLuaConversionError(String),
+    FromLuaConversionError {
+        /// Name of the Lua type that could not be converted.
+        from: &'static str,
+        /// Name of the Rust type that could not be created.
+        to: &'static str,
+        /// A string indicating the possible Lua values/types for this conversion.
+        ///
+        /// To avoid redundancy, this should only be set to `Some` when there are nontrivial rules
+        /// about valid conversions, since the `to` string should already hint at the problem.
+        expected: Option<&'static str>,
+        /// A string containing more detailed error information.
+        message: Option<String>,
+    },
     /// [`Thread::resume`] was called on an inactive coroutine.
     ///
     /// A coroutine is inactive if its main function has returned or if an error has occured inside
@@ -89,11 +108,22 @@ impl fmt::Display for Error {
             }
             Error::RuntimeError(ref msg) => write!(fmt, "Lua runtime error: {}", msg),
             Error::ErrorError(ref msg) => write!(fmt, "Lua error in error handler: {}", msg),
-            Error::ToLuaConversionError(ref msg) => {
-                write!(fmt, "Error converting rust type to lua: {}", msg)
+            Error::ToLuaConversionError { from, to, ref message } => {
+                write!(fmt, "error converting {} to Lua {}", from, to)?;
+                match *message {
+                    None => Ok(()),
+                    Some(ref message) => write!(fmt, " ({})", message),
+                }
             }
-            Error::FromLuaConversionError(ref msg) => {
-                write!(fmt, "Error converting lua type to rust: {}", msg)
+            Error::FromLuaConversionError { from, to, ref expected, ref message } => {
+                write!(fmt, "error converting Lua {} to {}", from, to)?;
+                match (expected.as_ref(), message.as_ref()) {
+                    (None, None) => Ok(()),
+                    (None, Some(ref message)) => write!(fmt, " ({})", message),
+                    (Some(ref expected), None) => write!(fmt, " (expected {})", expected),
+                    (Some(ref expected), Some(ref message)) =>
+                        write!(fmt, " ({}; expected {})", message, expected),
+                }
             }
             Error::CoroutineInactive => write!(fmt, "Cannot resume inactive coroutine"),
             Error::UserDataTypeMismatch => write!(fmt, "Userdata not expected type"),
@@ -112,8 +142,8 @@ impl StdError for Error {
             Error::IncompleteStatement(_) => "lua incomplete statement",
             Error::RuntimeError(_) => "lua runtime error",
             Error::ErrorError(_) => "lua error handling error",
-            Error::ToLuaConversionError(_) => "conversion error to lua",
-            Error::FromLuaConversionError(_) => "conversion error from lua",
+            Error::ToLuaConversionError { .. } => "conversion error to lua",
+            Error::FromLuaConversionError { .. } => "conversion error from lua",
             Error::CoroutineInactive => "lua coroutine inactive",
             Error::UserDataTypeMismatch => "lua userdata type mismatch",
             Error::UserDataBorrowError => "lua userdata already mutably borrowed",
