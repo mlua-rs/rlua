@@ -127,7 +127,7 @@ fn examples() -> Result<()> {
 
     impl UserData for Vec2 {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
-            methods.add_method("magnitude", |_, vec, _: ()| {
+            methods.add_method("magnitude", |_, vec, ()| {
                 let mag_squared = vec.0 * vec.0 + vec.1 * vec.1;
                 Ok(mag_squared.sqrt())
             });

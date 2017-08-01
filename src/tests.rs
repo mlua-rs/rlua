@@ -220,7 +220,7 @@ fn test_rust_function() {
     ).unwrap();
 
     let lua_function = globals.get::<_, Function>("lua_function").unwrap();
-    let rust_function = lua.create_function(|_, _: ()| Ok("hello"));
+    let rust_function = lua.create_function(|_, ()| Ok("hello"));
 
     globals.set("rust_function", rust_function).unwrap();
     assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
@@ -254,7 +254,7 @@ fn test_methods() {
 
     impl UserData for MyUserData {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
-            methods.add_method("get_value", |_, data, _: ()| Ok(data.0));
+            methods.add_method("get_value", |_, data, ()| Ok(data.0));
             methods.add_method_mut("set_value", |_, data, args| {
                 data.0 = args;
                 Ok(())
@@ -294,7 +294,7 @@ fn test_metamethods() {
 
     impl UserData for MyUserData {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
-            methods.add_method("get", |_, data, _: ()| Ok(data.0));
+            methods.add_method("get", |_, data, ()| Ok(data.0));
             methods.add_meta_function(MetaMethod::Add, |_, (lhs, rhs): (MyUserData, MyUserData)| {
                 Ok(MyUserData(lhs.0 + rhs.0))
             });
@@ -481,7 +481,7 @@ fn test_error() {
     ).unwrap();
 
     let rust_error_function =
-        lua.create_function(|_, _: ()| -> Result<()> { Err(TestError.to_lua_err()) });
+        lua.create_function(|_, ()| -> Result<()> { Err(TestError.to_lua_err()) });
     globals
         .set("rust_error_function", rust_error_function)
         .unwrap();
@@ -540,7 +540,7 @@ fn test_error() {
             "#,
             None,
         )?;
-        let rust_panic_function = lua.create_function(|_, _: ()| -> Result<()> {
+        let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
             panic!("expected panic, this panic should be caught in rust")
         });
         globals.set("rust_panic_function", rust_panic_function)?;
@@ -566,7 +566,7 @@ fn test_error() {
             "#,
             None,
         )?;
-        let rust_panic_function = lua.create_function(|_, _: ()| -> Result<()> {
+        let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
             panic!("expected panic, this panic should be caught in rust")
         });
         globals.set("rust_panic_function", rust_panic_function)?;
@@ -723,12 +723,12 @@ fn test_result_conversions() {
     let lua = Lua::new();
     let globals = lua.globals();
 
-    let err = lua.create_function(|_, _: ()| {
+    let err = lua.create_function(|_, ()| {
         Ok(Err::<String, _>(
             "only through failure can we succeed".to_lua_err(),
         ))
     });
-    let ok = lua.create_function(|_, _: ()| Ok(Ok::<_, Error>("!".to_owned())));
+    let ok = lua.create_function(|_, ()| Ok(Ok::<_, Error>("!".to_owned())));
 
     globals.set("err", err).unwrap();
     globals.set("ok", ok).unwrap();
@@ -780,7 +780,7 @@ fn test_expired_userdata() {
 
     impl UserData for MyUserdata {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
-            methods.add_method("access", |_, this, _: ()| {
+            methods.add_method("access", |_, this, ()| {
                 assert!(this.id == 123);
                 Ok(())
             });
@@ -869,7 +869,7 @@ fn string_views() {
 #[test]
 fn coroutine_from_closure() {
     let lua = Lua::new();
-    let thrd_main = lua.create_function(|_, _: ()| Ok(()));
+    let thrd_main = lua.create_function(|_, ()| Ok(()));
     lua.globals().set("main", thrd_main).unwrap();
     let thrd: Thread = lua.eval("coroutine.create(main)", None).unwrap();
     thrd.resume::<_, ()>(()).unwrap();
@@ -879,7 +879,7 @@ fn coroutine_from_closure() {
 #[should_panic]
 fn coroutine_panic() {
     let lua = Lua::new();
-    let thrd_main = lua.create_function(|lua, _: ()| {
+    let thrd_main = lua.create_function(|lua, ()| {
         // whoops, 'main' has a wrong type
         let _coro: u32 = lua.globals().get("main").unwrap();
         Ok(())
