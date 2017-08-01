@@ -32,7 +32,7 @@ fn main() {
                     );
                     break;
                 }
-                Err(Error::IncompleteStatement(_)) => {
+                Err(Error::SyntaxError { incomplete_input: true, .. }) => {
                     // continue reading input and append it to `line`
                     write!(stdout, ">> ").unwrap();
                     stdout.flush().unwrap();

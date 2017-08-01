@@ -245,10 +245,10 @@ pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
 }
 
 // If the return code indicates an error, pops the error off of the stack and
-// returns Err. If the error is actually a WrappedPaic, clears the current lua
-// stack continues the panic.  If the error on the top of the stack is actually
-// a WrappedError, just returns it.  Otherwise, interprets the error as the
-// appropriate lua error.
+// returns Err. If the error is actually a WrappedPanic, clears the current lua
+// stack and continues the panic.  If the error on the top of the stack is
+// actually a WrappedError, just returns it.  Otherwise, interprets the error as
+// the appropriate lua error.
 pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()> {
     if err == ffi::LUA_OK || err == ffi::LUA_YIELD {
         Ok(())
@@ -280,12 +280,11 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
             Err(match err {
                 ffi::LUA_ERRRUN => Error::RuntimeError(err_string),
                 ffi::LUA_ERRSYNTAX => {
-                    // This seems terrible, but as far as I can tell, this is exactly what the stock
-                    // lua repl does.
-                    if err_string.ends_with("<eof>") {
-                        Error::IncompleteStatement(err_string)
-                    } else {
-                        Error::SyntaxError(err_string)
+                    Error::SyntaxError {
+                        // This seems terrible, but as far as I can tell, this is exactly what the
+                        // stock Lua REPL does.
+                        incomplete_input: err_string.ends_with("<eof>"),
+                        message: err_string,
                     }
                 }
                 ffi::LUA_ERRERR => Error::ErrorError(err_string),

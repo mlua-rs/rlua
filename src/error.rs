@@ -6,10 +6,16 @@ use std::result::Result as StdResult;
 /// Error type returned by rlua methods.
 #[derive(Debug, Clone)]
 pub enum Error {
-    /// Lua syntax error, aka `LUA_ERRSYNTAX` that is NOT an incomplete statement.
-    SyntaxError(String),
-    /// Lua syntax error that IS an incomplete statement.  Useful for implementing a REPL.
-    IncompleteStatement(String),
+    /// Syntax error while parsing Lua source code.
+    SyntaxError {
+        /// The error message as returned by Lua.
+        message: String,
+        /// `true` if the error can likely be fixed by appending more input to the source code.
+        ///
+        /// This is useful for implementing REPLs as they can query the user for more input if this
+        /// is set.
+        incomplete_input: bool,
+    },
     /// Lua runtime error, aka `LUA_ERRRUN`.
     ///
     /// The Lua VM returns this error when a builtin operation is performed on incompatible types.
@@ -105,10 +111,7 @@ pub type Result<T> = StdResult<T, Error>;
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::SyntaxError(ref msg) => write!(fmt, "Lua syntax error: {}", msg),
-            Error::IncompleteStatement(ref msg) => {
-                write!(fmt, "Lua syntax error (incomplete statement): {}", msg)
-            }
+            Error::SyntaxError { ref message, .. } => write!(fmt, "syntax error: {}", message),
             Error::RuntimeError(ref msg) => write!(fmt, "Lua runtime error: {}", msg),
             Error::ErrorError(ref msg) => write!(fmt, "Lua error in error handler: {}", msg),
             Error::ToLuaConversionError { from, to, ref message } => {
@@ -141,8 +144,7 @@ impl fmt::Display for Error {
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::SyntaxError(_) => "lua syntax error",
-            Error::IncompleteStatement(_) => "lua incomplete statement",
+            Error::SyntaxError { .. } => "syntax error",
             Error::RuntimeError(_) => "lua runtime error",
             Error::ErrorError(_) => "lua error handling error",
             Error::ToLuaConversionError { .. } => "conversion error to lua",
