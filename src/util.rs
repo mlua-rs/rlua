@@ -377,7 +377,7 @@ pub unsafe fn pcall_with_traceback(
             ffi::luaL_traceback(state, state, ptr::null(), 0);
             let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
                 .to_string_lossy()
-                .to_owned();
+                .into_owned();
             push_wrapped_error(state, Error::CallbackError {
                 traceback,
                 cause: Arc::new(error),
