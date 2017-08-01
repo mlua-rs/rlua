@@ -385,11 +385,12 @@ pub unsafe fn pcall_with_traceback(
             ffi::lua_remove(state, -2);
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
-            if !s.is_null() {
-                ffi::luaL_traceback(state, state, s, 0);
+            let s = if s.is_null() {
+                cstr!("<unprintable Rust panic>")
             } else {
-                ffi::luaL_traceback(state, state, cstr!("<unprintable lua error>"), 0);
-            }
+                s
+            };
+            ffi::luaL_traceback(state, state, s, 0);
             ffi::lua_remove(state, -2);
         }
         1
