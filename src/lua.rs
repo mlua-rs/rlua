@@ -968,7 +968,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// back to the user-provided metamethod if no regular method was found.
     pub fn add_method<M>(&mut self, name: &str, method: M)
     where
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -983,7 +983,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// [`add_method`]: #method.add_method
     pub fn add_method_mut<M>(&mut self, name: &str, method: M)
     where
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -1000,7 +1000,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// [`add_method_mut`]: #method.add_method_mut
     pub fn add_function<F>(&mut self, name: &str, function: F)
     where
-        F: 'lua + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        F: 'static + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.methods.insert(name.to_owned(), Box::new(function));
     }
@@ -1015,7 +1015,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// [`add_meta_function`]: #method.add_meta_function
     pub fn add_meta_method<M>(&mut self, meta: MetaMethod, method: M)
     where
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
@@ -1030,7 +1030,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// [`add_meta_function`]: #method.add_meta_function
     pub fn add_meta_method_mut<M>(&mut self, meta: MetaMethod, method: M)
     where
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
@@ -1042,14 +1042,14 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// userdata of type `T`.
     pub fn add_meta_function<F>(&mut self, meta: MetaMethod, function: F)
     where
-        F: 'lua + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        F: 'static + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.meta_methods.insert(meta, Box::new(function));
     }
 
     fn box_method<M>(mut method: M) -> Callback<'lua>
     where
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = AnyUserData::from_lua(front, lua)?;
@@ -1065,7 +1065,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 
     fn box_method_mut<M>(mut method: M) -> Callback<'lua>
     where
-        M: 'lua + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = AnyUserData::from_lua(front, lua)?;
@@ -1514,7 +1514,7 @@ impl Lua {
     /// ```
     pub fn create_function<'lua, F>(&'lua self, func: F) -> Function<'lua>
     where
-        F: 'lua + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        F: 'static + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
     {
         self.create_callback_function(Box::new(func))
     }
