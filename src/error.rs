@@ -83,9 +83,12 @@ pub enum Error {
     /// [`UserData`]: trait.UserData.html
     UserDataBorrowMutError,
     /// A Rust callback returned `Err`, raising the contained `Error` as a Lua error.
-    ///
-    /// The first field is the Lua traceback, the second field holds the original error.
-    CallbackError(String, Arc<Error>),
+    CallbackError {
+        /// Lua call stack backtrace.
+        traceback: String,
+        /// Original error returned by the Rust code.
+        cause: Arc<Error>,
+    },
     /// A custom error.
     ///
     /// This can be used for returning user-defined errors from callbacks.
@@ -129,7 +132,7 @@ impl fmt::Display for Error {
             Error::UserDataTypeMismatch => write!(fmt, "Userdata not expected type"),
             Error::UserDataBorrowError => write!(fmt, "Userdata already mutably borrowed"),
             Error::UserDataBorrowMutError => write!(fmt, "Userdata already borrowed"),
-            Error::CallbackError(ref msg, _) => write!(fmt, "Error during lua callback: {}", msg),
+            Error::CallbackError { ref cause, .. } => write!(fmt, "{}", cause),
             Error::ExternalError(ref err) => err.fmt(fmt),
         }
     }
@@ -148,14 +151,14 @@ impl StdError for Error {
             Error::UserDataTypeMismatch => "lua userdata type mismatch",
             Error::UserDataBorrowError => "lua userdata already mutably borrowed",
             Error::UserDataBorrowMutError => "lua userdata already borrowed",
-            Error::CallbackError(_, _) => "lua callback error",
+            Error::CallbackError { ref cause, .. } => cause.description(),
             Error::ExternalError(ref err) => err.description(),
         }
     }
 
     fn cause(&self) -> Option<&StdError> {
         match *self {
-            Error::CallbackError(_, ref cause) => Some(cause.as_ref()),
+            Error::CallbackError { ref cause, .. } => Some(cause.as_ref()),
             Error::ExternalError(ref err) => err.cause(),
             _ => None,
         }

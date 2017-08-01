@@ -380,7 +380,10 @@ pub unsafe fn pcall_with_traceback(
                 .to_str()
                 .unwrap_or_else(|_| "<could not capture traceback>")
                 .to_owned();
-            push_wrapped_error(state, Error::CallbackError(traceback, Arc::new(error)));
+            push_wrapped_error(state, Error::CallbackError {
+                traceback,
+                cause: Arc::new(error),
+            });
             ffi::lua_remove(state, -2);
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
@@ -415,7 +418,10 @@ pub unsafe fn resume_with_traceback(
                 .to_str()
                 .unwrap_or_else(|_| "<could not capture traceback>")
                 .to_owned();
-            push_wrapped_error(state, Error::CallbackError(traceback, Arc::new(error)));
+            push_wrapped_error(state, Error::CallbackError {
+                traceback,
+                cause: Arc::new(error),
+            });
             ffi::lua_remove(state, -2);
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());

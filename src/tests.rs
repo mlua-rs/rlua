@@ -501,7 +501,7 @@ fn test_error() {
         _ => panic!("error not returned"),
     }
     match rust_error.call::<_, ()>(()) {
-        Err(Error::CallbackError(_, _)) => {}
+        Err(Error::CallbackError { .. }) => {}
         Err(_) => panic!("error is not CallbackError kind"),
         _ => panic!("error not returned"),
     }
