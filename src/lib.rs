@@ -1,9 +1,6 @@
 // Deny warnings inside doc tests / examples
 #![doc(test(attr(deny(warnings))))]
 
-#[cfg_attr(test, macro_use)]
-extern crate hlist_macro;
-
 pub mod ffi;
 #[macro_use]
 mod util;

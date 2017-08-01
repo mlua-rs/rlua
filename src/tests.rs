@@ -173,10 +173,7 @@ fn test_function() {
     ).unwrap();
 
     let concat = globals.get::<_, Function>("concat").unwrap();
-    assert_eq!(
-        concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
-        "foobar"
-    );
+    assert_eq!(concat.call::<_, String>(("foo", "bar")).unwrap(), "foobar");
 }
 
 #[test]
@@ -199,9 +196,9 @@ fn test_bind() {
     let mut concat = globals.get::<_, Function>("concat").unwrap();
     concat = concat.bind("foo").unwrap();
     concat = concat.bind("bar").unwrap();
-    concat = concat.bind(hlist!["baz", "baf"]).unwrap();
+    concat = concat.bind(("baz", "baf")).unwrap();
     assert_eq!(
-        concat.call::<_, String>(hlist!["hi", "wut"]).unwrap(),
+        concat.call::<_, String>(("hi", "wut")).unwrap(),
         "foobarbazbafhiwut"
     );
 }
@@ -223,9 +220,7 @@ fn test_rust_function() {
     ).unwrap();
 
     let lua_function = globals.get::<_, Function>("lua_function").unwrap();
-    let rust_function = lua.create_function(|lua, _| {
-        lua.pack("hello")
-    });
+    let rust_function = lua.create_function(|_, ()| Ok("hello"));
 
     globals.set("rust_function", rust_function).unwrap();
     assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
@@ -259,10 +254,10 @@ fn test_methods() {
 
     impl UserData for MyUserData {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
-            methods.add_method("get_value", |lua, data, _| lua.pack(data.0));
-            methods.add_method_mut("set_value", |lua, data, args| {
-                data.0 = lua.unpack(args)?;
-                lua.pack(())
+            methods.add_method("get_value", |_, data, ()| Ok(data.0));
+            methods.add_method_mut("set_value", |_, data, args| {
+                data.0 = args;
+                Ok(())
             });
         }
     }
@@ -299,23 +294,21 @@ fn test_metamethods() {
 
     impl UserData for MyUserData {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
-            methods.add_method("get", |lua, data, _| lua.pack(data.0));
-            methods.add_meta_function(MetaMethod::Add, |lua, args| {
-                let hlist_pat![lhs, rhs] = lua.unpack::<HList![MyUserData, MyUserData]>(args)?;
-                lua.pack(MyUserData(lhs.0 + rhs.0))
+            methods.add_method("get", |_, data, ()| Ok(data.0));
+            methods.add_meta_function(MetaMethod::Add, |_, (lhs, rhs): (MyUserData, MyUserData)| {
+                Ok(MyUserData(lhs.0 + rhs.0))
             });
-            methods.add_meta_function(MetaMethod::Sub, |lua, args| {
-                let hlist_pat![lhs, rhs] = lua.unpack::<HList![MyUserData, MyUserData]>(args)?;
-                lua.pack(MyUserData(lhs.0 - rhs.0))
+            methods.add_meta_function(MetaMethod::Sub, |_, (lhs, rhs): (MyUserData, MyUserData)| {
+                Ok(MyUserData(lhs.0 - rhs.0))
             });
-            methods.add_meta_method(MetaMethod::Index, |lua, data, args| {
-                let index = lua.unpack::<LuaString>(args)?;
-                if index.to_str()? == "inner" {
-                    lua.pack(data.0)
+            methods.add_meta_method(
+                MetaMethod::Index,
+                |_, data, index: LuaString| if index.to_str()? == "inner" {
+                    Ok(data.0)
                 } else {
                     Err("no such custom index".to_lua_err())
-                }
-            });
+                },
+            );
         }
     }
 
@@ -385,16 +378,12 @@ fn test_lua_multi() {
     let concat = globals.get::<_, Function>("concat").unwrap();
     let mreturn = globals.get::<_, Function>("mreturn").unwrap();
 
-    assert_eq!(
-        concat.call::<_, String>(hlist!["foo", "bar"]).unwrap(),
-        "foobar"
-    );
-    let hlist_pat![a, b] = mreturn.call::<_, HList![u64, u64]>(hlist![]).unwrap();
+    assert_eq!(concat.call::<_, String>(("foo", "bar")).unwrap(), "foobar");
+    let (a, b) = mreturn.call::<_, (u64, u64)>(()).unwrap();
     assert_eq!((a, b), (1, 2));
-    let hlist_pat![a, b, Variadic(v)] =
-        mreturn.call::<_, HList![u64, u64, Variadic<u64>]>(hlist![]).unwrap();
+    let (a, b, v) = mreturn.call::<_, (u64, u64, Variadic<u64>)>(()).unwrap();
     assert_eq!((a, b), (1, 2));
-    assert_eq!(v, vec![3, 4, 5, 6]);
+    assert_eq!(v[..], [3, 4, 5, 6]);
 }
 
 #[test]
@@ -491,7 +480,8 @@ fn test_error() {
         None,
     ).unwrap();
 
-    let rust_error_function = lua.create_function(|_, _| Err(TestError.to_lua_err()));
+    let rust_error_function =
+        lua.create_function(|_, ()| -> Result<()> { Err(TestError.to_lua_err()) });
     globals
         .set("rust_error_function", rust_error_function)
         .unwrap();
@@ -550,7 +540,7 @@ fn test_error() {
             "#,
             None,
         )?;
-        let rust_panic_function = lua.create_function(|_, _| {
+        let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
             panic!("expected panic, this panic should be caught in rust")
         });
         globals.set("rust_panic_function", rust_panic_function)?;
@@ -576,7 +566,7 @@ fn test_error() {
             "#,
             None,
         )?;
-        let rust_panic_function = lua.create_function(|_, _| {
+        let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
             panic!("expected panic, this panic should be caught in rust")
         });
         globals.set("rust_panic_function", rust_panic_function)?;
@@ -733,12 +723,12 @@ fn test_result_conversions() {
     let lua = Lua::new();
     let globals = lua.globals();
 
-    let err = lua.create_function(|lua, _| {
-        lua.pack(Err::<String, _>(
+    let err = lua.create_function(|_, ()| {
+        Ok(Err::<String, _>(
             "only through failure can we succeed".to_lua_err(),
         ))
     });
-    let ok = lua.create_function(|lua, _| lua.pack(Ok::<_, Error>("!".to_owned())));
+    let ok = lua.create_function(|_, ()| Ok(Ok::<_, Error>("!".to_owned())));
 
     globals.set("err", err).unwrap();
     globals.set("ok", ok).unwrap();
@@ -790,9 +780,9 @@ fn test_expired_userdata() {
 
     impl UserData for MyUserdata {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
-            methods.add_method("access", |lua, this, _| {
+            methods.add_method("access", |_, this, ()| {
                 assert!(this.id == 123);
-                lua.pack(())
+                Ok(())
             });
         }
     }
@@ -851,17 +841,26 @@ fn detroys_userdata() {
 #[test]
 fn string_views() {
     let lua = Lua::new();
-    lua.eval::<()>(r#"
+    lua.eval::<()>(
+        r#"
         ok = "null bytes are valid utf-8, wh\0 knew?"
         err = "but \xff isn't :("
-    "#, None).unwrap();
+    "#,
+        None,
+    ).unwrap();
 
     let globals = lua.globals();
     let ok: LuaString = globals.get("ok").unwrap();
     let err: LuaString = globals.get("err").unwrap();
 
-    assert_eq!(ok.to_str().unwrap(), "null bytes are valid utf-8, wh\0 knew?");
-    assert_eq!(ok.as_bytes(), &b"null bytes are valid utf-8, wh\0 knew?"[..]);
+    assert_eq!(
+        ok.to_str().unwrap(),
+        "null bytes are valid utf-8, wh\0 knew?"
+    );
+    assert_eq!(
+        ok.as_bytes(),
+        &b"null bytes are valid utf-8, wh\0 knew?"[..]
+    );
 
     assert!(err.to_str().is_err());
     assert_eq!(err.as_bytes(), &b"but \xff isn't :("[..]);
@@ -870,9 +869,7 @@ fn string_views() {
 #[test]
 fn coroutine_from_closure() {
     let lua = Lua::new();
-    let thrd_main = lua.create_function(|lua, _| {
-        lua.pack(())
-    });
+    let thrd_main = lua.create_function(|_, ()| Ok(()));
     lua.globals().set("main", thrd_main).unwrap();
     let thrd: Thread = lua.eval("coroutine.create(main)", None).unwrap();
     thrd.resume::<_, ()>(()).unwrap();
@@ -882,10 +879,10 @@ fn coroutine_from_closure() {
 #[should_panic]
 fn coroutine_panic() {
     let lua = Lua::new();
-    let thrd_main = lua.create_function(|lua, _| {
+    let thrd_main = lua.create_function(|lua, ()| {
         // whoops, 'main' has a wrong type
         let _coro: u32 = lua.globals().get("main").unwrap();
-        lua.pack(())
+        Ok(())
     });
     lua.globals().set("main", thrd_main.clone()).unwrap();
     let thrd: Thread = lua.create_thread(thrd_main);

@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate hlist_macro;
 extern crate rlua;
 
 use std::f32;
@@ -79,40 +77,28 @@ fn examples() -> Result<()> {
     let print: Function = globals.get("print")?;
     print.call::<_, ()>("hello from rust")?;
 
-    // This API handles variadics using Heterogeneous Lists.  This is one way to
-    // call a function with multiple parameters:
+    // This API handles variadics using tuples.  This is one way to call a function with multiple
+    // parameters:
 
-    print.call::<_, ()>(
-        hlist!["hello", "again", "from", "rust"],
-    )?;
+    print.call::<_, ()>(("hello", "again", "from", "rust"))?;
 
-    // You can bind rust functions to lua as well
-
-    let check_equal = lua.create_function(|lua, args| {
-        // Functions wrapped in lua receive their arguments packed together as
-        // MultiValue.  The first thing that most wrapped functions will do
-        // is "unpack" this MultiValue into its parts.  Due to lifetime type
-        // signature limitations, this cannot be done automatically from the
-        // function signature, but this will be fixed with ATCs.  Notice the use
-        // of the hlist macros again.
-        let hlist_pat![list1, list2] = lua.unpack::<HList![Vec<String>, Vec<String>]>(args)?;
-
-        // This function just checks whether two string lists are equal, and in
-        // an inefficient way.  Results are returned with lua.pack, which takes
-        // any number of values and turns them back into MultiValue.  In this
-        // way, multiple values can also be returned to Lua.  Again, this cannot
-        // be inferred as part of the function signature due to the same
-        // lifetime type signature limitations.
-        lua.pack(list1 == list2)
+    // You can bind rust functions to lua as well.  Callbacks receive the lua state itself as their
+    // first parameter, and the arguments given to the function as the second parameter.  The type
+    // of the arguments can be anything that is convertible from the set of parameters, in this
+    // case, the function expects two string sequences.
+    let check_equal = lua.create_function(|_, (list1, list2): (Vec<String>, Vec<String>)| {
+        // This function just checks whether two string lists are equal, and in an inefficient way.
+        // Lua callbacks return rlua::Result, an Ok value is a normal return, and an Err return
+        // turns into a Lua 'error'.  Again, any type that is convertible to lua may be returned.
+        Ok(list1 == list2)
     });
     globals.set("check_equal", check_equal)?;
 
-    // You can also accept variadic arguments to rust callbacks.
+    // You can also accept runtime variadic arguments to rust callbacks.
 
-    let join = lua.create_function(|lua, args| {
-        let strings = lua.unpack::<Variadic<String>>(args)?.0;
+    let join = lua.create_function(|_, strings: Variadic<String>| {
         // (This is quadratic!, it's just an example!)
-        lua.pack(strings.iter().fold("".to_owned(), |a, b| a + b))
+        Ok(strings.iter().fold("".to_owned(), |a, b| a + b))
     });
     globals.set("join", join)?;
 
@@ -141,22 +127,18 @@ fn examples() -> Result<()> {
 
     impl UserData for Vec2 {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
-            methods.add_method("magnitude", |lua, vec, _| {
+            methods.add_method("magnitude", |_, vec, ()| {
                 let mag_squared = vec.0 * vec.0 + vec.1 * vec.1;
-                lua.pack(mag_squared.sqrt())
+                Ok(mag_squared.sqrt())
             });
 
-            methods.add_meta_function(MetaMethod::Add, |lua, params| {
-                let hlist_pat![vec1, vec2] = lua.unpack::<HList![Vec2, Vec2]>(params)?;
-                lua.pack(Vec2(vec1.0 + vec2.0, vec1.1 + vec2.1))
+            methods.add_meta_function(MetaMethod::Add, |_, (vec1, vec2): (Vec2, Vec2)| {
+                Ok(Vec2(vec1.0 + vec2.0, vec1.1 + vec2.1))
             });
         }
     }
 
-    let vec2_constructor = lua.create_function(|lua, args| {
-        let hlist_pat![x, y] = lua.unpack::<HList![f32, f32]>(args)?;
-        lua.pack(Vec2(x, y))
-    });
+    let vec2_constructor = lua.create_function(|_, (x, y): (f32, f32)| Ok(Vec2(x, y)));
     globals.set("vec2", vec2_constructor)?;
 
     assert!(

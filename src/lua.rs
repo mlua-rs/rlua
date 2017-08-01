@@ -39,12 +39,10 @@ pub enum Value<'lua> {
     Function(Function<'lua>),
     /// Reference to a Lua thread (or coroutine).
     Thread(Thread<'lua>),
-    /// Reference to a userdata object that holds a custom type which implements
-    /// `UserData`.  Special builtin userdata types will be represented as
-    /// other `Value` variants.
+    /// Reference to a userdata object that holds a custom type which implements `UserData`.
+    /// Special builtin userdata types will be represented as other `Value` variants.
     UserData(AnyUserData<'lua>),
-    /// `Error` is a special builtin userdata type.  When received from Lua
-    /// it is implicitly cloned.
+    /// `Error` is a special builtin userdata type.  When received from Lua it is implicitly cloned.
     Error(Error),
 }
 pub use self::Value::Nil;
@@ -647,7 +645,6 @@ impl<'lua> Function<'lua> {
     ///
     /// ```
     /// # extern crate rlua;
-    /// # #[macro_use] extern crate hlist_macro;
     /// # use rlua::{Lua, Function, Result};
     /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
@@ -658,7 +655,7 @@ impl<'lua> Function<'lua> {
     ///     end
     /// "#, None)?;
     ///
-    /// assert_eq!(sum.call::<_, u32>(hlist![3, 4])?, 3 + 4);
+    /// assert_eq!(sum.call::<_, u32>((3, 4))?, 3 + 4);
     ///
     /// # Ok(())
     /// # }
@@ -966,9 +963,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     ///
     /// If `add_meta_method` is used to override the `__index` metamethod, this approach will fall
     /// back to the user-provided metamethod if no regular method was found.
-    pub fn add_method<M>(&mut self, name: &str, method: M)
+    pub fn add_method<A, R, M>(&mut self, name: &str, method: M)
     where
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -981,9 +980,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// Refer to [`add_method`] for more information about the implementation.
     ///
     /// [`add_method`]: #method.add_method
-    pub fn add_method_mut<M>(&mut self, name: &str, method: M)
+    pub fn add_method_mut<A, R, M>(&mut self, name: &str, method: M)
     where
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -998,11 +999,16 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     ///
     /// [`add_method`]: #method.add_method
     /// [`add_method_mut`]: #method.add_method_mut
-    pub fn add_function<F>(&mut self, name: &str, function: F)
+    pub fn add_function<A, R, F>(&mut self, name: &str, function: F)
     where
-        F: 'static + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
-        self.methods.insert(name.to_owned(), Box::new(function));
+        self.methods.insert(
+            name.to_owned(),
+            Self::box_function(function),
+        );
     }
 
     /// Add a metamethod which accepts a `&T` as the first parameter.
@@ -1013,9 +1019,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// side has a metatable. To prevent this, use [`add_meta_function`].
     ///
     /// [`add_meta_function`]: #method.add_meta_function
-    pub fn add_meta_method<M>(&mut self, meta: MetaMethod, method: M)
+    pub fn add_meta_method<A, R, M>(&mut self, meta: MetaMethod, method: M)
     where
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
@@ -1028,9 +1036,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// side has a metatable. To prevent this, use [`add_meta_function`].
     ///
     /// [`add_meta_function`]: #method.add_meta_function
-    pub fn add_meta_method_mut<M>(&mut self, meta: MetaMethod, method: M)
+    pub fn add_meta_method_mut<A, R, M>(&mut self, meta: MetaMethod, method: M)
     where
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
@@ -1040,21 +1050,39 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// Metamethods for binary operators can be triggered if either the left or right argument to
     /// the binary operator has a metatable, so the first argument here is not necessarily a
     /// userdata of type `T`.
-    pub fn add_meta_function<F>(&mut self, meta: MetaMethod, function: F)
+    pub fn add_meta_function<A, R, F>(&mut self, meta: MetaMethod, function: F)
     where
-        F: 'static + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
-        self.meta_methods.insert(meta, Box::new(function));
+        self.meta_methods.insert(meta, Self::box_function(function));
     }
 
-    fn box_method<M>(mut method: M) -> Callback<'lua>
+    fn box_function<A, R, F>(mut function: F) -> Callback<'lua>
     where
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + for<'a> FnMut(&'lua Lua, A) -> Result<R>,
+    {
+        Box::new(move |lua, args| {
+            function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(
+                lua,
+            )
+        })
+    }
+
+    fn box_method<A, R, M>(mut method: M) -> Callback<'lua>
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = AnyUserData::from_lua(front, lua)?;
             let userdata = userdata.borrow::<T>()?;
-            method(lua, &userdata, args)
+            method(lua, &userdata, A::from_lua_multi(args, lua)?)?
+                .to_lua_multi(lua)
         } else {
             Err(Error::FromLuaConversionError(
                 "No userdata supplied as first argument to method"
@@ -1063,14 +1091,17 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         })
     }
 
-    fn box_method_mut<M>(mut method: M) -> Callback<'lua>
+    fn box_method_mut<A, R, M>(mut method: M) -> Callback<'lua>
     where
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = AnyUserData::from_lua(front, lua)?;
             let mut userdata = userdata.borrow_mut::<T>()?;
-            method(lua, &mut userdata, args)
+            method(lua, &mut userdata, A::from_lua_multi(args, lua)?)?
+                .to_lua_multi(lua)
         } else {
             Err(
                 Error::FromLuaConversionError(
@@ -1078,7 +1109,6 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
                 ).into(),
             )
         })
-
     }
 }
 
@@ -1121,21 +1151,17 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 ///
 /// impl UserData for MyUserData {
 ///     fn add_methods(methods: &mut UserDataMethods<Self>) {
-///         methods.add_method("get", |lua, this, args| {
-/// #           let _ = (lua, args);    // used
-///             lua.pack(this.0)
+///         methods.add_method("get", |_, this, _: ()| {
+///             Ok(this.0)
 ///         });
 ///
-///         methods.add_method_mut("add", |lua, this, args| {
-///             let value: i32 = lua.unpack(args)?;
-///
+///         methods.add_method_mut("add", |_, this, value: i32| {
 ///             this.0 += value;
-///             lua.pack(())
+///             Ok(())
 ///         });
 ///
-///         methods.add_meta_method(MetaMethod::Add, |lua, this, args| {
-///             let value: i32 = lua.unpack(args)?;
-///             lua.pack(this.0 + value)
+///         methods.add_meta_method(MetaMethod::Add, |_, this, value: i32| {
+///             Ok(this.0 + value)
 ///         });
 ///     }
 /// }
@@ -1478,10 +1504,9 @@ impl Lua {
     /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
     ///
-    /// let greet = lua.create_function(|lua, args| {
-    ///     let name: String = lua.unpack(args)?;
+    /// let greet = lua.create_function(|_, name: String| {
     ///     println!("Hello, {}!", name);
-    ///     lua.pack(())
+    ///     Ok(())
     /// });
     /// # let _ = greet;    // used
     /// # Ok(())
@@ -1491,19 +1516,17 @@ impl Lua {
     /// # }
     /// ```
     ///
-    /// Use the `hlist_macro` crate to use multiple arguments:
+    /// Use tuples to accept multiple arguments:
     ///
     /// ```
-    /// #[macro_use] extern crate hlist_macro;
     /// # extern crate rlua;
     /// # use rlua::{Lua, Result};
     /// # fn try_main() -> Result<()> {
     /// let lua = Lua::new();
     ///
-    /// let print_person = lua.create_function(|lua, args| {
-    ///     let hlist_pat![name, age]: HList![String, u8] = lua.unpack(args)?;
+    /// let print_person = lua.create_function(|_, (name, age): (String, u8)| {
     ///     println!("{} is {} years old!", name, age);
-    ///     lua.pack(())
+    ///     Ok(())
     /// });
     /// # let _ = print_person;    // used
     /// # Ok(())
@@ -1512,11 +1535,15 @@ impl Lua {
     /// #     try_main().unwrap();
     /// # }
     /// ```
-    pub fn create_function<'lua, F>(&'lua self, func: F) -> Function<'lua>
+    pub fn create_function<'lua, A, R, F>(&'lua self, mut func: F) -> Function<'lua>
     where
-        F: 'static + FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
-        self.create_callback_function(Box::new(func))
+        self.create_callback_function(Box::new(move |lua, args| {
+            func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+        }))
     }
 
     /// Wraps a Lua function into a new thread (or coroutine).
@@ -1645,25 +1672,26 @@ impl Lua {
         }
     }
 
-    pub fn from<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> Result<Value<'lua>> {
+    /// Converts a value that implements `ToLua` into a `Value` instance.
+    pub fn pack<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> Result<Value<'lua>> {
         t.to_lua(self)
     }
 
-    pub fn to<'lua, T: FromLua<'lua>>(&'lua self, value: Value<'lua>) -> Result<T> {
+    /// Converts a `Value` instance into a value that implements `FromLua`.
+    pub fn unpack<'lua, T: FromLua<'lua>>(&'lua self, value: Value<'lua>) -> Result<T> {
         T::from_lua(value, self)
     }
 
-    /// Packs up a value that implements `ToLuaMulti` into a `MultiValue` instance.
-    ///
-    /// This can be used to return arbitrary Lua values from a Rust function back to Lua.
-    pub fn pack<'lua, T: ToLuaMulti<'lua>>(&'lua self, t: T) -> Result<MultiValue<'lua>> {
+    /// Converts a value that implements `ToLuaMulti` into a `MultiValue` instance.
+    pub fn pack_multi<'lua, T: ToLuaMulti<'lua>>(&'lua self, t: T) -> Result<MultiValue<'lua>> {
         t.to_lua_multi(self)
     }
 
-    /// Unpacks a `MultiValue` instance into a value that implements `FromLuaMulti`.
-    ///
-    /// This can be used to convert the arguments of a Rust function called by Lua.
-    pub fn unpack<'lua, T: FromLuaMulti<'lua>>(&'lua self, value: MultiValue<'lua>) -> Result<T> {
+    /// Converts a `MultiValue` instance into a value that implements `FromLuaMulti`.
+    pub fn unpack_multi<'lua, T: FromLuaMulti<'lua>>(
+        &'lua self,
+        value: MultiValue<'lua>,
+    ) -> Result<T> {
         T::from_lua_multi(value, self)
     }
 
