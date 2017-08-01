@@ -1063,7 +1063,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + for<'a> FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
         Box::new(move |lua, args| {
             function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(

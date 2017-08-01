@@ -910,7 +910,7 @@ fn should_not_compile() {
 
     // Should not allow self borrow of lua, it can change addresses
     globals.set("boom", lua.create_function(|_, _| {
-        lua.pack(lua.eval::<i32>("1 + 1", None)?)
+        lua.eval::<i32>("1 + 1", None)
     })).unwrap();
 }
 */
