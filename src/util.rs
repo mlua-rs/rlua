@@ -376,8 +376,7 @@ pub unsafe fn pcall_with_traceback(
         if let Some(error) = pop_wrapped_error(state) {
             ffi::luaL_traceback(state, state, ptr::null(), 0);
             let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
-                .to_str()
-                .unwrap_or_else(|_| "<could not capture traceback>")
+                .to_string_lossy()
                 .to_owned();
             push_wrapped_error(state, Error::CallbackError {
                 traceback,
