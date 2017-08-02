@@ -919,6 +919,33 @@ fn test_pcall_xpcall() {
     );
 }
 
+#[test]
+fn test_setmetatable_gc() {
+    let lua = Lua::new();
+    lua.exec::<()>(
+        r#"
+            val = nil
+            table = {}
+            setmetatable(table, {
+                __gc = function()
+                    val = "gcwascalled"
+                end
+            })
+            table_badgc = {}
+            setmetatable(table_badgc, {
+                __gc = "what's a gc"
+            })
+            table = nil
+            table_badgc = nil
+            collectgarbage("collect")
+        "#,
+        None,
+    ).unwrap();
+
+    let globals = lua.globals();
+    assert_eq!(globals.get::<_, String>("val").unwrap(), "gcwascalled");
+}
+
 // Need to use compiletest-rs or similar to make sure these don't compile.
 /*
 #[test]

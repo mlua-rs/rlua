@@ -121,8 +121,26 @@ extern "C" {
     pub fn lua_error(state: *mut lua_State) -> !;
     pub fn lua_atpanic(state: *mut lua_State, panic: lua_CFunction) -> lua_CFunction;
 
+    pub fn luaopen_base(state: *mut lua_State) -> c_int;
+    pub fn luaopen_coroutine(state: *mut lua_State) -> c_int;
+    pub fn luaopen_table(state: *mut lua_State) -> c_int;
+    pub fn luaopen_io(state: *mut lua_State) -> c_int;
+    pub fn luaopen_os(state: *mut lua_State) -> c_int;
+    pub fn luaopen_string(state: *mut lua_State) -> c_int;
+    pub fn luaopen_utf8(state: *mut lua_State) -> c_int;
+    pub fn luaopen_math(state: *mut lua_State) -> c_int;
+    pub fn luaopen_debug(state: *mut lua_State) -> c_int;
+    pub fn luaopen_package(state: *mut lua_State) -> c_int;
+
     pub fn luaL_newstate() -> *mut lua_State;
     pub fn luaL_openlibs(state: *mut lua_State);
+    pub fn luaL_requiref(
+        state: *mut lua_State,
+        modname: *const c_char,
+        openf: lua_CFunction,
+        glb: c_int,
+    );
+
     pub fn luaL_loadbufferx(
         state: *mut lua_State,
         buf: *const c_char,

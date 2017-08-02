@@ -290,22 +290,19 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
                 }
                 ffi::LUA_ERRERR => Error::ErrorError(err_string),
                 ffi::LUA_ERRMEM => {
-                    // This is not impossible to hit, but this library is not set up
-                    // to handle this properly.  Lua does a longjmp on out of memory
-                    // (like all lua errors), but it can do this from a huge number
-                    // of lua functions, and it is extremely difficult to set up the
-                    // pcall protection for every lua function that might allocate.
-                    // If lua does this in an unprotected context, it will abort
-                    // anyway, so the best we can do right now is guarantee an abort
-                    // even in a protected context.
-                    println!("Lua memory error, aborting!");
+                    // TODO: We should provide lua with custom allocators that guarantee aborting on
+                    // OOM, instead of relying on the system allocator.  Currently, this is a
+                    // theoretical soundness bug, because an OOM could trigger a longjmp out of
+                    // arbitrary rust code that is unprotectedly calling a lua function marked as
+                    // potentially causing memory errors, which is most of them.
+                    eprintln!("Lua memory error, aborting!");
                     process::abort()
                 }
                 ffi::LUA_ERRGCMM => {
-                    // This should be impossible, or at least is indicative of an
-                    // internal bug.  Similarly to LUA_ERRMEM, this could indicate a
-                    // longjmp out of rust code, so we just abort.
-                    println!("Lua error during __gc, aborting!");
+                    // This should be impossible, since we wrap setmetatable to protect __gc
+                    // metamethods, but if we do end up here then the same logic as setmetatable
+                    // applies and we must abort.
+                    eprintln!("Lua error during __gc, aborting!");
                     process::abort()
                 }
                 _ => lua_panic!(state, "internal error: unrecognized lua error code"),
@@ -489,7 +486,44 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
     }
 }
 
-/// Does not call checkstack, uses 1 stack space
+// Safely call setmetatable, if a __gc function is given, will wrap it in pcall, and panic on error.
+pub unsafe extern "C" fn safe_setmetatable(state: *mut ffi::lua_State) -> c_int {
+    if ffi::lua_gettop(state) < 2 {
+        push_string(state, "not enough arguments to setmetatable");
+        ffi::lua_error(state);
+    }
+
+    // Wrapping the __gc method in setmetatable ONLY works because Lua 5.3 only honors the __gc
+    // method when it exists upon calling setmetatable, and ignores it if it is set later.
+    push_string(state, "__gc");
+    if ffi::lua_rawget(state, -2) == ffi::LUA_TFUNCTION {
+        unsafe extern "C" fn safe_gc(state: *mut ffi::lua_State) -> c_int {
+            ffi::lua_pushvalue(state, ffi::lua_upvalueindex(1));
+            ffi::lua_insert(state, 1);
+            if ffi::lua_pcall(state, 1, 0, 0) != ffi::LUA_OK {
+                // If a user supplied __gc metamethod causes an error, we must always abort.  We may
+                // be inside a protected context due to being in a callback, but inside an
+                // unprotected ffi call that can cause memory errors, so may be at risk of
+                // longjmping over arbitrary rust.
+                eprintln!("Lua error during __gc, aborting!");
+                process::abort()
+            } else {
+                ffi::lua_gettop(state)
+            }
+        }
+
+        ffi::lua_pushcclosure(state, safe_gc, 1);
+        push_string(state, "__gc");
+        ffi::lua_insert(state, -2);
+        ffi::lua_rawset(state, -3);
+    } else {
+        ffi::lua_pop(state, 1);
+    }
+    ffi::lua_setmetatable(state, -2);
+    0
+}
+
+// Does not call checkstack, uses 1 stack space
 pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
     ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_MAINTHREAD);
     let main_state = ffi::lua_tothread(state, -1);

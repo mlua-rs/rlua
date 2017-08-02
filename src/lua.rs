@@ -1302,7 +1302,18 @@ impl Lua {
             let state = ffi::luaL_newstate();
 
             stack_guard(state, 0, || {
-                ffi::luaL_openlibs(state);
+                // Do not open the debug library, currently it can be used to cause unsafety.
+                ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
+                ffi::luaL_requiref(state, cstr!("base"), ffi::luaopen_base, 1);
+                ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
+                ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
+                ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
+                ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
+                ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
+                ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
+                ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
+                ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
+                ffi::lua_pop(state, 10);
 
                 // Create the userdata registry table
 
@@ -1348,7 +1359,8 @@ impl Lua {
 
                 ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
 
-                // Override pcall / xpcall
+                // Override pcall, xpcall, and setmetatable with versions that cannot be used to
+                // cause unsafety.
 
                 ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
 
@@ -1358,6 +1370,10 @@ impl Lua {
 
                 push_string(state, "xpcall");
                 ffi::lua_pushcfunction(state, safe_xpcall);
+                ffi::lua_rawset(state, -3);
+
+                push_string(state, "setmetatable");
+                ffi::lua_pushcfunction(state, safe_setmetatable);
                 ffi::lua_rawset(state, -3);
 
                 ffi::lua_pop(state, 1);
