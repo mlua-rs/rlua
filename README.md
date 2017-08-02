@@ -26,13 +26,13 @@ hlua:
 The key difference here is that rlua handles rust-side references to Lua values
 in a fundamentally different way than hlua, more similar to other Lua bindings
 systems like [Selene](https://github.com/jeremyong/Selene) for C++.  Values like
-LuaTable and LuaFunction that hold onto Lua values in the Rust stack, instead of
-pointing at values in the Lua stack, are placed into the registry with luaL_ref.
-In this way, it is possible to have an arbitrary number of handles to internal
-Lua values at any time, created and destroyed in arbitrary order.  This approach
-IS slightly slower than the approach that hlua takes of only manipulating the
-Lua stack, but this, combined with internal mutability, allows for a much more
-flexible API.
+`rlua::Table` and `rlua::Function` that hold onto Lua values in the Rust stack,
+instead of pointing at values in the Lua stack, are placed into the registry
+with luaL_ref.  In this way, it is possible to have an arbitrary number of
+handles to internal Lua values at any time, created and destroyed in arbitrary
+order.  This approach IS slightly slower than the approach that hlua takes of
+only manipulating the Lua stack, but this, combined with internal mutability,
+allows for a much more flexible API.
 
 There are currently a few notable missing pieces of this API:
 
@@ -44,8 +44,8 @@ There are currently a few notable missing pieces of this API:
     `_ENV` upvalue of a loaded chunk to a table other than `_G`, so that you can
     have different environments for different loaded chunks.
   * More fleshed out Lua API, there is some missing nice to have functionality
-    not exposed like storing values in the registry, and manipulating `LuaTable`
-    metatables.
+    not exposed like storing values in the registry, and manipulating
+    `rlua::Table` metatables.
   * Benchmarks, and quantifying performance differences with what you would
     might write in C.
 
@@ -123,4 +123,4 @@ Panic / abort considerations when using this API:
     panic in Rust, or more likely it will cause an internal `LUA_USE_APICHECK`
     abort, from exceeding LUAI_MAXCCALLS.
   * There are currently no checks on argument sizes, and I think you may be able
-    to cause an abort by providing a large enough `LuaVariadic`.
+    to cause an abort by providing a large enough `rlua::Variadic`.
