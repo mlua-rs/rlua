@@ -520,7 +520,7 @@ pub unsafe extern "C" fn safe_setmetatable(state: *mut ffi::lua_State) -> c_int 
         ffi::lua_pop(state, 1);
     }
     ffi::lua_setmetatable(state, -2);
-    0
+    1
 }
 
 // Does not call checkstack, uses 1 stack space

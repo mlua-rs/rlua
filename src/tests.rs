@@ -904,19 +904,31 @@ fn test_pcall_xpcall() {
 
             xpcall_error = nil
             xpcall(error, function(err) xpcall_error = err end, "testerror")
+
+            function xpcall_recursion()
+                xpcall(error, function(err) error(err) end, "testerror")
+            end
         "#,
         None,
     ).unwrap();
 
+    let globals = lua.globals();
+
     assert_eq!(
-        lua.globals().get::<_, String>("pcall_error").unwrap(),
+        globals.get::<_, String>("pcall_error").unwrap(),
         "testerror"
     );
 
     assert_eq!(
-        lua.globals().get::<_, String>("xpcall_error").unwrap(),
+        globals.get::<_, String>("xpcall_error").unwrap(),
         "testerror"
     );
+
+    // Make sure that weird xpcall error recursion at least doesn't cause unsafety or panics.
+    let _ = globals
+        .get::<_, Function>("xpcall_recursion")
+        .unwrap()
+        .call::<_, ()>(());
 }
 
 #[test]
