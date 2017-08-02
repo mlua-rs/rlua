@@ -39,9 +39,11 @@ impl<'lua> FromLua<'lua> for Table<'lua> {
     fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<Table<'lua>> {
         match value {
             Value::Table(table) => Ok(table),
-            _ => Err(Error::FromLuaConversionError(
-                "cannot convert lua value to table".to_owned(),
-            )),
+            _ => Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "table",
+                message: None,
+            }),
         }
     }
 }
@@ -56,9 +58,11 @@ impl<'lua> FromLua<'lua> for Function<'lua> {
     fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<Function<'lua>> {
         match value {
             Value::Function(table) => Ok(table),
-            _ => Err(Error::FromLuaConversionError(
-                "cannot convert lua value to function".to_owned(),
-            )),
+            _ => Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "function",
+                message: None,
+            }),
         }
     }
 }
@@ -73,9 +77,11 @@ impl<'lua> FromLua<'lua> for Thread<'lua> {
     fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<Thread<'lua>> {
         match value {
             Value::Thread(t) => Ok(t),
-            _ => Err(Error::FromLuaConversionError(
-                "cannot convert lua value to thread".to_owned(),
-            )),
+            _ => Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "thread",
+                message: None,
+            }),
         }
     }
 }
@@ -90,9 +96,11 @@ impl<'lua> FromLua<'lua> for AnyUserData<'lua> {
     fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<AnyUserData<'lua>> {
         match value {
             Value::UserData(ud) => Ok(ud),
-            _ => Err(Error::FromLuaConversionError(
-                "cannot convert lua value to userdata".to_owned(),
-            )),
+            _ => Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "userdata",
+                message: None,
+            }),
         }
     }
 }
@@ -107,9 +115,11 @@ impl<'lua, T: UserData + Clone> FromLua<'lua> for T {
     fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<T> {
         match value {
             Value::UserData(ud) => Ok(ud.borrow::<T>()?.clone()),
-            _ => Err(Error::FromLuaConversionError(
-                "cannot convert lua value to userdata".to_owned(),
-            )),
+            _ => Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "userdata",
+                message: None,
+            }),
         }
     }
 }
@@ -156,12 +166,14 @@ impl<'lua> ToLua<'lua> for LightUserData {
 }
 
 impl<'lua> FromLua<'lua> for LightUserData {
-    fn from_lua(v: Value, _: &'lua Lua) -> Result<Self> {
-        match v {
+    fn from_lua(value: Value, _: &'lua Lua) -> Result<Self> {
+        match value {
             Value::LightUserData(ud) => Ok(ud),
-            _ => Err(Error::FromLuaConversionError(
-                "cannot convert lua value to lightuserdata".to_owned(),
-            )),
+            _ => Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "light userdata",
+                message: None,
+            }),
         }
     }
 }
@@ -241,9 +253,11 @@ impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Vec<T> {
         if let Value::Table(table) = value {
             table.sequence_values().collect()
         } else {
-            Err(Error::FromLuaConversionError(
-                "cannot convert lua value to table for Vec".to_owned(),
-            ))
+            Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "Vec",
+                message: Some("expected table".to_string()),
+            })
         }
     }
 }
@@ -259,9 +273,11 @@ impl<'lua, K: Eq + Hash + FromLua<'lua>, V: FromLua<'lua>> FromLua<'lua> for Has
         if let Value::Table(table) = value {
             table.pairs().collect()
         } else {
-            Err(Error::FromLuaConversionError(
-                "cannot convert lua value to table for HashMap".to_owned(),
-            ))
+            Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "HashMap",
+                message: Some("expected table".to_string()),
+            })
         }
     }
 }
@@ -277,9 +293,11 @@ impl<'lua, K: Ord + FromLua<'lua>, V: FromLua<'lua>> FromLua<'lua> for BTreeMap<
         if let Value::Table(table) = value {
             table.pairs().collect()
         } else {
-            Err(Error::FromLuaConversionError(
-                "cannot convert lua value to table for BTreeMap".to_owned(),
-            ))
+            Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "BTreeMap",
+                message: Some("expected table".to_string()),
+            })
         }
     }
 }

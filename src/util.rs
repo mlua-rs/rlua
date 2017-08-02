@@ -245,10 +245,10 @@ pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
 }
 
 // If the return code indicates an error, pops the error off of the stack and
-// returns Err. If the error is actually a WrappedPaic, clears the current lua
-// stack continues the panic.  If the error on the top of the stack is actually
-// a WrappedError, just returns it.  Otherwise, interprets the error as the
-// appropriate lua error.
+// returns Err. If the error is actually a WrappedPanic, clears the current lua
+// stack and continues the panic.  If the error on the top of the stack is
+// actually a WrappedError, just returns it.  Otherwise, interprets the error as
+// the appropriate lua error.
 pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()> {
     if err == ffi::LUA_OK || err == ffi::LUA_YIELD {
         Ok(())
@@ -280,15 +280,20 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
             Err(match err {
                 ffi::LUA_ERRRUN => Error::RuntimeError(err_string),
                 ffi::LUA_ERRSYNTAX => {
-                    // This seems terrible, but as far as I can tell, this is exactly what the stock
-                    // lua repl does.
-                    if err_string.ends_with("<eof>") {
-                        Error::IncompleteStatement(err_string)
-                    } else {
-                        Error::SyntaxError(err_string)
+                    Error::SyntaxError {
+                        // This seems terrible, but as far as I can tell, this is exactly what the
+                        // stock Lua REPL does.
+                        incomplete_input: err_string.ends_with("<eof>"),
+                        message: err_string,
                     }
                 }
-                ffi::LUA_ERRERR => Error::ErrorError(err_string),
+                ffi::LUA_ERRERR => {
+                    // The Lua manual documents this error wrongly: It is not raised when a message
+                    // handler errors, but rather when some specific situations regarding stack
+                    // overflow handling occurs. Since it is not very useful do differentiate
+                    // between that and "ordinary" runtime errors, we handle them the same way.
+                    Error::RuntimeError(err_string)
+                }
                 ffi::LUA_ERRMEM => {
                     // TODO: We should provide lua with custom allocators that guarantee aborting on
                     // OOM, instead of relying on the system allocator.  Currently, this is a
@@ -374,18 +379,21 @@ pub unsafe fn pcall_with_traceback(
         if let Some(error) = pop_wrapped_error(state) {
             ffi::luaL_traceback(state, state, ptr::null(), 0);
             let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
-                .to_str()
-                .unwrap_or_else(|_| "<could not capture traceback>")
-                .to_owned();
-            push_wrapped_error(state, Error::CallbackError(traceback, Arc::new(error)));
+                .to_string_lossy()
+                .into_owned();
+            push_wrapped_error(state, Error::CallbackError {
+                traceback,
+                cause: Arc::new(error),
+            });
             ffi::lua_remove(state, -2);
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
-            if !s.is_null() {
-                ffi::luaL_traceback(state, state, s, 0);
+            let s = if s.is_null() {
+                cstr!("<unprintable Rust panic>")
             } else {
-                ffi::luaL_traceback(state, state, cstr!("<unprintable lua error>"), 0);
-            }
+                s
+            };
+            ffi::luaL_traceback(state, state, s, 0);
             ffi::lua_remove(state, -2);
         }
         1
@@ -412,7 +420,10 @@ pub unsafe fn resume_with_traceback(
                 .to_str()
                 .unwrap_or_else(|_| "<could not capture traceback>")
                 .to_owned();
-            push_wrapped_error(state, Error::CallbackError(traceback, Arc::new(error)));
+            push_wrapped_error(state, Error::CallbackError {
+                traceback,
+                cause: Arc::new(error),
+            });
             ffi::lua_remove(state, -2);
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
@@ -545,10 +556,7 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
             Ok(1)
 
         } else {
-            Err(Error::FromLuaConversionError(
-                "internal error: userdata mismatch in Error metamethod"
-                    .to_owned(),
-            ))
+            panic!("internal error: userdata mismatch in Error metamethod");
         })
     }
 

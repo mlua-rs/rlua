@@ -33,7 +33,7 @@ fn main() {
                     );
                     break;
                 }
-                Err(Error::IncompleteStatement(_)) => {
+                Err(Error::SyntaxError { incomplete_input: true, .. }) => {
                     // continue reading input and append it to `line`
                     line.push_str("\n");    // separate input lines
                     prompt = ">> ";

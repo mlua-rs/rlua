@@ -47,6 +47,24 @@ pub enum Value<'lua> {
 }
 pub use self::Value::Nil;
 
+impl<'lua> Value<'lua> {
+    pub(crate) fn type_name(&self) -> &'static str {
+        match *self {
+            Value::Nil => "nil",
+            Value::Boolean(_) => "boolean",
+            Value::LightUserData(_) => "light userdata",
+            Value::Integer(_) => "integer",
+            Value::Number(_) => "number",
+            Value::String(_) => "string",
+            Value::Table(_) => "table",
+            Value::Function(_) => "function",
+            Value::Thread(_) => "thread",
+            Value::UserData(_) => "userdata",
+            Value::Error(_) => "userdata",
+        }
+    }
+}
+
 /// Trait for types convertible to `Value`.
 pub trait ToLua<'a> {
     /// Performs the conversion.
@@ -190,7 +208,11 @@ impl<'lua> String<'lua> {
     /// # }
     /// ```
     pub fn to_str(&self) -> Result<&str> {
-        str::from_utf8(self.as_bytes()).map_err(|e| Error::FromLuaConversionError(e.to_string()))
+        str::from_utf8(self.as_bytes()).map_err(|e| Error::FromLuaConversionError {
+            from: "string",
+            to: "&str",
+            message: Some(e.to_string()),
+        })
     }
 
     /// Get the bytes that make up this string.
@@ -1083,10 +1105,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
             method(lua, &userdata, A::from_lua_multi(args, lua)?)?
                 .to_lua_multi(lua)
         } else {
-            Err(Error::FromLuaConversionError(
-                "No userdata supplied as first argument to method"
-                    .to_owned(),
-            ))
+            Err(Error::FromLuaConversionError {
+                from: "missing argument",
+                to: "userdata",
+                message: None,
+            })
         })
     }
 
@@ -1102,11 +1125,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
             method(lua, &mut userdata, A::from_lua_multi(args, lua)?)?
                 .to_lua_multi(lua)
         } else {
-            Err(
-                Error::FromLuaConversionError(
-                    "No userdata supplied as first argument to method".to_owned(),
-                ).into(),
-            )
+            Err(Error::FromLuaConversionError {
+                from: "missing argument",
+                to: "userdata",
+                message: None,
+            })
         })
     }
 }
@@ -1400,7 +1423,11 @@ impl Lua {
                     self.state,
                     if let Some(name) = name {
                         let name = CString::new(name.to_owned()).map_err(|e| {
-                            Error::ToLuaConversionError(e.to_string())
+                            Error::ToLuaConversionError {
+                                from: "&str",
+                                to: "string",
+                                message: Some(e.to_string()),
+                            }
                         })?;
                         ffi::luaL_loadbuffer(
                             self.state,
@@ -1621,12 +1648,15 @@ impl Lua {
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1);
+                    let ty = v.type_name();
                     self.push_value(self.state, v);
                     if ffi::lua_tostring(self.state, -1).is_null() {
                         ffi::lua_pop(self.state, 1);
-                        Err(Error::FromLuaConversionError(
-                            "cannot convert lua value to string".to_owned(),
-                        ))
+                        Err(Error::FromLuaConversionError {
+                            from: ty,
+                            to: "String",
+                            message: Some("expected string or number".to_string()),
+                        })
                     } else {
                         Ok(String(self.pop_ref(self.state)))
                     }
@@ -1645,14 +1675,17 @@ impl Lua {
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1);
+                    let ty = v.type_name();
                     self.push_value(self.state, v);
                     let mut isint = 0;
                     let i = ffi::lua_tointegerx(self.state, -1, &mut isint);
                     ffi::lua_pop(self.state, 1);
                     if isint == 0 {
-                        Err(Error::FromLuaConversionError(
-                            "cannot convert lua value to integer".to_owned(),
-                        ))
+                        Err(Error::FromLuaConversionError {
+                            from: ty,
+                            to: "integer",
+                            message: None,
+                        })
                     } else {
                         Ok(i)
                     }
@@ -1671,14 +1704,17 @@ impl Lua {
             v => unsafe {
                 stack_guard(self.state, 0, || {
                     check_stack(self.state, 1);
+                    let ty = v.type_name();
                     self.push_value(self.state, v);
                     let mut isnum = 0;
                     let n = ffi::lua_tonumberx(self.state, -1, &mut isnum);
                     ffi::lua_pop(self.state, 1);
                     if isnum == 0 {
-                        Err(Error::FromLuaConversionError(
-                            "cannot convert lua value to number".to_owned(),
-                        ))
+                        Err(Error::FromLuaConversionError {
+                            from: ty,
+                            to: "number",
+                            message: Some("number or string coercible to number".to_string()),
+                        })
                     } else {
                         Ok(n)
                     }
