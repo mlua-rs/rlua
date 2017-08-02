@@ -1,27 +1,28 @@
 //! This example shows a simple read-evaluate-print-loop (REPL).
 
 extern crate rlua;
+extern crate rustyline;
 
 use rlua::{Lua, MultiValue, Error};
-use std::io::prelude::*;
-use std::io::{stdin, stdout, stderr, BufReader};
+use rustyline::Editor;
 
 fn main() {
     let lua = Lua::new();
-    let mut stdout = stdout();
-    let mut stdin = BufReader::new(stdin());
+    let mut editor = Editor::<()>::new();
 
     loop {
-        write!(stdout, "> ").unwrap();
-        stdout.flush().unwrap();
-
+        let mut prompt = "> ";
         let mut line = String::new();
 
         loop {
-            stdin.read_line(&mut line).unwrap();
+            match editor.readline(prompt) {
+                Ok(input) => line.push_str(&input),
+                Err(_) => return,
+            }
 
             match lua.eval::<MultiValue>(&line, None) {
                 Ok(values) => {
+                    editor.add_history_entry(&line);
                     println!(
                         "{}",
                         values
@@ -34,11 +35,11 @@ fn main() {
                 }
                 Err(Error::IncompleteStatement(_)) => {
                     // continue reading input and append it to `line`
-                    write!(stdout, ">> ").unwrap();
-                    stdout.flush().unwrap();
+                    line.push_str("\n");    // separate input lines
+                    prompt = ">> ";
                 }
                 Err(e) => {
-                    writeln!(stderr(), "error: {}", e).unwrap();
+                    eprintln!("error: {}", e);
                     break;
                 }
             }
