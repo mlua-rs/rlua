@@ -67,8 +67,8 @@ This library is very much Work In Progress, so there is a lot of API churn.  I
 believe the library should be stable and usable enough to realistically use in a
 real project, but the API has probably not settled down yet.  I currently follow
 "pre-1.0 semver" (if such a thing exists), but there have been a large number of
-API version bumps, and there will may continue to be.  If you have a dependency
-on rlua, you might want to consider adding a 0.x version bound.
+API version bumps, and there may continue to be.  If you have a dependency on
+rlua, you might want to consider adding a 0.x version bound.
 
 ## Safety and panics
 
