@@ -889,6 +889,35 @@ fn coroutine_panic() {
     thrd.resume::<_, ()>(()).unwrap();
 }
 
+#[test]
+fn test_pcall_xpcall() {
+    let lua = Lua::new();
+    // make sure that we handle not enough arguments
+    assert!(lua.exec::<()>("pcall()", None).is_err());
+    assert!(lua.exec::<()>("xpcall()", None).is_err());
+    assert!(lua.exec::<()>("xpcall(function() end)", None).is_err());
+
+    lua.exec::<()>(
+        r#"
+            pcall_error = nil
+            _, pcall_error = pcall(error, "testerror")
+
+            xpcall_error = nil
+            xpcall(error, function(err) xpcall_error = err end, "testerror")
+        "#,
+        None,
+    ).unwrap();
+
+    assert_eq!(
+        lua.globals().get::<_, String>("pcall_error").unwrap(),
+        "testerror"
+    );
+
+    assert_eq!(
+        lua.globals().get::<_, String>("xpcall_error").unwrap(),
+        "testerror"
+    );
+}
 
 // Need to use compiletest-rs or similar to make sure these don't compile.
 /*

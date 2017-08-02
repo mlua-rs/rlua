@@ -432,7 +432,11 @@ pub unsafe fn resume_with_traceback(
 
 // A variant of pcall that does not allow lua to catch panic errors from callback_error
 pub unsafe extern "C" fn safe_pcall(state: *mut ffi::lua_State) -> c_int {
-    if ffi::lua_pcall(state, ffi::lua_gettop(state) - 1, ffi::LUA_MULTRET, 0) != ffi::LUA_OK {
+    let top = ffi::lua_gettop(state);
+    if top == 0 {
+        push_string(state, "not enough arguments to pcall");
+        ffi::lua_error(state);
+    } else if ffi::lua_pcall(state, top - 1, ffi::LUA_MULTRET, 0) != ffi::LUA_OK {
         if is_wrapped_panic(state, -1) {
             ffi::lua_error(state);
         }
@@ -459,10 +463,16 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
         }
     }
 
+    let top = ffi::lua_gettop(state);
+    if top < 2 {
+        push_string(state, "not enough arguments to xpcall");
+        ffi::lua_error(state);
+    }
+
     ffi::lua_pushvalue(state, 2);
     ffi::lua_pushcclosure(state, xpcall_msgh, 1);
     ffi::lua_copy(state, 1, 2);
-    ffi::lua_insert(state, 1);
+    ffi::lua_replace(state, 1);
 
     let res = ffi::lua_pcall(state, ffi::lua_gettop(state) - 2, ffi::LUA_MULTRET, 1);
     if res != ffi::LUA_OK {
