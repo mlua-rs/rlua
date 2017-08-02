@@ -10,7 +10,7 @@ keywords = ["lua"]
 license = "MIT"
 
 [badges]
-travis-ci = { repository = "https://github.com/chucklefish/rlua", branch = "master" }
+travis-ci = { repository = "chucklefish/rlua", branch = "master" }
 
 [features]
 default = ["builtin-lua"]
