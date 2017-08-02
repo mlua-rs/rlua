@@ -20,3 +20,6 @@ builtin-lua = ["gcc"]
 
 [build-dependencies]
 gcc = { version = "0.3", optional = true }
+
+[dev-dependencies]
+rustyline = "1.0.0"
