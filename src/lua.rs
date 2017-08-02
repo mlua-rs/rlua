@@ -211,7 +211,6 @@ impl<'lua> String<'lua> {
         str::from_utf8(self.as_bytes()).map_err(|e| Error::FromLuaConversionError {
             from: "string",
             to: "&str",
-            expected: Some("utf-8 string"),
             message: Some(e.to_string()),
         })
     }
@@ -1109,8 +1108,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         } else {
             Err(Error::FromLuaConversionError {
                 from: "missing argument",
-                to: "UserData",
-                expected: Some("userdata"),
+                to: "userdata",
                 message: None,
             })
         })
@@ -1130,8 +1128,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         } else {
             Err(Error::FromLuaConversionError {
                 from: "missing argument",
-                to: "UserData",
-                expected: Some("userdata"),
+                to: "userdata",
                 message: None,
             })
         })
@@ -1643,8 +1640,7 @@ impl Lua {
                         Err(Error::FromLuaConversionError {
                             from: ty,
                             to: "String",
-                            expected: Some("string or number"),
-                            message: None,
+                            message: Some("expected string or number".to_string()),
                         })
                     } else {
                         Ok(String(self.pop_ref(self.state)))
@@ -1673,7 +1669,6 @@ impl Lua {
                         Err(Error::FromLuaConversionError {
                             from: ty,
                             to: "integer",
-                            expected: None,
                             message: None,
                         })
                     } else {
@@ -1703,8 +1698,7 @@ impl Lua {
                         Err(Error::FromLuaConversionError {
                             from: ty,
                             to: "number",
-                            expected: Some("number or string coercible to number"),
-                            message: None,
+                            message: Some("number or string coercible to number".to_string()),
                         })
                     } else {
                         Ok(n)

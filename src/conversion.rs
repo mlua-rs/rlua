@@ -42,7 +42,6 @@ impl<'lua> FromLua<'lua> for Table<'lua> {
             _ => Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "table",
-                expected: None,
                 message: None,
             }),
         }
@@ -62,7 +61,6 @@ impl<'lua> FromLua<'lua> for Function<'lua> {
             _ => Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "function",
-                expected: None,
                 message: None,
             }),
         }
@@ -82,7 +80,6 @@ impl<'lua> FromLua<'lua> for Thread<'lua> {
             _ => Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "thread",
-                expected: None,
                 message: None,
             }),
         }
@@ -102,7 +99,6 @@ impl<'lua> FromLua<'lua> for AnyUserData<'lua> {
             _ => Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "userdata",
-                expected: None,
                 message: None,
             }),
         }
@@ -122,7 +118,6 @@ impl<'lua, T: UserData + Clone> FromLua<'lua> for T {
             _ => Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "userdata",
-                expected: None,
                 message: None,
             }),
         }
@@ -177,7 +172,6 @@ impl<'lua> FromLua<'lua> for LightUserData {
             _ => Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "light userdata",
-                expected: None,
                 message: None,
             }),
         }
@@ -262,8 +256,7 @@ impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Vec<T> {
             Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "Vec",
-                expected: Some("table"),
-                message: None,
+                message: Some("expected table".to_string()),
             })
         }
     }
@@ -283,8 +276,7 @@ impl<'lua, K: Eq + Hash + FromLua<'lua>, V: FromLua<'lua>> FromLua<'lua> for Has
             Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "HashMap",
-                expected: Some("table"),
-                message: None,
+                message: Some("expected table".to_string()),
             })
         }
     }
@@ -304,8 +296,7 @@ impl<'lua, K: Ord + FromLua<'lua>, V: FromLua<'lua>> FromLua<'lua> for BTreeMap<
             Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "BTreeMap",
-                expected: Some("table"),
-                message: None,
+                message: Some("expected table".to_string()),
             })
         }
     }

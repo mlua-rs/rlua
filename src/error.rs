@@ -42,11 +42,6 @@ pub enum Error {
         from: &'static str,
         /// Name of the Rust type that could not be created.
         to: &'static str,
-        /// A string indicating the possible Lua values/types for this conversion.
-        ///
-        /// To avoid redundancy, this should only be set to `Some` when there are nontrivial rules
-        /// about valid conversions, since the `to` string should already hint at the problem.
-        expected: Option<&'static str>,
         /// A string containing more detailed error information.
         message: Option<String>,
     },
@@ -121,14 +116,11 @@ impl fmt::Display for Error {
                     Some(ref message) => write!(fmt, " ({})", message),
                 }
             }
-            Error::FromLuaConversionError { from, to, ref expected, ref message } => {
+            Error::FromLuaConversionError { from, to, ref message } => {
                 write!(fmt, "error converting Lua {} to {}", from, to)?;
-                match (expected.as_ref(), message.as_ref()) {
-                    (None, None) => Ok(()),
-                    (None, Some(ref message)) => write!(fmt, " ({})", message),
-                    (Some(ref expected), None) => write!(fmt, " (expected {})", expected),
-                    (Some(ref expected), Some(ref message)) =>
-                        write!(fmt, " ({}; expected {})", message, expected),
+                match *message {
+                    None => Ok(()),
+                    Some(ref message) => write!(fmt, " ({})", message),
                 }
             }
             Error::CoroutineInactive => write!(fmt, "cannot resume inactive coroutine"),
