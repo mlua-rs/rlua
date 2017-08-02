@@ -765,15 +765,14 @@ impl<'lua> Function<'lua> {
 /// Status of a Lua thread (or coroutine).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ThreadStatus {
-    /// The thread has finished executing.
-    Dead,
-    /// The thread was just created, is currently running or is suspended because it has called
-    /// `coroutine.yield`.
+    /// The thread was just created, or is suspended because it has called `coroutine.yield`.
     ///
     /// If a thread is in this state, it can be resumed by calling [`Thread::resume`].
     ///
     /// [`Thread::resume`]: struct.Thread.html#method.resume
-    Active,
+    Resumable,
+    /// Either the thread has finished executing, or the thread is currently running.
+    Unresumable,
     /// The thread has raised a Lua error during execution.
     Error,
 }
@@ -886,9 +885,9 @@ impl<'lua> Thread<'lua> {
                 if status != ffi::LUA_OK && status != ffi::LUA_YIELD {
                     ThreadStatus::Error
                 } else if status == ffi::LUA_YIELD || ffi::lua_gettop(thread_state) > 0 {
-                    ThreadStatus::Active
+                    ThreadStatus::Resumable
                 } else {
-                    ThreadStatus::Dead
+                    ThreadStatus::Unresumable
                 }
             })
         }

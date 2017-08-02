@@ -599,17 +599,17 @@ fn test_thread() {
         ).unwrap(),
     );
 
-    assert_eq!(thread.status(), ThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Resumable);
     assert_eq!(thread.resume::<_, i64>(0).unwrap(), 0);
-    assert_eq!(thread.status(), ThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Resumable);
     assert_eq!(thread.resume::<_, i64>(1).unwrap(), 1);
-    assert_eq!(thread.status(), ThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Resumable);
     assert_eq!(thread.resume::<_, i64>(2).unwrap(), 3);
-    assert_eq!(thread.status(), ThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Resumable);
     assert_eq!(thread.resume::<_, i64>(3).unwrap(), 6);
-    assert_eq!(thread.status(), ThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Resumable);
     assert_eq!(thread.resume::<_, i64>(4).unwrap(), 10);
-    assert_eq!(thread.status(), ThreadStatus::Dead);
+    assert_eq!(thread.status(), ThreadStatus::Unresumable);
 
     let accumulate = lua.create_thread(
         lua.eval::<Function>(
@@ -628,7 +628,7 @@ fn test_thread() {
         accumulate.resume::<_, ()>(i).unwrap();
     }
     assert_eq!(accumulate.resume::<_, i64>(4).unwrap(), 10);
-    assert_eq!(accumulate.status(), ThreadStatus::Active);
+    assert_eq!(accumulate.status(), ThreadStatus::Resumable);
     assert!(accumulate.resume::<_, ()>("error").is_err());
     assert_eq!(accumulate.status(), ThreadStatus::Error);
 
@@ -642,7 +642,7 @@ fn test_thread() {
         "#,
         None,
     ).unwrap();
-    assert_eq!(thread.status(), ThreadStatus::Active);
+    assert_eq!(thread.status(), ThreadStatus::Resumable);
     assert_eq!(thread.resume::<_, i64>(()).unwrap(), 42);
 
     let thread: Thread = lua.eval(
