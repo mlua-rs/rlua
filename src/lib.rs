@@ -1,7 +1,7 @@
-extern crate libc;
-
 // Deny warnings inside doc tests / examples
 #![doc(test(attr(deny(warnings))))]
+
+extern crate libc;
 
 pub mod ffi;
 #[macro_use]
