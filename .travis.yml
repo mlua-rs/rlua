@@ -3,6 +3,8 @@ rust:
   - stable
   - beta
   - nightly
+env:
+  - RUSTFLAGS="-D warnings"
 matrix:
   allow_failures:
     - rust: nightly
