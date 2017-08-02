@@ -22,11 +22,6 @@ pub enum Error {
     /// Among other things, this includes invoking operators on wrong types (such as calling or
     /// indexing a `nil` value).
     RuntimeError(String),
-    /// Lua error from inside an error handler, aka `LUA_ERRERR`.
-    ///
-    /// To prevent an infinite recursion when invoking an error handler, this error will be returned
-    /// instead of invoking the error handler.
-    ErrorError(String),
     /// A Rust value could not be converted to a Lua value.
     ToLuaConversionError {
         /// Name of the Rust type that could not be converted.
@@ -108,7 +103,6 @@ impl fmt::Display for Error {
         match *self {
             Error::SyntaxError { ref message, .. } => write!(fmt, "syntax error: {}", message),
             Error::RuntimeError(ref msg) => write!(fmt, "runtime error: {}", msg),
-            Error::ErrorError(ref msg) => write!(fmt, "error in error handler: {}", msg),
             Error::ToLuaConversionError { from, to, ref message } => {
                 write!(fmt, "error converting {} to Lua {}", from, to)?;
                 match *message {
@@ -138,7 +132,6 @@ impl StdError for Error {
         match *self {
             Error::SyntaxError { .. } => "syntax error",
             Error::RuntimeError(_) => "runtime error",
-            Error::ErrorError(_) => "error inside error handler",
             Error::ToLuaConversionError { .. } => "conversion error to lua",
             Error::FromLuaConversionError { .. } => "conversion error from lua",
             Error::CoroutineInactive => "attempt to resume inactive coroutine",

@@ -287,7 +287,12 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
                         message: err_string,
                     }
                 }
-                ffi::LUA_ERRERR => Error::ErrorError(err_string),
+                ffi::LUA_ERRERR => {
+                    // This can only happen when rlua's own message handler raises an error, which
+                    // should never happen unless there's a bug. This would also be dangerous as it
+                    // longjmps over Rust frames.
+                    lua_panic!(state, "message handler raised error: {}", err_string);
+                }
                 ffi::LUA_ERRMEM => {
                     // This is not impossible to hit, but this library is not set up
                     // to handle this properly.  Lua does a longjmp on out of memory
