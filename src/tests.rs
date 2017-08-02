@@ -70,7 +70,12 @@ fn test_eval() {
     assert_eq!(lua.eval::<i32>("return 1 + 2", None).unwrap(), 3);
     match lua.eval::<()>("if true then", None) {
         Err(Error::SyntaxError { incomplete_input: true, .. }) => {}
-        r => panic!("expected SyntaxError with incomplete_input=true, got {:?}", r),
+        r => {
+            panic!(
+                "expected SyntaxError with incomplete_input=true, got {:?}",
+                r
+            )
+        }
     }
 }
 

@@ -295,11 +295,8 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
                     Error::RuntimeError(err_string)
                 }
                 ffi::LUA_ERRMEM => {
-                    // TODO: We should provide lua with custom allocators that guarantee aborting on
-                    // OOM, instead of relying on the system allocator.  Currently, this is a
-                    // theoretical soundness bug, because an OOM could trigger a longjmp out of
-                    // arbitrary rust code that is unprotectedly calling a lua function marked as
-                    // potentially causing memory errors, which is most of them.
+                    // This should be impossible, as we set the lua allocator to one that aborts
+                    // instead of failing.
                     eprintln!("Lua memory error, aborting!");
                     process::abort()
                 }
@@ -381,10 +378,13 @@ pub unsafe fn pcall_with_traceback(
             let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
                 .to_string_lossy()
                 .into_owned();
-            push_wrapped_error(state, Error::CallbackError {
-                traceback,
-                cause: Arc::new(error),
-            });
+            push_wrapped_error(
+                state,
+                Error::CallbackError {
+                    traceback,
+                    cause: Arc::new(error),
+                },
+            );
             ffi::lua_remove(state, -2);
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
@@ -420,10 +420,13 @@ pub unsafe fn resume_with_traceback(
                 .to_str()
                 .unwrap_or_else(|_| "<could not capture traceback>")
                 .to_owned();
-            push_wrapped_error(state, Error::CallbackError {
-                traceback,
-                cause: Arc::new(error),
-            });
+            push_wrapped_error(
+                state,
+                Error::CallbackError {
+                    traceback,
+                    cause: Arc::new(error),
+                },
+            );
             ffi::lua_remove(state, -2);
         } else if !is_wrapped_panic(state, 1) {
             let s = ffi::lua_tolstring(state, 1, ptr::null_mut());

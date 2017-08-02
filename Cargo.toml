@@ -18,6 +18,9 @@ default = ["builtin-lua"]
 # assumptions about how lua is built.
 builtin-lua = ["gcc"]
 
+[dependencies]
+libc = { version = "0.2" }
+
 [build-dependencies]
 gcc = { version = "0.3", optional = true }
 

@@ -2,17 +2,17 @@
 #![allow(non_snake_case)]
 
 use std::ptr;
-use std::os::raw::*;
+use std::os::raw::{c_void, c_char, c_int, c_longlong, c_double};
 
 pub type lua_Integer = c_longlong;
 pub type lua_Number = c_double;
 
 pub enum lua_State {}
-pub type lua_Alloc = extern "C" fn(ud: *mut c_void,
-                                   ptr: *mut c_void,
-                                   osize: usize,
-                                   nsize: usize)
-                                   -> *mut c_void;
+pub type lua_Alloc = unsafe extern "C" fn(ud: *mut c_void,
+                                          ptr: *mut c_void,
+                                          osize: usize,
+                                          nsize: usize)
+                                          -> *mut c_void;
 pub type lua_KContext = *mut c_void;
 pub type lua_KFunction = unsafe extern "C" fn(state: *mut lua_State,
                                               status: c_int,
@@ -50,6 +50,8 @@ pub const LUA_TTHREAD: c_int = 8;
 
 #[link(name = "lua5.3")]
 extern "C" {
+    pub fn lua_newstate(alloc: lua_Alloc, ud: *mut c_void) -> *mut lua_State;
+
     pub fn lua_close(state: *mut lua_State);
     pub fn lua_callk(
         state: *mut lua_State,
@@ -132,7 +134,6 @@ extern "C" {
     pub fn luaopen_debug(state: *mut lua_State) -> c_int;
     pub fn luaopen_package(state: *mut lua_State) -> c_int;
 
-    pub fn luaL_newstate() -> *mut lua_State;
     pub fn luaL_openlibs(state: *mut lua_State);
     pub fn luaL_requiref(
         state: *mut lua_State,

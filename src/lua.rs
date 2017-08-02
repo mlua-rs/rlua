@@ -8,7 +8,10 @@ use std::marker::PhantomData;
 use std::collections::{HashMap, VecDeque};
 use std::collections::hash_map::Entry as HashMapEntry;
 use std::os::raw::{c_char, c_int, c_void};
+use std::process;
 use std::string::String as StdString;
+
+use libc;
 
 use ffi;
 use error::*;
@@ -208,10 +211,12 @@ impl<'lua> String<'lua> {
     /// # }
     /// ```
     pub fn to_str(&self) -> Result<&str> {
-        str::from_utf8(self.as_bytes()).map_err(|e| Error::FromLuaConversionError {
-            from: "string",
-            to: "&str",
-            message: Some(e.to_string()),
+        str::from_utf8(self.as_bytes()).map_err(|e| {
+            Error::FromLuaConversionError {
+                from: "string",
+                to: "&str",
+                message: Some(e.to_string()),
+            }
         })
     }
 
@@ -1321,8 +1326,30 @@ impl Lua {
     ///
     /// Also loads the standard library.
     pub fn new() -> Lua {
+        unsafe extern "C" fn allocator(
+            _: *mut c_void,
+            ptr: *mut c_void,
+            _: usize,
+            nsize: usize,
+        ) -> *mut c_void {
+            if nsize == 0 {
+                libc::free(ptr as *mut libc::c_void);
+                ptr::null_mut()
+            } else {
+                let p = libc::realloc(ptr as *mut libc::c_void, nsize);
+                if p.is_null() {
+                    // We must abort on OOM, because otherwise this will result in an unsafe
+                    // longjmp.
+                    eprintln!("Out of memory in Lua allocation, aborting!");
+                    process::abort()
+                } else {
+                    p as *mut c_void
+                }
+            }
+        }
+
         unsafe {
-            let state = ffi::luaL_newstate();
+            let state = ffi::lua_newstate(allocator, ptr::null_mut());
 
             stack_guard(state, 0, || {
                 // Do not open the debug library, currently it can be used to cause unsafety.
