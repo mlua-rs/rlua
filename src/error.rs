@@ -103,14 +103,22 @@ impl fmt::Display for Error {
         match *self {
             Error::SyntaxError { ref message, .. } => write!(fmt, "syntax error: {}", message),
             Error::RuntimeError(ref msg) => write!(fmt, "runtime error: {}", msg),
-            Error::ToLuaConversionError { from, to, ref message } => {
+            Error::ToLuaConversionError {
+                from,
+                to,
+                ref message,
+            } => {
                 write!(fmt, "error converting {} to Lua {}", from, to)?;
                 match *message {
                     None => Ok(()),
                     Some(ref message) => write!(fmt, " ({})", message),
                 }
             }
-            Error::FromLuaConversionError { from, to, ref message } => {
+            Error::FromLuaConversionError {
+                from,
+                to,
+                ref message,
+            } => {
                 write!(fmt, "error converting Lua {} to {}", from, to)?;
                 match *message {
                     None => Ok(()),

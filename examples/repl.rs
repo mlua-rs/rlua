@@ -35,7 +35,7 @@ fn main() {
                 }
                 Err(Error::SyntaxError { incomplete_input: true, .. }) => {
                     // continue reading input and append it to `line`
-                    line.push_str("\n");    // separate input lines
+                    line.push_str("\n"); // separate input lines
                     prompt = ">> ";
                 }
                 Err(e) => {
