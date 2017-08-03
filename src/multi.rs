@@ -51,8 +51,8 @@ impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
 
 /// Can be used to pass variadic values to or receive variadic values from Lua, where the type of
 /// the values is all the same and the number of values is defined at runtime.  This can be included
-/// in tuple when unpacking, but must be the final entry, and will consume the rest of the
-/// parameters given.
+/// in a tuple when converting from a MultiValue, but it must be the final entry, and it will
+/// consume the rest of the parameters given.
 #[derive(Debug, Clone)]
 pub struct Variadic<T>(Vec<T>);
 
