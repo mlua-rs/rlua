@@ -25,7 +25,7 @@ builtin-lua = ["gcc"]
 libc = { version = "0.2" }
 
 [build-dependencies]
-gcc = { version = "0.3", optional = true }
+gcc = { version = "0.3.52", optional = true }
 
 [dev-dependencies]
 rustyline = "1.0.0"
