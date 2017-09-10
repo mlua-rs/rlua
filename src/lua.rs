@@ -396,7 +396,7 @@ impl<'lua> Table<'lua> {
                 check_stack(lua.state, 2);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
-                ffi::lua_gettable(lua.state, -2);
+                ffi::lua_rawget(lua.state, -2);
                 let res = V::from_lua(lua.pop_value(lua.state), lua)?;
                 ffi::lua_pop(lua.state, 1);
                 Ok(res)
@@ -432,6 +432,41 @@ impl<'lua> Table<'lua> {
                 let len = ffi::lua_rawlen(lua.state, -1);
                 ffi::lua_pop(lua.state, 1);
                 len as Integer
+            })
+        }
+    }
+
+    pub fn get_metatable(&self) -> Option<Table<'lua>> {
+        let lua = self.0.lua;
+        unsafe {
+            stack_guard(lua.state, 0, || {
+                check_stack(lua.state, 1);
+                lua.push_ref(lua.state, &self.0);
+                if ffi::lua_getmetatable(lua.state, -1) == 0 {
+                    ffi::lua_pop(lua.state, 1);
+                    None
+                } else {
+                    let table = Table(lua.pop_ref(lua.state));
+                    ffi::lua_pop(lua.state, 1);
+                    Some(table)
+                }
+            })
+        }
+    }
+
+    pub fn set_metatable(&self, metatable: Option<Table<'lua>>) {
+        let lua = self.0.lua;
+        unsafe {
+            stack_guard(lua.state, 0, move || {
+                check_stack(lua.state, 1);
+                lua.push_ref(lua.state, &self.0);
+                if let Some(metatable) = metatable {
+                    lua.push_ref(lua.state, &metatable.0);
+                } else {
+                    ffi::lua_pushnil(lua.state);
+                }
+                ffi::lua_setmetatable(lua.state, -2);
+                ffi::lua_pop(lua.state, 1);
             })
         }
     }

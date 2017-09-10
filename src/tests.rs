@@ -4,7 +4,7 @@ use std::panic::catch_unwind;
 use std::os::raw::c_void;
 
 use String as LuaString;
-use {Lua, Result, ExternalError, LightUserData, UserDataMethods, UserData, Table, Thread,
+use {Lua, Nil, Result, ExternalError, LightUserData, UserDataMethods, UserData, Table, Thread,
      ThreadStatus, Error, Function, Value, Variadic, MetaMethod};
 
 #[test]
@@ -961,6 +961,26 @@ fn test_setmetatable_gc() {
 
     let globals = lua.globals();
     assert_eq!(globals.get::<_, String>("val").unwrap(), "gcwascalled");
+}
+
+#[test]
+fn test_metatable() {
+    let lua = Lua::new();
+
+    let table = lua.create_table();
+    let metatable = lua.create_table();
+    metatable.set("__index", lua.create_function(|_, ()| Ok("index_value"))).unwrap();
+    table.set_metatable(Some(metatable));
+    assert_eq!(table.get::<_, String>("any_key").unwrap(), "index_value");
+    match table.raw_get::<_, Value>("any_key").unwrap() {
+        Nil => {}
+        _ => panic!(),
+    }
+    table.set_metatable(None);
+    match table.get::<_, Value>("any_key").unwrap() {
+        Nil => {}
+        _ => panic!(),
+    };
 }
 
 // Need to use compiletest-rs or similar to make sure these don't compile.
