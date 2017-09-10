@@ -6,7 +6,7 @@ fn main() {
     {
         use std::env;
 
-        let mut config = gcc::Config::new();
+        let mut config = gcc::Build::new();
 
         let target_os = env::var("CARGO_CFG_TARGET_OS");
         let target_family = env::var("CARGO_CFG_TARGET_FAMILY");
