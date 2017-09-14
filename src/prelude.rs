@@ -1,3 +1,5 @@
+//! Re-exports most types with an extra `Lua*` prefix to prevent name clashes.
+
 pub use {Error as LuaError, Result as LuaResult, ExternalError as LuaExternalError,
          ExternalResult as LuaExternalResult, Value as LuaValue, Nil as LuaNil, ToLua, FromLua,
          MultiValue as LuaMultiValue, ToLuaMulti, FromLuaMulti, Integer as LuaInteger,
