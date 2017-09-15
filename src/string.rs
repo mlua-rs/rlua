@@ -46,7 +46,7 @@ impl<'lua> String<'lua> {
 
     /// Get the bytes that make up this string.
     ///
-    /// The returned slice will not contain the terminating null byte, but will contain any null
+    /// The returned slice will not contain the terminating nul byte, but will contain any nul
     /// bytes embedded into the Lua string.
     ///
     /// # Examples
@@ -63,6 +63,12 @@ impl<'lua> String<'lua> {
     /// # }
     /// ```
     pub fn as_bytes(&self) -> &[u8] {
+        let nulled = self.as_bytes_with_nul();
+        &nulled[..nulled.len()-1]
+    }
+
+    /// Get the bytes that make up this string, including the trailing nul byte.
+    pub fn as_bytes_with_nul(&self) -> &[u8] {
         let lua = self.0.lua;
         unsafe {
             stack_guard(lua.state, 0, || {
@@ -74,7 +80,7 @@ impl<'lua> String<'lua> {
                 let data = ffi::lua_tolstring(lua.state, -1, &mut size);
 
                 ffi::lua_pop(lua.state, 1);
-                slice::from_raw_parts(data as *const u8, size)
+                slice::from_raw_parts(data as *const u8, size + 1)
             })
         }
     }
@@ -132,6 +138,7 @@ mod tests {
             r#"
                 ok = "null bytes are valid utf-8, wh\0 knew?"
                 err = "but \xff isn't :("
+                empty = ""
             "#,
             None,
         ).unwrap();
@@ -139,6 +146,7 @@ mod tests {
         let globals = lua.globals();
         let ok: String = globals.get("ok").unwrap();
         let err: String = globals.get("err").unwrap();
+        let empty: String = globals.get("empty").unwrap();
 
         assert_eq!(
             ok.to_str().unwrap(),
@@ -151,5 +159,9 @@ mod tests {
 
         assert!(err.to_str().is_err());
         assert_eq!(err.as_bytes(), &b"but \xff isn't :("[..]);
+
+        assert_eq!(empty.to_str().unwrap(), "");
+        assert_eq!(empty.as_bytes_with_nul(), &[0]);
+        assert_eq!(empty.as_bytes(), &[]);
     }
 }
