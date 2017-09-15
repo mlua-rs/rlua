@@ -79,3 +79,77 @@ impl<'lua> String<'lua> {
         }
     }
 }
+
+impl<'lua> AsRef<[u8]> for String<'lua> {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+// Lua strings are basically &[u8] slices, so implement PartialEq for anything resembling that.
+//
+// This makes our `String` comparable with `Vec<u8>`, `[u8]`, `&str`, `String` and `rlua::String`
+// itself.
+//
+// The only downside is that this disallows a comparison with `Cow<str>`, as that only implements
+// `AsRef<str>`, which collides with this impl. Requiring `AsRef<str>` would fix that, but limit us
+// in other ways.
+impl<'lua, T> PartialEq<T> for String<'lua> where T: AsRef<[u8]> {
+    fn eq(&self, other: &T) -> bool {
+        self.as_bytes() == other.as_ref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use Lua;
+
+    use std::borrow::Cow;
+
+    fn with_str<F>(s: &str, f: F) where F: FnOnce(String) {
+        let lua = Lua::new();
+        let string = lua.create_string(s);
+        f(string);
+    }
+
+    #[test]
+    fn compare() {
+        // Tests that all comparisons we want to have are usable
+        with_str("teststring", |t| assert_eq!(t, "teststring"));                // &str
+        with_str("teststring", |t| assert_eq!(t, b"teststring"));               // &[u8]
+        with_str("teststring", |t| assert_eq!(t, b"teststring".to_vec()));      // Vec<u8>
+        with_str("teststring", |t| assert_eq!(t, "teststring".to_string()));    // String
+        with_str("teststring", |t| assert_eq!(t, t));                           // rlua::String
+        with_str("teststring", |t| assert_eq!(t, Cow::from(b"teststring".as_ref())));  // Cow (borrowed)
+        with_str("bla", |t| assert_eq!(t, Cow::from(b"bla".to_vec())));         // Cow (owned)
+    }
+
+    #[test]
+    fn string_views() {
+        let lua = Lua::new();
+        lua.eval::<()>(
+            r#"
+                ok = "null bytes are valid utf-8, wh\0 knew?"
+                err = "but \xff isn't :("
+            "#,
+            None,
+        ).unwrap();
+
+        let globals = lua.globals();
+        let ok: String = globals.get("ok").unwrap();
+        let err: String = globals.get("err").unwrap();
+
+        assert_eq!(
+            ok.to_str().unwrap(),
+            "null bytes are valid utf-8, wh\0 knew?"
+        );
+        assert_eq!(
+            ok.as_bytes(),
+            &b"null bytes are valid utf-8, wh\0 knew?"[..]
+        );
+
+        assert!(err.to_str().is_err());
+        assert_eq!(err.as_bytes(), &b"but \xff isn't :("[..]);
+    }
+}
