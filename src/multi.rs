@@ -5,8 +5,8 @@ use std::result::Result as StdResult;
 use error::*;
 use lua::*;
 
-/// Result is convertible to `MultiValue` following the common lua idiom of returning the result
-/// on success, or in the case of an error, returning nil followed by the error
+/// Result is convertible to `MultiValue` following the common Lua idiom of returning the result
+/// on success, or in the case of an error, returning `nil` and an error message.
 impl<'lua, T: ToLua<'lua>, E: ToLua<'lua>> ToLuaMulti<'lua> for StdResult<T, E> {
     fn to_lua_multi(self, lua: &'lua Lua) -> Result<MultiValue<'lua>> {
         let mut result = MultiValue::new();
@@ -49,14 +49,39 @@ impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
     }
 }
 
-/// Can be used to pass variadic values to or receive variadic values from Lua, where the type of
-/// the values is all the same and the number of values is defined at runtime.  This can be included
-/// in a tuple when converting from a MultiValue, but it must be the final entry, and it will
-/// consume the rest of the parameters given.
+/// Wraps a variable number of `T`s.
+///
+/// Can be used to work with variadic functions more easily. Using this type as the last argument of
+/// a Rust callback will accept any number of arguments from Lua and convert them to the type `T`
+/// using [`FromLua`]. `Variadic<T>` can also be returned from a callback, returning a variable
+/// number of values to Lua.
+///
+/// The [`MultiValue`] type is equivalent to `Variadic<Value>`.
+///
+/// # Examples
+///
+/// ```
+/// # extern crate rlua;
+/// # use rlua::{Lua, Variadic, Result};
+/// # fn try_main() -> Result<()> {
+/// let lua = Lua::new();
+///
+/// let add = lua.create_function(|_, vals: Variadic<f64>| -> Result<f64> {
+///     Ok(vals.iter().sum())
+/// });
+/// lua.globals().set("add", add)?;
+/// assert_eq!(lua.eval::<f64>("add(3, 2, 5)", None)?, 10.0);
+/// # Ok(())
+/// # }
+/// # fn main() {
+/// #     try_main().unwrap();
+/// # }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Variadic<T>(Vec<T>);
 
 impl<T> Variadic<T> {
+    /// Creates an empty `Variadic` wrapper containing no values.
     pub fn new() -> Variadic<T> {
         Variadic(Vec::new())
     }

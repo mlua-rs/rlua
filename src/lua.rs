@@ -85,6 +85,7 @@ pub trait FromLua<'lua>: Sized {
 pub struct MultiValue<'lua>(VecDeque<Value<'lua>>);
 
 impl<'lua> MultiValue<'lua> {
+    /// Creates an empty `MultiValue` containing no values.
     pub fn new() -> MultiValue<'lua> {
         MultiValue(VecDeque::new())
     }
@@ -436,6 +437,9 @@ impl<'lua> Table<'lua> {
         }
     }
 
+    /// Returns a reference to the metatable of this table, or `None` if no metatable is set.
+    ///
+    /// Unlike the `getmetatable` Lua function, this method ignores the `__metatable` field.
     pub fn get_metatable(&self) -> Option<Table<'lua>> {
         let lua = self.0.lua;
         unsafe {
@@ -454,6 +458,10 @@ impl<'lua> Table<'lua> {
         }
     }
 
+    /// Sets or removes the metatable of this table.
+    ///
+    /// If `metatable` is `None`, the metatable is removed (if no metatable is set, this does
+    /// nothing).
     pub fn set_metatable(&self, metatable: Option<Table<'lua>>) {
         let lua = self.0.lua;
         unsafe {
@@ -1177,7 +1185,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 /// Trait for custom userdata types.
 ///
 /// By implementing this trait, a struct becomes eligible for use inside Lua code. Implementations
-/// of `ToLua` and `FromLua` are automatically provided.
+/// of [`ToLua`] and [`FromLua`] are automatically provided.
 ///
 /// # Examples
 ///
@@ -1245,6 +1253,8 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 /// # }
 /// ```
 ///
+/// [`ToLua`]: trait.ToLua.html
+/// [`FromLua`]: trait.FromLua.html
 /// [`UserDataMethods`]: struct.UserDataMethods.html
 pub trait UserData: 'static + Sized {
     /// Adds custom methods and operators specific to this userdata.
