@@ -77,6 +77,9 @@ impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
 /// #     try_main().unwrap();
 /// # }
 /// ```
+///
+/// [`FromLua`]: trait.FromLua.html
+/// [`MultiValue`]: struct.MultiValue.html
 #[derive(Debug, Clone)]
 pub struct Variadic<T>(Vec<T>);
 
