@@ -1399,7 +1399,6 @@ impl Lua {
             stack_guard(state, 0, || {
                 // Do not open the debug library, currently it can be used to cause unsafety.
                 ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
-                ffi::luaL_requiref(state, cstr!("base"), ffi::luaopen_base, 1);
                 ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
                 ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
                 ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
@@ -1408,7 +1407,7 @@ impl Lua {
                 ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
                 ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
                 ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
-                ffi::lua_pop(state, 10);
+                ffi::lua_pop(state, 9);
 
                 // Create the userdata registry table
 
