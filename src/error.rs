@@ -129,7 +129,9 @@ impl fmt::Display for Error {
             Error::UserDataTypeMismatch => write!(fmt, "userdata is not expected type"),
             Error::UserDataBorrowError => write!(fmt, "userdata already mutably borrowed"),
             Error::UserDataBorrowMutError => write!(fmt, "userdata already borrowed"),
-            Error::CallbackError { ref cause, .. } => write!(fmt, "{}", cause),
+            Error::CallbackError { ref traceback, .. } => {
+                write!(fmt, "callback error: {}", traceback)
+            }
             Error::ExternalError(ref err) => err.fmt(fmt),
         }
     }
@@ -146,7 +148,7 @@ impl StdError for Error {
             Error::UserDataTypeMismatch => "userdata type mismatch",
             Error::UserDataBorrowError => "userdata already mutably borrowed",
             Error::UserDataBorrowMutError => "userdata already borrowed",
-            Error::CallbackError { ref cause, .. } => cause.description(),
+            Error::CallbackError { .. } => "callback error",
             Error::ExternalError(ref err) => err.description(),
         }
     }
