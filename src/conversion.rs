@@ -6,6 +6,7 @@ use error::*;
 use lua::*;
 use string::String;
 use table::Table;
+use userdata::{LightUserData, UserData, AnyUserData};
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {
