@@ -1,10 +1,12 @@
 language: rust
-rust:
-  - stable
-  - beta
-  - nightly
 env:
   - RUSTFLAGS="-D warnings"
 matrix:
+  include:
+    - rust: stable
+      script: cargo test --lib -v
+    - rust: beta
+      script: cargo test --lib -v
+    - rust: nightly
   allow_failures:
     - rust: nightly

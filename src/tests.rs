@@ -954,28 +954,3 @@ fn test_metatable() {
         _ => panic!(),
     };
 }
-
-// Need to use compiletest-rs or similar to make sure these don't compile.
-/*
-#[test]
-fn should_not_compile() {
-    let lua = Lua::new();
-    let globals = lua.globals();
-
-    // Should not allow userdata borrow to outlive lifetime of AnyUserData handle
-    struct MyUserData;
-    impl UserData for MyUserData {};
-    let userdata_ref;
-    {
-        let touter = globals.get::<_, Table>("touter").unwrap();
-        touter.set("userdata", lua.create_userdata(MyUserData)).unwrap();
-        let userdata = touter.get::<_, AnyUserData>("userdata").unwrap();
-        userdata_ref = userdata.borrow::<MyUserData>();
-    }
-
-    // Should not allow self borrow of lua, it can change addresses
-    globals.set("boom", lua.create_function(|_, _| {
-        lua.eval::<i32>("1 + 1", None)
-    })).unwrap();
-}
-*/
