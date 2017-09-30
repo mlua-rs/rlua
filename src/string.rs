@@ -64,7 +64,7 @@ impl<'lua> String<'lua> {
     /// ```
     pub fn as_bytes(&self) -> &[u8] {
         let nulled = self.as_bytes_with_nul();
-        &nulled[..nulled.len()-1]
+        &nulled[..nulled.len() - 1]
     }
 
     /// Get the bytes that make up this string, including the trailing nul byte.
@@ -100,7 +100,10 @@ impl<'lua> AsRef<[u8]> for String<'lua> {
 // The only downside is that this disallows a comparison with `Cow<str>`, as that only implements
 // `AsRef<str>`, which collides with this impl. Requiring `AsRef<str>` would fix that, but limit us
 // in other ways.
-impl<'lua, T> PartialEq<T> for String<'lua> where T: AsRef<[u8]> {
+impl<'lua, T> PartialEq<T> for String<'lua>
+where
+    T: AsRef<[u8]>,
+{
     fn eq(&self, other: &T) -> bool {
         self.as_bytes() == other.as_ref()
     }
@@ -109,11 +112,14 @@ impl<'lua, T> PartialEq<T> for String<'lua> where T: AsRef<[u8]> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Lua;
+    use lua::Lua;
 
     use std::borrow::Cow;
 
-    fn with_str<F>(s: &str, f: F) where F: FnOnce(String) {
+    fn with_str<F>(s: &str, f: F)
+    where
+        F: FnOnce(String),
+    {
         let lua = Lua::new();
         let string = lua.create_string(s);
         f(string);
@@ -122,13 +128,15 @@ mod tests {
     #[test]
     fn compare() {
         // Tests that all comparisons we want to have are usable
-        with_str("teststring", |t| assert_eq!(t, "teststring"));                // &str
-        with_str("teststring", |t| assert_eq!(t, b"teststring"));               // &[u8]
-        with_str("teststring", |t| assert_eq!(t, b"teststring".to_vec()));      // Vec<u8>
-        with_str("teststring", |t| assert_eq!(t, "teststring".to_string()));    // String
-        with_str("teststring", |t| assert_eq!(t, t));                           // rlua::String
-        with_str("teststring", |t| assert_eq!(t, Cow::from(b"teststring".as_ref())));  // Cow (borrowed)
-        with_str("bla", |t| assert_eq!(t, Cow::from(b"bla".to_vec())));         // Cow (owned)
+        with_str("teststring", |t| assert_eq!(t, "teststring")); // &str
+        with_str("teststring", |t| assert_eq!(t, b"teststring")); // &[u8]
+        with_str("teststring", |t| assert_eq!(t, b"teststring".to_vec())); // Vec<u8>
+        with_str("teststring", |t| assert_eq!(t, "teststring".to_string())); // String
+        with_str("teststring", |t| assert_eq!(t, t)); // rlua::String
+        with_str("teststring", |t| {
+            assert_eq!(t, Cow::from(b"teststring".as_ref()))
+        }); // Cow (borrowed)
+        with_str("bla", |t| assert_eq!(t, Cow::from(b"bla".to_vec()))); // Cow (owned)
     }
 
     #[test]
