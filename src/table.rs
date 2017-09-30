@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
 
 use ffi;
-use lua::{LuaRef, ToLua, FromLua, Integer};
-use util::*;
 use error::Result;
+use util::*;
+use types::{Integer, LuaRef};
+use lua::{ToLua, FromLua};
 
 /// Handle to an internal Lua table.
 #[derive(Clone, Debug)]

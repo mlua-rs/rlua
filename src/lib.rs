@@ -46,6 +46,7 @@ pub mod ffi;
 #[macro_use]
 mod util;
 mod error;
+mod types;
 mod lua;
 mod conversion;
 mod multi;
@@ -57,11 +58,12 @@ mod userdata;
 mod tests;
 
 pub use error::{Error, Result, ExternalError, ExternalResult};
-pub use lua::{Value, Nil, ToLua, FromLua, MultiValue, ToLuaMulti, FromLuaMulti, Integer, Number,
-              Function, ThreadStatus, Thread, Lua};
+pub use types::{Integer, Number, LightUserData};
 pub use multi::Variadic;
 pub use string::String;
 pub use table::{Table, TablePairs, TableSequence};
-pub use userdata::{LightUserData, MetaMethod, UserDataMethods, UserData, AnyUserData};
+pub use userdata::{MetaMethod, UserDataMethods, UserData, AnyUserData};
+pub use lua::{Value, Nil, ToLua, FromLua, MultiValue, ToLuaMulti, FromLuaMulti, Function,
+              ThreadStatus, Thread, Lua};
 
 pub mod prelude;

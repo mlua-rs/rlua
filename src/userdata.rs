@@ -1,17 +1,13 @@
 use std::cell::{RefCell, Ref, RefMut};
 use std::marker::PhantomData;
 use std::collections::HashMap;
-use std::os::raw::c_void;
 use std::string::String as StdString;
 
 use ffi;
 use error::*;
 use util::*;
-use lua::{FromLua, FromLuaMulti, ToLuaMulti, Callback, LuaRef, Lua};
-
-/// A "light" userdata value. Equivalent to an unmanaged raw pointer.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct LightUserData(pub *mut c_void);
+use types::{Callback, LuaRef};
+use lua::{FromLua, FromLuaMulti, ToLuaMulti, Lua};
 
 /// Kinds of metamethods that can be overridden.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -400,32 +396,10 @@ impl<'lua> AnyUserData<'lua> {
 
 #[cfg(test)]
 mod tests {
-    use super::{LightUserData, UserData, MetaMethod, UserDataMethods};
+    use super::{UserData, MetaMethod, UserDataMethods};
     use error::ExternalError;
     use string::String;
     use lua::{Function, Lua};
-
-    use std::os::raw::c_void;
-
-    #[test]
-    fn test_lightuserdata() {
-        let lua = Lua::new();
-        let globals = lua.globals();
-        lua.exec::<()>(
-            r#"
-            function id(a)
-                return a
-            end
-        "#,
-            None,
-        ).unwrap();
-        let res = globals
-            .get::<_, Function>("id")
-            .unwrap()
-            .call::<_, LightUserData>(LightUserData(42 as *mut c_void))
-            .unwrap();
-        assert_eq!(res, LightUserData(42 as *mut c_void));
-    }
 
     #[test]
     fn test_user_data() {

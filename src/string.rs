@@ -1,9 +1,9 @@
 use std::{slice, str};
 
 use ffi;
-use lua::LuaRef;
 use error::{Error, Result};
 use util::{check_stack, stack_guard};
+use types::LuaRef;
 
 /// Handle to an internal Lua string.
 ///

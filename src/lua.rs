@@ -1,4 +1,4 @@
-use std::{fmt, ptr, str};
+use std::{ptr, str};
 use std::ops::{Deref, DerefMut};
 use std::iter::FromIterator;
 use std::cell::RefCell;
@@ -15,9 +15,10 @@ use libc;
 use ffi;
 use error::*;
 use util::*;
+use types::{Integer, Number, LightUserData, Callback, LuaRef};
 use string::String;
 use table::Table;
-use userdata::{LightUserData, UserDataMethods, MetaMethod, UserData, AnyUserData};
+use userdata::{UserDataMethods, MetaMethod, UserData, AnyUserData};
 
 /// A dynamically typed Lua value.
 #[derive(Debug, Clone)]
@@ -144,44 +145,6 @@ pub trait FromLuaMulti<'lua>: Sized {
     /// any missing values are nil.
     fn from_lua_multi(values: MultiValue<'lua>, lua: &'lua Lua) -> Result<Self>;
 }
-
-pub(crate) type Callback<'lua> = Box<
-    FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>
-        + 'lua,
->;
-
-pub(crate) struct LuaRef<'lua> {
-    pub lua: &'lua Lua,
-    pub registry_id: c_int,
-}
-
-impl<'lua> fmt::Debug for LuaRef<'lua> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LuaRef({})", self.registry_id)
-    }
-}
-
-impl<'lua> Clone for LuaRef<'lua> {
-    fn clone(&self) -> Self {
-        unsafe {
-            self.lua.push_ref(self.lua.state, self);
-            self.lua.pop_ref(self.lua.state)
-        }
-    }
-}
-
-impl<'lua> Drop for LuaRef<'lua> {
-    fn drop(&mut self) {
-        unsafe {
-            ffi::luaL_unref(self.lua.state, ffi::LUA_REGISTRYINDEX, self.registry_id);
-        }
-    }
-}
-
-/// Type of Lua integer numbers.
-pub type Integer = ffi::lua_Integer;
-/// Type of Lua floating point numbers.
-pub type Number = ffi::lua_Number;
 
 /// Handle to an internal Lua function.
 #[derive(Clone, Debug)]

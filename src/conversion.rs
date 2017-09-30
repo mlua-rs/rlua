@@ -3,10 +3,11 @@ use std::hash::Hash;
 use std::string::String as StdString;
 
 use error::*;
+use types::{Integer, Number, LightUserData};
 use lua::*;
 use string::String;
 use table::Table;
-use userdata::{LightUserData, UserData, AnyUserData};
+use userdata::{UserData, AnyUserData};
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {
