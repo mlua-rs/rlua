@@ -397,3 +397,211 @@ impl<'lua> AnyUserData<'lua> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{LightUserData, UserData, MetaMethod, UserDataMethods};
+    use error::ExternalError;
+    use string::String;
+    use lua::{Function, Lua};
+
+    use std::os::raw::c_void;
+
+    #[test]
+    fn test_lightuserdata() {
+        let lua = Lua::new();
+        let globals = lua.globals();
+        lua.exec::<()>(
+            r#"
+            function id(a)
+                return a
+            end
+        "#,
+            None,
+        ).unwrap();
+        let res = globals
+            .get::<_, Function>("id")
+            .unwrap()
+            .call::<_, LightUserData>(LightUserData(42 as *mut c_void))
+            .unwrap();
+        assert_eq!(res, LightUserData(42 as *mut c_void));
+    }
+
+    #[test]
+    fn test_user_data() {
+        struct UserData1(i64);
+        struct UserData2(Box<i64>);
+
+        impl UserData for UserData1 {};
+        impl UserData for UserData2 {};
+
+        let lua = Lua::new();
+
+        let userdata1 = lua.create_userdata(UserData1(1));
+        let userdata2 = lua.create_userdata(UserData2(Box::new(2)));
+
+        assert!(userdata1.is::<UserData1>());
+        assert!(!userdata1.is::<UserData2>());
+        assert!(userdata2.is::<UserData2>());
+        assert!(!userdata2.is::<UserData1>());
+
+        assert_eq!(userdata1.borrow::<UserData1>().unwrap().0, 1);
+        assert_eq!(*userdata2.borrow::<UserData2>().unwrap().0, 2);
+    }
+
+    #[test]
+    fn test_methods() {
+        struct MyUserData(i64);
+
+        impl UserData for MyUserData {
+            fn add_methods(methods: &mut UserDataMethods<Self>) {
+                methods.add_method("get_value", |_, data, ()| Ok(data.0));
+                methods.add_method_mut("set_value", |_, data, args| {
+                    data.0 = args;
+                    Ok(())
+                });
+            }
+        }
+
+        let lua = Lua::new();
+        let globals = lua.globals();
+        let userdata = lua.create_userdata(MyUserData(42));
+        globals.set("userdata", userdata.clone()).unwrap();
+        lua.exec::<()>(
+            r#"
+            function get_it()
+                return userdata:get_value()
+            end
+
+            function set_it(i)
+                return userdata:set_value(i)
+            end
+        "#,
+            None,
+        ).unwrap();
+        let get = globals.get::<_, Function>("get_it").unwrap();
+        let set = globals.get::<_, Function>("set_it").unwrap();
+        assert_eq!(get.call::<_, i64>(()).unwrap(), 42);
+        userdata.borrow_mut::<MyUserData>().unwrap().0 = 64;
+        assert_eq!(get.call::<_, i64>(()).unwrap(), 64);
+        set.call::<_, ()>(100).unwrap();
+        assert_eq!(get.call::<_, i64>(()).unwrap(), 100);
+    }
+
+    #[test]
+    fn test_metamethods() {
+        #[derive(Copy, Clone)]
+        struct MyUserData(i64);
+
+        impl UserData for MyUserData {
+            fn add_methods(methods: &mut UserDataMethods<Self>) {
+                methods.add_method("get", |_, data, ()| Ok(data.0));
+                methods.add_meta_function(MetaMethod::Add, |_,
+                 (lhs, rhs): (MyUserData,
+                              MyUserData)| {
+                    Ok(MyUserData(lhs.0 + rhs.0))
+                });
+                methods.add_meta_function(MetaMethod::Sub, |_,
+                 (lhs, rhs): (MyUserData,
+                              MyUserData)| {
+                    Ok(MyUserData(lhs.0 - rhs.0))
+                });
+                methods.add_meta_method(
+                    MetaMethod::Index,
+                    |_, data, index: String| if index.to_str()? == "inner" {
+                        Ok(data.0)
+                    } else {
+                        Err("no such custom index".to_lua_err())
+                    },
+                );
+            }
+        }
+
+        let lua = Lua::new();
+        let globals = lua.globals();
+        globals.set("userdata1", MyUserData(7)).unwrap();
+        globals.set("userdata2", MyUserData(3)).unwrap();
+        assert_eq!(
+            lua.eval::<MyUserData>("userdata1 + userdata2", None)
+                .unwrap()
+                .0,
+            10
+        );
+        assert_eq!(
+            lua.eval::<MyUserData>("userdata1 - userdata2", None)
+                .unwrap()
+                .0,
+            4
+        );
+        assert_eq!(lua.eval::<i64>("userdata1:get()", None).unwrap(), 7);
+        assert_eq!(lua.eval::<i64>("userdata2.inner", None).unwrap(), 3);
+        assert!(lua.eval::<()>("userdata2.nonexist_field", None).is_err());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_expired_userdata() {
+        struct MyUserdata {
+            id: u8,
+        }
+
+        impl UserData for MyUserdata {
+            fn add_methods(methods: &mut UserDataMethods<Self>) {
+                methods.add_method("access", |_, this, ()| {
+                    assert!(this.id == 123);
+                    Ok(())
+                });
+            }
+        }
+
+        let lua = Lua::new();
+        {
+            let globals = lua.globals();
+            globals.set("userdata", MyUserdata { id: 123 }).unwrap();
+        }
+
+        lua.eval::<()>(
+            r#"
+        local tbl = setmetatable({
+            userdata = userdata
+        }, { __gc = function(self)
+            -- resurrect userdata
+            hatch = self.userdata
+        end })
+
+        tbl = nil
+        userdata = nil  -- make table and userdata collectable
+        collectgarbage("collect")
+        hatch:access()
+    "#,
+            None,
+        ).unwrap();
+    }
+
+    #[test]
+    fn detroys_userdata() {
+        use std::sync::atomic::{Ordering, AtomicBool, ATOMIC_BOOL_INIT};
+
+        static DROPPED: AtomicBool = ATOMIC_BOOL_INIT;
+
+        struct MyUserdata;
+
+        impl UserData for MyUserdata {}
+
+        impl Drop for MyUserdata {
+            fn drop(&mut self) {
+                DROPPED.store(true, Ordering::SeqCst);
+            }
+        }
+
+        let lua = Lua::new();
+        {
+            let globals = lua.globals();
+            globals.set("userdata", MyUserdata).unwrap();
+        }
+
+        assert_eq!(DROPPED.load(Ordering::SeqCst), false);
+        drop(lua); // should destroy all objects
+        assert_eq!(DROPPED.load(Ordering::SeqCst), true);
+    }
+}
