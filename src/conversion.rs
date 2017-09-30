@@ -4,6 +4,8 @@ use std::string::String as StdString;
 
 use error::*;
 use lua::*;
+use string::String;
+use table::Table;
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {

@@ -49,14 +49,18 @@ mod error;
 mod lua;
 mod conversion;
 mod multi;
+mod string;
+mod table;
 
 #[cfg(test)]
 mod tests;
 
 pub use error::{Error, Result, ExternalError, ExternalResult};
 pub use lua::{Value, Nil, ToLua, FromLua, MultiValue, ToLuaMulti, FromLuaMulti, Integer, Number,
-              LightUserData, String, Table, TablePairs, TableSequence, Function, ThreadStatus,
-              Thread, MetaMethod, UserDataMethods, UserData, AnyUserData, Lua};
+              LightUserData, Function, ThreadStatus, Thread,
+              MetaMethod, UserDataMethods, UserData, AnyUserData, Lua};
 pub use multi::Variadic;
+pub use string::String;
+pub use table::{Table, TablePairs, TableSequence};
 
 pub mod prelude;
