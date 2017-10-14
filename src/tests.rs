@@ -560,6 +560,39 @@ fn test_pcall_xpcall() {
         .call::<_, ()>(());
 }
 
+#[test]
+#[should_panic]
+fn test_recursive_callback_panic() {
+    let lua = Lua::new();
+
+    let mut v = Some(Box::new(123));
+    let f = lua.create_function::<_, (), _>(move |lua, mutate: bool| {
+        if mutate {
+            v = None;
+        } else {
+            // Produce a mutable reference
+            let r = v.as_mut().unwrap();
+            // Whoops, this will recurse into the function and produce another mutable reference!
+            lua.globals()
+                .get::<_, Function>("f")
+                .unwrap()
+                .call::<_, ()>(true)
+                .unwrap();
+            println!("Should not get here, mutable aliasing has occurred!");
+            println!("value at {:p}", r as *mut _);
+            println!("value is {}", r);
+        }
+
+        Ok(())
+    });
+    lua.globals().set("f", f).unwrap();
+    lua.globals()
+        .get::<_, Function>("f")
+        .unwrap()
+        .call::<_, ()>(false)
+        .unwrap();
+}
+
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.
 /*
 #[test]

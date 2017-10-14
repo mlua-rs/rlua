@@ -6,7 +6,6 @@ use std::ffi::CString;
 use std::any::TypeId;
 use std::marker::PhantomData;
 use std::collections::{HashMap, VecDeque};
-use std::collections::hash_map::Entry as HashMapEntry;
 use std::os::raw::{c_char, c_int, c_void};
 use std::process;
 
@@ -497,18 +496,12 @@ impl Lua {
                     &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
                 );
 
-                push_userdata::<RefCell<HashMap<TypeId, c_int>>>(
-                    state,
-                    RefCell::new(HashMap::new()),
-                );
+                push_userdata::<HashMap<TypeId, c_int>>(state, HashMap::new());
 
                 ffi::lua_newtable(state);
 
                 push_string(state, "__gc");
-                ffi::lua_pushcfunction(
-                    state,
-                    userdata_destructor::<RefCell<HashMap<TypeId, c_int>>>,
-                );
+                ffi::lua_pushcfunction(state, userdata_destructor::<HashMap<TypeId, c_int>>);
                 ffi::lua_rawset(state, -3);
 
                 ffi::lua_setmetatable(state, -2);
@@ -525,7 +518,7 @@ impl Lua {
                 ffi::lua_newtable(state);
 
                 push_string(state, "__gc");
-                ffi::lua_pushcfunction(state, userdata_destructor::<Callback>);
+                ffi::lua_pushcfunction(state, userdata_destructor::<RefCell<Callback>>);
                 ffi::lua_rawset(state, -3);
 
                 push_string(state, "__metatable");
@@ -907,7 +900,15 @@ impl Lua {
                     ephemeral: true,
                 };
 
-                let func = &mut *get_userdata::<Callback>(state, ffi::lua_upvalueindex(1));
+                let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1));
+                let mut func = if let Ok(func) = (*func).try_borrow_mut() {
+                    func
+                } else {
+                    lua_panic!(
+                        state,
+                        "recursive callback function call would mutably borrow function twice"
+                    );
+                };
 
                 let nargs = ffi::lua_gettop(state);
                 let mut args = MultiValue::new();
@@ -915,7 +916,7 @@ impl Lua {
                     args.push_front(lua.pop_value(state));
                 }
 
-                let results = func(&lua, args)?;
+                let results = func.deref_mut()(&lua, args)?;
                 let nresults = results.len() as c_int;
 
                 for r in results {
@@ -930,7 +931,7 @@ impl Lua {
             stack_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
 
-                push_userdata::<Callback>(self.state, func);
+                push_userdata::<RefCell<Callback>>(self.state, RefCell::new(func));
 
                 ffi::lua_pushlightuserdata(
                     self.state,
@@ -1103,100 +1104,97 @@ impl Lua {
                 &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
             );
             ffi::lua_gettable(self.state, ffi::LUA_REGISTRYINDEX);
-            let registered_userdata =
-                &mut *get_userdata::<RefCell<HashMap<TypeId, c_int>>>(self.state, -1);
-            let mut map = (*registered_userdata).borrow_mut();
+            let registered_userdata = get_userdata::<HashMap<TypeId, c_int>>(self.state, -1);
             ffi::lua_pop(self.state, 1);
 
-            match map.entry(TypeId::of::<T>()) {
-                HashMapEntry::Occupied(entry) => *entry.get(),
-                HashMapEntry::Vacant(entry) => {
-                    ffi::lua_newtable(self.state);
+            if let Some(table_id) = (*registered_userdata).get(&TypeId::of::<T>()) {
+                return *table_id;
+            }
 
-                    let mut methods = UserDataMethods {
-                        methods: HashMap::new(),
-                        meta_methods: HashMap::new(),
-                        _type: PhantomData,
+            let mut methods = UserDataMethods {
+                methods: HashMap::new(),
+                meta_methods: HashMap::new(),
+                _type: PhantomData,
+            };
+            T::add_methods(&mut methods);
+
+            ffi::lua_newtable(self.state);
+
+            let has_methods = !methods.methods.is_empty();
+
+            if has_methods {
+                push_string(self.state, "__index");
+                ffi::lua_newtable(self.state);
+
+                for (k, m) in methods.methods {
+                    push_string(self.state, &k);
+                    self.push_value(
+                        self.state,
+                        Value::Function(self.create_callback_function(m)),
+                    );
+                    ffi::lua_rawset(self.state, -3);
+                }
+
+                ffi::lua_rawset(self.state, -3);
+            }
+
+            for (k, m) in methods.meta_methods {
+                if k == MetaMethod::Index && has_methods {
+                    push_string(self.state, "__index");
+                    ffi::lua_pushvalue(self.state, -1);
+                    ffi::lua_gettable(self.state, -3);
+                    self.push_value(
+                        self.state,
+                        Value::Function(self.create_callback_function(m)),
+                    );
+                    ffi::lua_pushcclosure(self.state, meta_index_impl, 2);
+                    ffi::lua_rawset(self.state, -3);
+                } else {
+                    let name = match k {
+                        MetaMethod::Add => "__add",
+                        MetaMethod::Sub => "__sub",
+                        MetaMethod::Mul => "__mul",
+                        MetaMethod::Div => "__div",
+                        MetaMethod::Mod => "__mod",
+                        MetaMethod::Pow => "__pow",
+                        MetaMethod::Unm => "__unm",
+                        MetaMethod::IDiv => "__idiv",
+                        MetaMethod::BAnd => "__band",
+                        MetaMethod::BOr => "__bor",
+                        MetaMethod::BXor => "__bxor",
+                        MetaMethod::BNot => "__bnot",
+                        MetaMethod::Shl => "__shl",
+                        MetaMethod::Shr => "__shr",
+                        MetaMethod::Concat => "__concat",
+                        MetaMethod::Len => "__len",
+                        MetaMethod::Eq => "__eq",
+                        MetaMethod::Lt => "__lt",
+                        MetaMethod::Le => "__le",
+                        MetaMethod::Index => "__index",
+                        MetaMethod::NewIndex => "__newindex",
+                        MetaMethod::Call => "__call",
+                        MetaMethod::ToString => "__tostring",
                     };
-                    T::add_methods(&mut methods);
-
-                    let has_methods = !methods.methods.is_empty();
-
-                    if has_methods {
-                        push_string(self.state, "__index");
-                        ffi::lua_newtable(self.state);
-
-                        for (k, m) in methods.methods {
-                            push_string(self.state, &k);
-                            self.push_value(
-                                self.state,
-                                Value::Function(self.create_callback_function(m)),
-                            );
-                            ffi::lua_rawset(self.state, -3);
-                        }
-
-                        ffi::lua_rawset(self.state, -3);
-                    }
-
-                    for (k, m) in methods.meta_methods {
-                        if k == MetaMethod::Index && has_methods {
-                            push_string(self.state, "__index");
-                            ffi::lua_pushvalue(self.state, -1);
-                            ffi::lua_gettable(self.state, -3);
-                            self.push_value(
-                                self.state,
-                                Value::Function(self.create_callback_function(m)),
-                            );
-                            ffi::lua_pushcclosure(self.state, meta_index_impl, 2);
-                            ffi::lua_rawset(self.state, -3);
-                        } else {
-                            let name = match k {
-                                MetaMethod::Add => "__add",
-                                MetaMethod::Sub => "__sub",
-                                MetaMethod::Mul => "__mul",
-                                MetaMethod::Div => "__div",
-                                MetaMethod::Mod => "__mod",
-                                MetaMethod::Pow => "__pow",
-                                MetaMethod::Unm => "__unm",
-                                MetaMethod::IDiv => "__idiv",
-                                MetaMethod::BAnd => "__band",
-                                MetaMethod::BOr => "__bor",
-                                MetaMethod::BXor => "__bxor",
-                                MetaMethod::BNot => "__bnot",
-                                MetaMethod::Shl => "__shl",
-                                MetaMethod::Shr => "__shr",
-                                MetaMethod::Concat => "__concat",
-                                MetaMethod::Len => "__len",
-                                MetaMethod::Eq => "__eq",
-                                MetaMethod::Lt => "__lt",
-                                MetaMethod::Le => "__le",
-                                MetaMethod::Index => "__index",
-                                MetaMethod::NewIndex => "__newindex",
-                                MetaMethod::Call => "__call",
-                                MetaMethod::ToString => "__tostring",
-                            };
-                            push_string(self.state, name);
-                            self.push_value(
-                                self.state,
-                                Value::Function(self.create_callback_function(m)),
-                            );
-                            ffi::lua_rawset(self.state, -3);
-                        }
-                    }
-
-                    push_string(self.state, "__gc");
-                    ffi::lua_pushcfunction(self.state, userdata_destructor::<RefCell<T>>);
+                    push_string(self.state, name);
+                    self.push_value(
+                        self.state,
+                        Value::Function(self.create_callback_function(m)),
+                    );
                     ffi::lua_rawset(self.state, -3);
-
-                    push_string(self.state, "__metatable");
-                    ffi::lua_pushboolean(self.state, 0);
-                    ffi::lua_rawset(self.state, -3);
-
-                    let id = ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX);
-                    entry.insert(id);
-                    id
                 }
             }
+
+            push_string(self.state, "__gc");
+            ffi::lua_pushcfunction(self.state, userdata_destructor::<RefCell<T>>);
+            ffi::lua_rawset(self.state, -3);
+
+            push_string(self.state, "__metatable");
+            ffi::lua_pushboolean(self.state, 0);
+            ffi::lua_rawset(self.state, -3);
+
+            let id = ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX);
+            (*registered_userdata).insert(TypeId::of::<T>(), id);
+            id
         })
     }
 }

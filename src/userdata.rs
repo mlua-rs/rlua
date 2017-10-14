@@ -536,18 +536,18 @@ mod tests {
 
         lua.eval::<()>(
             r#"
-        local tbl = setmetatable({
-            userdata = userdata
-        }, { __gc = function(self)
-            -- resurrect userdata
-            hatch = self.userdata
-        end })
+                local tbl = setmetatable({
+                    userdata = userdata
+                }, { __gc = function(self)
+                    -- resurrect userdata
+                    hatch = self.userdata
+                end })
 
-        tbl = nil
-        userdata = nil  -- make table and userdata collectable
-        collectgarbage("collect")
-        hatch:access()
-    "#,
+                tbl = nil
+                userdata = nil  -- make table and userdata collectable
+                collectgarbage("collect")
+                hatch:access()
+            "#,
             None,
         ).unwrap();
     }

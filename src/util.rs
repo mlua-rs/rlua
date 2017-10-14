@@ -257,8 +257,8 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
             Err(err)
 
         } else if is_wrapped_panic(state, -1) {
-            let panic = &mut *get_userdata::<WrappedPanic>(state, -1);
-            if let Some(p) = panic.0.take() {
+            let panic = get_userdata::<WrappedPanic>(state, -1);
+            if let Some(p) = (*panic).0.take() {
                 ffi::lua_settop(state, 0);
                 resume_unwind(p);
             } else {
@@ -317,17 +317,16 @@ pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) {
     ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
 }
 
-pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> *mut T {
+pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) {
     let ud = ffi::lua_newuserdata(state, mem::size_of::<Option<T>>()) as *mut Option<T>;
-    ptr::write(ud, None);
-    *ud = Some(t);
-    (*ud).as_mut().unwrap()
+    ptr::write(ud, Some(t));
 }
 
 pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
     let ud = ffi::lua_touserdata(state, index) as *mut Option<T>;
     lua_assert!(state, !ud.is_null());
-    (*ud).as_mut().expect("access of expired userdata")
+    lua_assert!(state, (*ud).is_some(), "access of expired userdata");
+    (*ud).as_mut().unwrap()
 }
 
 pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
@@ -552,8 +551,8 @@ pub struct WrappedPanic(pub Option<Box<Any + Send>>);
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
         callback_error(state, || if is_wrapped_error(state, -1) {
-            let error = &*get_userdata::<WrappedError>(state, -1);
-            push_string(state, &error.0.to_string());
+            let error = get_userdata::<WrappedError>(state, -1);
+            push_string(state, &(*error).0.to_string());
             ffi::lua_remove(state, -2);
 
             Ok(1)
