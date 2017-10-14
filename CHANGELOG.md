@@ -1,4 +1,4 @@
-## [0.9.2]
+## [0.9.3]
 - Soundness fix for recursive function calls, now causes a panic.
   This is temporary while I work on a more major update that
   prevents panics / aborts from scripts.
