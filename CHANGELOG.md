@@ -1,4 +1,9 @@
 ## [0.9.2]
+- Soundness fix for recursive function calls, now causes a panic.
+  This is temporary while I work on a more major update that
+  prevents panics / aborts from scripts.
+
+## [0.9.2]
 - Bugfix, don't load the "base" library into the "base" global variable
   @jonas-schievink
 - Additional documentation work, a link fix for `Variadic` docs, new crate
