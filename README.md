@@ -12,8 +12,8 @@ as possible, while also being completely safe.
 
 There are other high level Lua bindings systems for rust, and this crate is an
 exploration of a different part of the design space.  The other high level
-interface to Lua that I am aware of right now
-is [hlua](https://github.com/tomaka/hlua/) which you should definitely check out
+interface to Lua that I am aware of right now is
+[hlua](https://github.com/tomaka/hlua/) which you should definitely check out
 and use if it suits your needs.  This crate has the following differences with
 hlua:
 
@@ -36,16 +36,18 @@ allows for a much more flexible API.
 
 There are currently a few notable missing pieces of this API:
 
-  * Security limits on Lua code such as total instruction limits and recursion
-    limits to prevent DOS from malicious Lua code, as well as control over which
-    libraries are available to scripts.
+  * Complete panic / abort safety for scripts.  This is a near term goal, but
+    currently there are ways to cause panics / aborts with lua scripts which are
+    not considered a bug.
+  * Security limits on Lua code such as total instruction limits and control
+    over which potentially dangerous libraries (e.g. io) are available to
+    scripts.
   * Lua profiling support
   * "Context" or "Sandboxing" support.  There should be the ability to set the
     `_ENV` upvalue of a loaded chunk to a table other than `_G`, so that you can
     have different environments for different loaded chunks.
   * More fleshed out Lua API, there is some missing nice to have functionality
-    not exposed like storing values in the registry, and manipulating
-    `rlua::Table` metatables.
+    not exposed like storing values in the registry.
   * Benchmarks, and quantifying performance differences with what you would
     might write in C.
 
@@ -61,26 +63,27 @@ It is also worth it to list some non-goals for the project:
   * Be a perfect zero cost wrapper over the Lua C API
   * Allow the user to do absolutely everything that the Lua C API might allow
 
-## API stability or lack thereof
+## API stability
 
-This library is very much Work In Progress, so there is a lot of API churn.  I
-believe the library should be stable and usable enough to realistically use in a
-real project, but the API has probably not settled down yet.  I currently follow
-"pre-1.0 semver" (if such a thing exists), but there have been a large number of
-API version bumps, and there may continue to be.  If you have a dependency on
-rlua, you might want to consider adding a 0.x version bound.
+This library is very much Work In Progress, so there is a some API churn.
+Currently, it follows a pre-1.0 semver, so all API changes should be accompanied
+by 0.x version bumps.
 
 ## Safety and panics
 
 The goal of this library is complete safety, it should not be possible to cause
 undefined behavior whatsoever with the API, even in edge cases.  There is,
 however, QUITE a lot of unsafe code in this crate, and I would call the current
-safety level of the crate "Work In Progress".  If you find the ability to cause
-UB with this API *at all*, please file a bug report.
+safety level of the crate "Work In Progress".  Still, UB is considered the most
+serious kind of bug, so if you find the ability to cause UB with this API *at
+all*, please file a bug report.
 
-There are, however, a few ways to cause *panics* and even *aborts* with this
-API.  Usually these panics or aborts are alternatives to what would otherwise be
-unsafety.
+There are, however, a few ways to cause *panics* and even *aborts* with this API
+that are not currently considered bugs.  Usually these panics or aborts are
+alternatives to what would otherwise be unsafety.  A near term goal of this
+project is to remove the ability for lua to cause a panic or abort, and then
+panic / abort behavior will be considered a bug just like UB is, but that is
+currently not the case.
 
 Panic / abort considerations when using this API:
 
@@ -95,7 +98,8 @@ Panic / abort considerations when using this API:
     trigger.  If you encounter one of these this is a bug.
   * When the internal version of Lua is built using the `gcc` crate (the
     default), `LUA_USE_APICHECK` is enabled.  Any abort caused by this internal
-    Lua API checking should be considered a bug.
+    Lua API checking should be considered a bug, particularly because without
+    `LUA_USE_APICHECK` it would generally be unsafe.
   * The library internally calls lua_checkstack to ensure that there is
     sufficient stack space, and if the stack cannot be sufficiently grown this
     is a panic.  There should not be a way to cause this using the API, if you
@@ -121,6 +125,11 @@ Panic / abort considerations when using this API:
   * There are currently no recursion limits on callbacks.  This could cause one
     of two problems, either the API will run out of stack space and cause a
     panic in Rust, or more likely it will cause an internal `LUA_USE_APICHECK`
-    abort, from exceeding LUAI_MAXCCALLS.
+    abort, from exceeding LUAI_MAXCCALLS.  This may be a source of unsafety if
+    `LUA_USE_APICHECK` is disabled, and is considered a bug.
+  * All callbacks in `rlua` are FnMut, so if you trigger your own callback
+    recursively, currently this will panic.
   * There are currently no checks on argument sizes, and I think you may be able
-    to cause an abort by providing a large enough `rlua::Variadic`.
+    to cause an abort by providing a large enough `rlua::Variadic`.  I believe
+    this would be unsafe without `LUA_USE_APICHECK` and should be considered a
+    bug.
