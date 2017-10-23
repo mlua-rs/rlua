@@ -920,6 +920,8 @@ impl Lua {
                 let results = func.deref_mut()(&lua, args)?;
                 let nresults = results.len() as c_int;
 
+                check_stack(state, nresults);
+
                 for r in results {
                     lua.push_value(state, r);
                 }
@@ -948,6 +950,7 @@ impl Lua {
         }
     }
 
+    // Used 1 stack space, does not call checkstack
     pub(crate) unsafe fn push_value(&self, state: *mut ffi::lua_State, value: Value) {
         match value {
             Value::Nil => {
@@ -1051,6 +1054,7 @@ impl Lua {
         }
     }
 
+    // Used 1 stack space, does not call checkstack
     pub(crate) unsafe fn push_ref(&self, state: *mut ffi::lua_State, lref: &LuaRef) {
         assert_eq!(
             lref.lua.main_state,
@@ -1082,6 +1086,8 @@ impl Lua {
         // Used if both an __index metamethod is set and regular methods, checks methods table
         // first, then __index metamethod.
         unsafe extern "C" fn meta_index_impl(state: *mut ffi::lua_State) -> c_int {
+            check_stack(state, 2);
+
             ffi::lua_pushvalue(state, -1);
             ffi::lua_gettable(state, ffi::lua_upvalueindex(1));
             if ffi::lua_isnil(state, -1) == 0 {
