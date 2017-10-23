@@ -1,10 +1,10 @@
 //! Re-exports most types with an extra `Lua*` prefix to prevent name clashes.
 
-pub use {Error as LuaError, Result as LuaResult, ExternalError as LuaExternalError,
-         ExternalResult as LuaExternalResult, Value as LuaValue, Nil as LuaNil, ToLua, FromLua,
-         MultiValue as LuaMultiValue, ToLuaMulti, FromLuaMulti, Integer as LuaInteger,
-         Number as LuaNumber, LightUserData as LuaLightUserData, String as LuaString,
-         Table as LuaTable, TablePairs as LuaTablePairs, TableSequence as LuaTableSequence,
-         Function as LuaFunction, ThreadStatus as LuaThreadStatus, Thread as LuaThread,
-         MetaMethod as LuaMetaMethod, UserDataMethods as LuaUserDataMethods,
-         UserData as LuaUserData, AnyUserData as LuaAnyUserData, Lua};
+pub use {AnyUserData as LuaAnyUserData, Error as LuaError, ExternalError as LuaExternalError,
+         ExternalResult as LuaExternalResult, FromLua, FromLuaMulti, Function as LuaFunction,
+         Integer as LuaInteger, LightUserData as LuaLightUserData, Lua,
+         MetaMethod as LuaMetaMethod, MultiValue as LuaMultiValue, Nil as LuaNil,
+         Number as LuaNumber, Result as LuaResult, String as LuaString, Table as LuaTable,
+         TablePairs as LuaTablePairs, TableSequence as LuaTableSequence, Thread as LuaThread,
+         ThreadStatus as LuaThreadStatus, ToLua, ToLuaMulti, UserData as LuaUserData,
+         UserDataMethods as LuaUserDataMethods, Value as LuaValue};

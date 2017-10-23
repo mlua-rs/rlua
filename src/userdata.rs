@@ -1,4 +1,4 @@
-use std::cell::{RefCell, Ref, RefMut};
+use std::cell::{Ref, RefCell, RefMut};
 use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::string::String as StdString;
@@ -7,7 +7,7 @@ use ffi;
 use error::*;
 use util::*;
 use types::{Callback, LuaRef};
-use lua::{FromLua, FromLuaMulti, ToLuaMulti, Lua};
+use lua::{FromLua, FromLuaMulti, Lua, ToLuaMulti};
 
 /// Kinds of metamethods that can be overridden.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -83,10 +83,8 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         R: ToLuaMulti<'lua>,
         M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
-        self.methods.insert(
-            name.to_owned(),
-            Self::box_method(method),
-        );
+        self.methods
+            .insert(name.to_owned(), Self::box_method(method));
     }
 
     /// Add a regular method which accepts a `&mut T` as the first parameter.
@@ -100,10 +98,8 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         R: ToLuaMulti<'lua>,
         M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
-        self.methods.insert(
-            name.to_owned(),
-            Self::box_method_mut(method),
-        );
+        self.methods
+            .insert(name.to_owned(), Self::box_method_mut(method));
     }
 
     /// Add a regular method as a function which accepts generic arguments, the first argument will
@@ -119,10 +115,8 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         R: ToLuaMulti<'lua>,
         F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
-        self.methods.insert(
-            name.to_owned(),
-            Self::box_function(function),
-        );
+        self.methods
+            .insert(name.to_owned(), Self::box_function(function));
     }
 
     /// Add a metamethod which accepts a `&T` as the first parameter.
@@ -180,9 +174,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
         Box::new(move |lua, args| {
-            function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(
-                lua,
-            )
+            function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
         })
     }
 
@@ -195,8 +187,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = AnyUserData::from_lua(front, lua)?;
             let userdata = userdata.borrow::<T>()?;
-            method(lua, &userdata, A::from_lua_multi(args, lua)?)?
-                .to_lua_multi(lua)
+            method(lua, &userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
         } else {
             Err(Error::FromLuaConversionError {
                 from: "missing argument",
@@ -215,8 +206,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
             let userdata = AnyUserData::from_lua(front, lua)?;
             let mut userdata = userdata.borrow_mut::<T>()?;
-            method(lua, &mut userdata, A::from_lua_multi(args, lua)?)?
-                .to_lua_multi(lua)
+            method(lua, &mut userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
         } else {
             Err(Error::FromLuaConversionError {
                 from: "missing argument",
@@ -351,9 +341,8 @@ impl<'lua> AnyUserData<'lua> {
     /// `UserDataTypeMismatch` if the userdata is not of type `T`.
     pub fn borrow_mut<T: UserData>(&self) -> Result<RefMut<T>> {
         self.inspect(|cell| {
-            Ok(cell.try_borrow_mut().map_err(
-                |_| Error::UserDataBorrowMutError,
-            )?)
+            Ok(cell.try_borrow_mut()
+                .map_err(|_| Error::UserDataBorrowMutError)?)
         }).ok_or(Error::UserDataTypeMismatch)?
     }
 
@@ -396,7 +385,7 @@ impl<'lua> AnyUserData<'lua> {
 
 #[cfg(test)]
 mod tests {
-    use super::{UserData, MetaMethod, UserDataMethods};
+    use super::{MetaMethod, UserData, UserDataMethods};
     use error::ExternalError;
     use string::String;
     use lua::{Function, Lua};
@@ -470,24 +459,21 @@ mod tests {
         impl UserData for MyUserData {
             fn add_methods(methods: &mut UserDataMethods<Self>) {
                 methods.add_method("get", |_, data, ()| Ok(data.0));
-                methods.add_meta_function(MetaMethod::Add, |_,
-                 (lhs, rhs): (MyUserData,
-                              MyUserData)| {
-                    Ok(MyUserData(lhs.0 + rhs.0))
-                });
-                methods.add_meta_function(MetaMethod::Sub, |_,
-                 (lhs, rhs): (MyUserData,
-                              MyUserData)| {
-                    Ok(MyUserData(lhs.0 - rhs.0))
-                });
-                methods.add_meta_method(
-                    MetaMethod::Index,
-                    |_, data, index: String| if index.to_str()? == "inner" {
+                methods
+                    .add_meta_function(MetaMethod::Add, |_, (lhs, rhs): (MyUserData, MyUserData)| {
+                        Ok(MyUserData(lhs.0 + rhs.0))
+                    });
+                methods
+                    .add_meta_function(MetaMethod::Sub, |_, (lhs, rhs): (MyUserData, MyUserData)| {
+                        Ok(MyUserData(lhs.0 - rhs.0))
+                    });
+                methods.add_meta_method(MetaMethod::Index, |_, data, index: String| {
+                    if index.to_str()? == "inner" {
                         Ok(data.0)
                     } else {
                         Err("no such custom index".to_lua_err())
-                    },
-                );
+                    }
+                });
             }
         }
 
@@ -554,7 +540,7 @@ mod tests {
 
     #[test]
     fn detroys_userdata() {
-        use std::sync::atomic::{Ordering, AtomicBool, ATOMIC_BOOL_INIT};
+        use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
 
         static DROPPED: AtomicBool = ATOMIC_BOOL_INIT;
 

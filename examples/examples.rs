@@ -2,7 +2,7 @@ extern crate rlua;
 
 use std::f32;
 
-use rlua::{Lua, Result, Function, Variadic, UserData, UserDataMethods, MetaMethod};
+use rlua::{Function, Lua, MetaMethod, Result, UserData, UserDataMethods, Variadic};
 
 fn examples() -> Result<()> {
     // Create a Lua context with Lua::new().  Eventually, this will allow
@@ -103,17 +103,11 @@ fn examples() -> Result<()> {
     globals.set("join", join)?;
 
     assert_eq!(
-        lua.eval::<bool>(
-            r#"check_equal({"a", "b", "c"}, {"a", "b", "c"})"#,
-            None,
-        )?,
+        lua.eval::<bool>(r#"check_equal({"a", "b", "c"}, {"a", "b", "c"})"#, None)?,
         true
     );
     assert_eq!(
-        lua.eval::<bool>(
-            r#"check_equal({"a", "b", "c"}, {"d", "e", "f"})"#,
-            None,
-        )?,
+        lua.eval::<bool>(r#"check_equal({"a", "b", "c"}, {"d", "e", "f"})"#, None)?,
         false
     );
     assert_eq!(lua.eval::<String>(r#"join("a", "b", "c")"#, None)?, "abc");
@@ -141,12 +135,7 @@ fn examples() -> Result<()> {
     let vec2_constructor = lua.create_function(|_, (x, y): (f32, f32)| Ok(Vec2(x, y)));
     globals.set("vec2", vec2_constructor)?;
 
-    assert!(
-        lua.eval::<f32>(
-            "(vec2(1, 2) + vec2(2, 2)):magnitude()",
-            None,
-        )? - 5.0 < f32::EPSILON
-    );
+    assert!(lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()", None)? - 5.0 < f32::EPSILON);
 
     Ok(())
 }

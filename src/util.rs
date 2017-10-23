@@ -8,7 +8,7 @@ use std::os::raw::{c_char, c_int, c_void};
 use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
 
 use ffi;
-use error::{Result, Error};
+use error::{Error, Result};
 
 macro_rules! cstr {
   ($s:expr) => (
@@ -228,7 +228,11 @@ pub unsafe fn pgeti(
 // Protected version of lua_next, uses 3 stack spaces, does not call checkstack.
 pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
     unsafe extern "C" fn next(state: *mut ffi::lua_State) -> c_int {
-        if ffi::lua_next(state, -2) == 0 { 0 } else { 2 }
+        if ffi::lua_next(state, -2) == 0 {
+            0
+        } else {
+            2
+        }
     }
 
     let table_index = ffi::lua_absindex(state, index);
@@ -241,7 +245,11 @@ pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
     let stack_start = ffi::lua_gettop(state) - 3;
     handle_error(state, pcall_with_traceback(state, 2, ffi::LUA_MULTRET))?;
     let nresults = ffi::lua_gettop(state) - stack_start;
-    if nresults == 0 { Ok(0) } else { Ok(1) }
+    if nresults == 0 {
+        Ok(0)
+    } else {
+        Ok(1)
+    }
 }
 
 // If the return code indicates an error, pops the error off of the stack and
@@ -255,7 +263,6 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
     } else {
         if let Some(err) = pop_wrapped_error(state) {
             Err(err)
-
         } else if is_wrapped_panic(state, -1) {
             let panic = get_userdata::<WrappedPanic>(state, -1);
             if let Some(p) = (*panic).0.take() {
@@ -264,7 +271,6 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
             } else {
                 lua_panic!(state, "internal error: panic was resumed twice")
             }
-
         } else {
             let err_string =
                 if let Some(s) = ffi::lua_tolstring(state, -1, ptr::null_mut()).as_ref() {
@@ -556,7 +562,6 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
             ffi::lua_remove(state, -2);
 
             Ok(1)
-
         } else {
             panic!("internal error: userdata mismatch in Error metamethod");
         })

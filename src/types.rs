@@ -3,7 +3,7 @@ use std::os::raw::{c_int, c_void};
 
 use ffi;
 use error::Result;
-use lua::{MultiValue, Lua};
+use lua::{Lua, MultiValue};
 
 /// Type of Lua integer numbers.
 pub type Integer = ffi::lua_Integer;
@@ -15,8 +15,7 @@ pub type Number = ffi::lua_Number;
 pub struct LightUserData(pub *mut c_void);
 
 pub(crate) type Callback<'lua> = Box<
-    FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>
-        + 'lua,
+    FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'lua,
 >;
 
 pub(crate) struct LuaRef<'lua> {

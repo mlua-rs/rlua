@@ -4,7 +4,7 @@ use ffi;
 use error::Result;
 use util::*;
 use types::{Integer, LuaRef};
-use lua::{ToLua, FromLua};
+use lua::{FromLua, ToLua};
 
 /// Handle to an internal Lua table.
 #[derive(Clone, Debug)]
@@ -367,10 +367,10 @@ where
                             ffi::lua_pop(lua.state, 1);
 
                             Some((|| {
-                                 let key = K::from_lua(key, lua)?;
-                                 let value = V::from_lua(value, lua)?;
-                                 Ok((key, value))
-                             })())
+                                let key = K::from_lua(key, lua)?;
+                                let value = V::from_lua(value, lua)?;
+                                Ok((key, value))
+                            })())
                         }
                         Err(e) => Some(Err(e)),
                     }
@@ -433,7 +433,7 @@ where
 mod tests {
     use super::Table;
     use error::Result;
-    use lua::{Value, Nil, Lua};
+    use lua::{Lua, Nil, Value};
 
     #[test]
     fn test_set_get() {
@@ -588,7 +588,9 @@ mod tests {
 
         let table = lua.create_table();
         let metatable = lua.create_table();
-        metatable.set("__index", lua.create_function(|_, ()| Ok("index_value"))).unwrap();
+        metatable
+            .set("__index", lua.create_function(|_, ()| Ok("index_value")))
+            .unwrap();
         table.set_metatable(Some(metatable));
         assert_eq!(table.get::<_, String>("any_key").unwrap(), "index_value");
         match table.raw_get::<_, Value>("any_key").unwrap() {

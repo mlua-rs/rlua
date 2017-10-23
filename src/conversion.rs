@@ -1,13 +1,13 @@
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
 use std::string::String as StdString;
 
 use error::*;
-use types::{Integer, Number, LightUserData};
+use types::{Integer, LightUserData, Number};
 use lua::*;
 use string::String;
 use table::Table;
-use userdata::{UserData, AnyUserData};
+use userdata::{AnyUserData, UserData};
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {

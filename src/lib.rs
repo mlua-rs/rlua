@@ -57,13 +57,13 @@ mod userdata;
 #[cfg(test)]
 mod tests;
 
-pub use error::{Error, Result, ExternalError, ExternalResult};
-pub use types::{Integer, Number, LightUserData};
+pub use error::{Error, ExternalError, ExternalResult, Result};
+pub use types::{Integer, LightUserData, Number};
 pub use multi::Variadic;
 pub use string::String;
 pub use table::{Table, TablePairs, TableSequence};
-pub use userdata::{MetaMethod, UserDataMethods, UserData, AnyUserData};
-pub use lua::{Value, Nil, ToLua, FromLua, MultiValue, ToLuaMulti, FromLuaMulti, Function,
-              ThreadStatus, Thread, Lua};
+pub use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
+pub use lua::{FromLua, FromLuaMulti, Function, Lua, MultiValue, Nil, Thread, ThreadStatus, ToLua,
+              ToLuaMulti, Value};
 
 pub mod prelude;

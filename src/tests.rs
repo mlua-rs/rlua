@@ -2,7 +2,7 @@ use std::fmt;
 use std::error;
 use std::panic::catch_unwind;
 
-use {Lua, Result, ExternalError, Table, Thread, ThreadStatus, Error, Function, Value, Variadic};
+use {Error, ExternalError, Function, Lua, Result, Table, Thread, ThreadStatus, Value, Variadic};
 
 #[test]
 fn test_load() {
@@ -56,13 +56,14 @@ fn test_eval() {
     assert_eq!(lua.eval::<bool>("false == false", None).unwrap(), true);
     assert_eq!(lua.eval::<i32>("return 1 + 2", None).unwrap(), 3);
     match lua.eval::<()>("if true then", None) {
-        Err(Error::SyntaxError { incomplete_input: true, .. }) => {}
-        r => {
-            panic!(
-                "expected SyntaxError with incomplete_input=true, got {:?}",
-                r
-            )
-        }
+        Err(Error::SyntaxError {
+            incomplete_input: true,
+            ..
+        }) => {}
+        r => panic!(
+            "expected SyntaxError with incomplete_input=true, got {:?}",
+            r
+        ),
     }
 }
 
@@ -289,12 +290,18 @@ fn test_error() {
     assert!(return_string_error.call::<_, Error>(()).is_ok());
 
     match lua.eval::<()>("if youre happy and you know it syntax error", None) {
-        Err(Error::SyntaxError { incomplete_input: false, .. }) => {}
+        Err(Error::SyntaxError {
+            incomplete_input: false,
+            ..
+        }) => {}
         Err(_) => panic!("error is not LuaSyntaxError::Syntax kind"),
         _ => panic!("error not returned"),
     }
     match lua.eval::<()>("function i_will_finish_what_i()", None) {
-        Err(Error::SyntaxError { incomplete_input: true, .. }) => {}
+        Err(Error::SyntaxError {
+            incomplete_input: true,
+            ..
+        }) => {}
         Err(_) => panic!("error is not LuaSyntaxError::IncompleteStatement kind"),
         _ => panic!("error not returned"),
     }

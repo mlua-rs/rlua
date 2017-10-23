@@ -14,10 +14,10 @@ use libc;
 use ffi;
 use error::*;
 use util::*;
-use types::{Integer, Number, LightUserData, Callback, LuaRef};
+use types::{Callback, Integer, LightUserData, LuaRef, Number};
 use string::String;
 use table::Table;
-use userdata::{UserDataMethods, MetaMethod, UserData, AnyUserData};
+use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 
 /// A dynamically typed Lua value.
 #[derive(Debug, Clone)]
@@ -1018,17 +1018,15 @@ impl Lua {
                 ud
             }
 
-            ffi::LUA_TNUMBER => {
-                if ffi::lua_isinteger(state, -1) != 0 {
-                    let i = Value::Integer(ffi::lua_tointeger(state, -1));
-                    ffi::lua_pop(state, 1);
-                    i
-                } else {
-                    let n = Value::Number(ffi::lua_tonumber(state, -1));
-                    ffi::lua_pop(state, 1);
-                    n
-                }
-            }
+            ffi::LUA_TNUMBER => if ffi::lua_isinteger(state, -1) != 0 {
+                let i = Value::Integer(ffi::lua_tointeger(state, -1));
+                ffi::lua_pop(state, 1);
+                i
+            } else {
+                let n = Value::Number(ffi::lua_tonumber(state, -1));
+                ffi::lua_pop(state, 1);
+                n
+            },
 
             ffi::LUA_TSTRING => Value::String(String(self.pop_ref(state))),
 
