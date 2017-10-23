@@ -259,17 +259,18 @@ impl<'lua> Function<'lua> {
     pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> Result<Function<'lua>> {
         unsafe extern "C" fn bind_call_impl(state: *mut ffi::lua_State) -> c_int {
             let nargs = ffi::lua_gettop(state);
-
             let nbinds = ffi::lua_tointeger(state, ffi::lua_upvalueindex(2)) as c_int;
-            check_stack(state, nbinds + 1);
+            check_stack(state, nbinds + 2);
+
+            ffi::lua_settop(state, nargs + nbinds + 1);
+            ffi::lua_rotate(state, -(nargs + nbinds + 1), nbinds + 1);
 
             ffi::lua_pushvalue(state, ffi::lua_upvalueindex(1));
-            ffi::lua_insert(state, 1);
+            ffi::lua_replace(state, 1);
 
-            // TODO: This is quadratic
             for i in 0..nbinds {
                 ffi::lua_pushvalue(state, ffi::lua_upvalueindex(i + 3));
-                ffi::lua_insert(state, i + 2);
+                ffi::lua_replace(state, i + 2);
             }
 
             ffi::lua_call(state, nargs + nbinds, ffi::LUA_MULTRET);
