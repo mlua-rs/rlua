@@ -217,6 +217,7 @@ impl<'lua> Function<'lua> {
                 )?;
                 let nresults = ffi::lua_gettop(lua.state) - stack_start;
                 let mut results = MultiValue::new();
+                check_stack(lua.state, 1);
                 for _ in 0..nresults {
                     results.push_front(lua.pop_value(lua.state));
                 }
@@ -283,7 +284,7 @@ impl<'lua> Function<'lua> {
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
 
-                check_stack(lua.state, nargs + 2);
+                check_stack(lua.state, nargs + 3);
                 lua.push_ref(lua.state, &self.0);
                 ffi::lua_pushinteger(lua.state, nargs as ffi::lua_Integer);
                 for arg in args {
@@ -398,6 +399,7 @@ impl<'lua> Thread<'lua> {
 
                 let nresults = ffi::lua_gettop(thread_state);
                 let mut results = MultiValue::new();
+                check_stack(thread_state, 1);
                 for _ in 0..nresults {
                     results.push_front(lua.pop_value(thread_state));
                 }
@@ -565,6 +567,8 @@ impl Lua {
     pub fn load(&self, source: &str, name: Option<&str>) -> Result<Function> {
         unsafe {
             stack_err_guard(self.state, 0, || {
+                check_stack(self.state, 1);
+
                 handle_error(
                     self.state,
                     if let Some(name) = name {
@@ -631,7 +635,7 @@ impl Lua {
     pub fn create_string(&self, s: &str) -> String {
         unsafe {
             stack_guard(self.state, 0, || {
-                check_stack(self.state, 1);
+                check_stack(self.state, 2);
                 ffi::lua_pushlstring(self.state, s.as_ptr() as *const c_char, s.len());
                 String(self.pop_ref(self.state))
             })
@@ -642,7 +646,7 @@ impl Lua {
     pub fn create_table(&self) -> Table {
         unsafe {
             stack_guard(self.state, 0, || {
-                check_stack(self.state, 1);
+                check_stack(self.state, 2);
                 ffi::lua_newtable(self.state);
                 Table(self.pop_ref(self.state))
             })
@@ -740,7 +744,7 @@ impl Lua {
     pub fn create_thread<'lua>(&'lua self, func: Function<'lua>) -> Thread<'lua> {
         unsafe {
             stack_guard(self.state, 0, move || {
-                check_stack(self.state, 1);
+                check_stack(self.state, 2);
 
                 let thread_state = ffi::lua_newthread(self.state);
                 self.push_ref(thread_state, &func.0);
@@ -757,7 +761,7 @@ impl Lua {
     {
         unsafe {
             stack_guard(self.state, 0, move || {
-                check_stack(self.state, 2);
+                check_stack(self.state, 3);
 
                 push_userdata::<RefCell<T>>(self.state, RefCell::new(data));
 
@@ -778,7 +782,7 @@ impl Lua {
     pub fn globals(&self) -> Table {
         unsafe {
             stack_guard(self.state, 0, move || {
-                check_stack(self.state, 1);
+                check_stack(self.state, 2);
                 ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
                 Table(self.pop_ref(self.state))
             })
@@ -793,7 +797,7 @@ impl Lua {
             Value::String(s) => Ok(s),
             v => unsafe {
                 stack_guard(self.state, 0, || {
-                    check_stack(self.state, 1);
+                    check_stack(self.state, 2);
                     let ty = v.type_name();
                     self.push_value(self.state, v);
                     if ffi::lua_tostring(self.state, -1).is_null() {
@@ -913,6 +917,7 @@ impl Lua {
 
                 let nargs = ffi::lua_gettop(state);
                 let mut args = MultiValue::new();
+                check_stack(state, 1);
                 for _ in 0..nargs {
                     args.push_front(lua.pop_value(state));
                 }
@@ -999,6 +1004,7 @@ impl Lua {
         }
     }
 
+    // Used 1 stack space, does not call checkstack
     pub(crate) unsafe fn pop_value(&self, state: *mut ffi::lua_State) -> Value {
         match ffi::lua_type(state, -1) {
             ffi::LUA_TNIL => {
@@ -1072,6 +1078,8 @@ impl Lua {
     //
     // This pins the object, preventing garbage collection until the returned
     // `LuaRef` is dropped.
+    //
+    // pop_ref uses 1 extra stack space and does not call checkstack
     pub(crate) unsafe fn pop_ref(&self, state: *mut ffi::lua_State) -> LuaRef {
         let registry_id = ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX);
         LuaRef {
