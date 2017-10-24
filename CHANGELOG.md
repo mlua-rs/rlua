@@ -1,3 +1,8 @@
+## [0.9.4]
+- Fix quadratic behavior in ``Function::bind``
+- `lua_checkstack` fixes, particularly fixing a crash bug due to luaL_ref using
+  a single extra stack space.
+
 ## [0.9.3]
 - Soundness fix for recursive function calls, now causes a panic.
   This is temporary while I work on a more major update that
