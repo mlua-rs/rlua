@@ -36,7 +36,7 @@ pub const LUA_NOREF: c_int = -2;
 pub const LUA_REFNIL: c_int = -1;
 
 pub const LUA_MULTRET: c_int = -1;
-pub const LUAI_MAXSTACK: c_int = 1000000;
+pub const LUAI_MAXSTACK: c_int = 1_000_000;
 pub const LUA_REGISTRYINDEX: c_int = -LUAI_MAXSTACK - 1000;
 pub const LUA_RIDX_MAINTHREAD: lua_Integer = 1;
 pub const LUA_RIDX_GLOBALS: lua_Integer = 2;

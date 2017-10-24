@@ -260,62 +260,59 @@ pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
 pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()> {
     if err == ffi::LUA_OK || err == ffi::LUA_YIELD {
         Ok(())
-    } else {
-        if let Some(err) = pop_wrapped_error(state) {
-            Err(err)
-        } else if is_wrapped_panic(state, -1) {
-            let panic = get_userdata::<WrappedPanic>(state, -1);
-            if let Some(p) = (*panic).0.take() {
-                ffi::lua_settop(state, 0);
-                resume_unwind(p);
-            } else {
-                lua_panic!(state, "internal error: panic was resumed twice")
-            }
+    } else if let Some(err) = pop_wrapped_error(state) {
+        Err(err)
+    } else if is_wrapped_panic(state, -1) {
+        let panic = get_userdata::<WrappedPanic>(state, -1);
+        if let Some(p) = (*panic).0.take() {
+            ffi::lua_settop(state, 0);
+            resume_unwind(p);
         } else {
-            let err_string =
-                if let Some(s) = ffi::lua_tolstring(state, -1, ptr::null_mut()).as_ref() {
-                    CStr::from_ptr(s)
-                        .to_str()
-                        .unwrap_or_else(|_| "<unprintable error>")
-                        .to_owned()
-                } else {
-                    "<unprintable error>".to_owned()
-                };
-            ffi::lua_pop(state, 1);
-
-            Err(match err {
-                ffi::LUA_ERRRUN => Error::RuntimeError(err_string),
-                ffi::LUA_ERRSYNTAX => {
-                    Error::SyntaxError {
-                        // This seems terrible, but as far as I can tell, this is exactly what the
-                        // stock Lua REPL does.
-                        incomplete_input: err_string.ends_with("<eof>"),
-                        message: err_string,
-                    }
-                }
-                ffi::LUA_ERRERR => {
-                    // The Lua manual documents this error wrongly: It is not raised when a message
-                    // handler errors, but rather when some specific situations regarding stack
-                    // overflow handling occurs. Since it is not very useful do differentiate
-                    // between that and "ordinary" runtime errors, we handle them the same way.
-                    Error::RuntimeError(err_string)
-                }
-                ffi::LUA_ERRMEM => {
-                    // This should be impossible, as we set the lua allocator to one that aborts
-                    // instead of failing.
-                    eprintln!("Lua memory error, aborting!");
-                    process::abort()
-                }
-                ffi::LUA_ERRGCMM => {
-                    // This should be impossible, since we wrap setmetatable to protect __gc
-                    // metamethods, but if we do end up here then the same logic as setmetatable
-                    // applies and we must abort.
-                    eprintln!("Lua error during __gc, aborting!");
-                    process::abort()
-                }
-                _ => lua_panic!(state, "internal error: unrecognized lua error code"),
-            })
+            lua_panic!(state, "internal error: panic was resumed twice")
         }
+    } else {
+        let err_string = if let Some(s) = ffi::lua_tolstring(state, -1, ptr::null_mut()).as_ref() {
+            CStr::from_ptr(s)
+                .to_str()
+                .unwrap_or_else(|_| "<unprintable error>")
+                .to_owned()
+        } else {
+            "<unprintable error>".to_owned()
+        };
+        ffi::lua_pop(state, 1);
+
+        Err(match err {
+            ffi::LUA_ERRRUN => Error::RuntimeError(err_string),
+            ffi::LUA_ERRSYNTAX => {
+                Error::SyntaxError {
+                    // This seems terrible, but as far as I can tell, this is exactly what the
+                    // stock Lua REPL does.
+                    incomplete_input: err_string.ends_with("<eof>"),
+                    message: err_string,
+                }
+            }
+            ffi::LUA_ERRERR => {
+                // The Lua manual documents this error wrongly: It is not raised when a message
+                // handler errors, but rather when some specific situations regarding stack
+                // overflow handling occurs. Since it is not very useful do differentiate
+                // between that and "ordinary" runtime errors, we handle them the same way.
+                Error::RuntimeError(err_string)
+            }
+            ffi::LUA_ERRMEM => {
+                // This should be impossible, as we set the lua allocator to one that aborts
+                // instead of failing.
+                eprintln!("Lua memory error, aborting!");
+                process::abort()
+            }
+            ffi::LUA_ERRGCMM => {
+                // This should be impossible, since we wrap setmetatable to protect __gc
+                // metamethods, but if we do end up here then the same logic as setmetatable
+                // applies and we must abort.
+                eprintln!("Lua error during __gc, aborting!");
+                process::abort()
+            }
+            _ => lua_panic!(state, "internal error: unrecognized lua error code"),
+        })
     }
 }
 
@@ -695,7 +692,7 @@ pub unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool
     get_panic_metatable(state);
     let res = ffi::lua_rawequal(state, -1, -2) != 0;
     ffi::lua_pop(state, 2);
-    return res;
+    res
 }
 
 pub unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
