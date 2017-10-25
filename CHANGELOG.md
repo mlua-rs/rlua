@@ -1,3 +1,9 @@
+## [0.9.5]
+- Fix incorrect `xpcall` behavior
+- Change FromLua / ToLua impls for HashMap to be generic over the hasher.  This
+  may be technically a backwards incompatible change, but this would be really
+  unusual though, and I don't think it deserves an API bump.
+
 ## [0.9.4]
 - Fix quadratic behavior in ``Function::bind``
 - `lua_checkstack` fixes, particularly fixing a crash bug due to luaL_ref using
