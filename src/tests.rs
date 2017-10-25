@@ -528,39 +528,51 @@ fn coroutine_panic() {
 #[test]
 fn test_pcall_xpcall() {
     let lua = Lua::new();
+    let globals = lua.globals();
+
     // make sure that we handle not enough arguments
     assert!(lua.exec::<()>("pcall()", None).is_err());
     assert!(lua.exec::<()>("xpcall()", None).is_err());
     assert!(lua.exec::<()>("xpcall(function() end)", None).is_err());
 
+    // Make sure that the return values from are correct on success
+    assert_eq!(lua.eval::<(bool, String)>("pcall(function(p) return p end, 'foo')", None).unwrap(), (true, "foo".to_owned()));
+    assert_eq!(lua.eval::<(bool, String)>("xpcall(function(p) return p end, print, 'foo')", None).unwrap(), (true, "foo".to_owned()));
+
+    // Make sure that the return values are correct on errors, and that error handling works
+
     lua.exec::<()>(
         r#"
             pcall_error = nil
-            _, pcall_error = pcall(error, "testerror")
+            pcall_status, pcall_error = pcall(error, "testerror")
 
             xpcall_error = nil
-            xpcall(error, function(err) xpcall_error = err end, "testerror")
-
-            function xpcall_recursion()
-                xpcall(error, function(err) error(err) end, "testerror")
-            end
+            xpcall_status, _ = xpcall(error, function(err) xpcall_error = err end, "testerror")
         "#,
         None,
     ).unwrap();
 
-    let globals = lua.globals();
-
+    assert_eq!(globals.get::<_, bool>("pcall_status").unwrap(), false);
     assert_eq!(
         globals.get::<_, String>("pcall_error").unwrap(),
         "testerror"
     );
 
+    assert_eq!(globals.get::<_, bool>("xpcall_statusr").unwrap(), false);
     assert_eq!(
         globals.get::<_, String>("xpcall_error").unwrap(),
         "testerror"
     );
 
     // Make sure that weird xpcall error recursion at least doesn't cause unsafety or panics.
+    lua.exec::<()>(
+        r#"
+            function xpcall_recursion()
+                xpcall(error, function(err) error(err) end, "testerror")
+            end
+        "#,
+        None,
+    ).unwrap();
     let _ = globals
         .get::<_, Function>("xpcall_recursion")
         .unwrap()

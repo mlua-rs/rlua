@@ -497,8 +497,8 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
         2
     } else {
         ffi::lua_pushboolean(state, 1);
-        ffi::lua_insert(state, 1);
-        ffi::lua_gettop(state)
+        ffi::lua_insert(state, 2);
+        ffi::lua_gettop(state) - 1
     }
 }
 
