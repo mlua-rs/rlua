@@ -1,3 +1,7 @@
+## [0.9.6]
+- Fix an annoying bug that made external errors appear to have no further cause
+  errors in the cause chain.
+
 ## [0.9.5]
 - Fix incorrect `xpcall` behavior
 - Change FromLua / ToLua impls for HashMap to be generic over the hasher.  This
