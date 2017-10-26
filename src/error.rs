@@ -177,18 +177,27 @@ where
     E: Into<Box<StdError + Send + Sync>>,
 {
     fn to_lua_err(self) -> Error {
-        #[derive(Debug)]
         struct WrapError(Box<StdError + Send + Sync>);
+
+        impl fmt::Debug for WrapError {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                fmt::Debug::fmt(&self.0, f)
+            }
+        }
 
         impl fmt::Display for WrapError {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                self.0.fmt(f)
+                fmt::Display::fmt(&self.0, f)
             }
         }
 
         impl StdError for WrapError {
             fn description(&self) -> &str {
                 self.0.description()
+            }
+
+            fn cause(&self) -> Option<&StdError> {
+                self.0.cause()
             }
         }
 
