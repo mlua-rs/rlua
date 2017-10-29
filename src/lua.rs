@@ -562,6 +562,7 @@ impl Lua {
     /// The debug library is very unsound, loading it and using it breaks all
     /// the guarantees of rlua.
     pub unsafe fn load_debug(&self) {
+        check_stack(self.state, 1);
         ffi::luaL_requiref(self.state, cstr!("debug"), ffi::luaopen_debug, 1);
         ffi::lua_pop(self.state, 1);
     }
