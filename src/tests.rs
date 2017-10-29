@@ -15,6 +15,23 @@ fn test_load() {
 }
 
 #[test]
+fn test_load_debug() {
+    let lua = Lua::new();
+    lua.eval::<()>("debug", None).unwrap();
+    unsafe {
+        lua.load_debug();
+    }
+    match lua.eval("debug", None).unwrap() {
+        Value::Table(_) => {},
+        val => {
+            panic!("Expected table for debug library, got {:#?}", val)
+        }
+    }
+    let traceback_output = lua.eval::<String>("debug.traceback()", None).unwrap();
+    assert_eq!(traceback_output.split("\n").next(), "stack traceback:".into());
+}
+
+#[test]
 fn test_exec() {
     let lua = Lua::new();
     let globals = lua.globals();
