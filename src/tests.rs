@@ -17,7 +17,7 @@ fn test_load() {
 #[test]
 fn test_load_debug() {
     let lua = Lua::new();
-    lua.eval::<()>("debug", None).unwrap();
+    lua.exec::<()>("assert(debug == nil)", None).unwrap();
     unsafe {
         lua.load_debug();
     }
