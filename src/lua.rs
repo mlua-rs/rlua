@@ -563,6 +563,7 @@ impl Lua {
     /// the guarantees of rlua.
     pub unsafe fn load_debug(&self) {
         ffi::luaL_requiref(self.state, cstr!("debug"), ffi::luaopen_debug, 1);
+        ffi::lua_pop(self.state, 1);
     }
 
     /// Loads a chunk of Lua code and returns it as a function.
