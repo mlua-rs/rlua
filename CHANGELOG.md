@@ -1,3 +1,7 @@
+## [0.9.7]
+- Add unsafe function to load the debug Lua module (thanks @Timidger!)
+- Fix setmetatable wrapper with nil metatable (thanks again to @Timidger!)
+
 ## [0.9.6]
 - Fix an annoying bug that made external errors appear to have no further cause
   errors in the cause chain.
