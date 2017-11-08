@@ -512,7 +512,7 @@ pub unsafe extern "C" fn safe_setmetatable(state: *mut ffi::lua_State) -> c_int 
     // Wrapping the __gc method in setmetatable ONLY works because Lua 5.3 only honors the __gc
     // method when it exists upon calling setmetatable, and ignores it if it is set later.
     push_string(state, "__gc");
-    if ffi::lua_rawget(state, -2) == ffi::LUA_TFUNCTION {
+    if ffi::lua_istable(state, -2) == 1 && ffi::lua_rawget(state, -2) == ffi::LUA_TFUNCTION {
         unsafe extern "C" fn safe_gc(state: *mut ffi::lua_State) -> c_int {
             ffi::lua_pushvalue(state, ffi::lua_upvalueindex(1));
             ffi::lua_insert(state, 1);

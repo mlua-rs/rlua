@@ -629,6 +629,16 @@ fn test_recursive_callback_panic() {
         .unwrap();
 }
 
+#[test]
+fn test_set_metatable_nil() {
+    let lua = Lua::new();
+    lua.exec::<()>(
+    r#"
+        a = {}
+        setmetatable(a, nil)
+    "#, None).unwrap();
+}
+
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.
 /*
 #[test]
