@@ -425,7 +425,7 @@ pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<Error> {
 }
 
 // Checks if the value at the given index is a WrappedError
-pub unsafe fn is_wrapped_error(state: *mut ffi::lua_State, index: c_int) -> bool {
+unsafe fn is_wrapped_error(state: *mut ffi::lua_State, index: c_int) -> bool {
     assert_ne!(
         ffi::lua_checkstack(state, 2),
         0,
@@ -450,7 +450,7 @@ pub unsafe fn is_wrapped_error(state: *mut ffi::lua_State, index: c_int) -> bool
 }
 
 // Checks if the value at the given index is a WrappedPanic
-pub unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool {
+unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool {
     assert_ne!(
         ffi::lua_checkstack(state, 2),
         0,
@@ -474,7 +474,7 @@ pub unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool
     res
 }
 
-pub unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
+unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
         callback_error(state, || if is_wrapped_error(state, -1) {
             let error = get_userdata::<WrappedError>(state, -1);
@@ -523,7 +523,7 @@ pub unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
     ffi::LUA_TTABLE
 }
 
-pub unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
+unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
     ffi::lua_pushlightuserdata(
         state,
         &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
