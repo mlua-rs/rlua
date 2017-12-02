@@ -393,50 +393,11 @@ pub struct WrappedPanic(pub Option<Box<Any + Send>>);
 
 // Pushes a WrappedError::Error to the top of the stack
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
-    unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
-        callback_error(state, || if is_wrapped_error(state, -1) {
-            let error = get_userdata::<WrappedError>(state, -1);
-            push_string(state, &(*error).0.to_string());
-            ffi::lua_remove(state, -2);
-
-            Ok(1)
-        } else {
-            panic!("internal error: userdata mismatch in Error metamethod");
-        })
-    }
-
     ffi::luaL_checkstack(state, 2, ptr::null());
 
     push_userdata(state, WrappedError(err));
 
     get_error_metatable(state);
-    if ffi::lua_isnil(state, -1) != 0 {
-        ffi::lua_pop(state, 1);
-
-        ffi::luaL_checkstack(state, 7, ptr::null());
-
-        ffi::lua_newtable(state);
-        ffi::lua_pushlightuserdata(
-            state,
-            &ERROR_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-        );
-        ffi::lua_pushvalue(state, -2);
-
-        push_string(state, "__gc");
-        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedError>);
-        ffi::lua_settable(state, -3);
-
-        push_string(state, "__tostring");
-        ffi::lua_pushcfunction(state, error_tostring);
-        ffi::lua_settable(state, -3);
-
-        push_string(state, "__metatable");
-        ffi::lua_pushboolean(state, 0);
-        ffi::lua_settable(state, -3);
-
-        ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
-    }
-
     ffi::lua_setmetatable(state, -2);
 }
 
@@ -447,29 +408,6 @@ pub unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Se
     push_userdata(state, WrappedPanic(Some(panic)));
 
     get_panic_metatable(state);
-    if ffi::lua_isnil(state, -1) != 0 {
-        ffi::lua_pop(state, 1);
-
-        ffi::luaL_checkstack(state, 7, ptr::null());
-
-        ffi::lua_newtable(state);
-        ffi::lua_pushlightuserdata(
-            state,
-            &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-        );
-        ffi::lua_pushvalue(state, -2);
-
-        push_string(state, "__gc");
-        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
-        ffi::lua_settable(state, -3);
-
-        push_string(state, "__metatable");
-        ffi::lua_pushboolean(state, 0);
-        ffi::lua_settable(state, -3);
-
-        ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
-    }
-
     ffi::lua_setmetatable(state, -2);
 }
 
@@ -537,11 +475,52 @@ pub unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool
 }
 
 pub unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
+    unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
+        callback_error(state, || if is_wrapped_error(state, -1) {
+            let error = get_userdata::<WrappedError>(state, -1);
+            push_string(state, &(*error).0.to_string());
+            ffi::lua_remove(state, -2);
+
+            Ok(1)
+        } else {
+            panic!("internal error: userdata mismatch in Error metamethod");
+        })
+    }
+
     ffi::lua_pushlightuserdata(
         state,
         &ERROR_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
     );
-    ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX)
+    let t = ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX);
+
+    if t != ffi::LUA_TTABLE {
+        ffi::lua_pop(state, 1);
+
+        ffi::luaL_checkstack(state, 8, ptr::null());
+
+        ffi::lua_newtable(state);
+        ffi::lua_pushlightuserdata(
+            state,
+            &ERROR_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+        );
+        ffi::lua_pushvalue(state, -2);
+
+        push_string(state, "__gc");
+        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedError>);
+        ffi::lua_settable(state, -3);
+
+        push_string(state, "__tostring");
+        ffi::lua_pushcfunction(state, error_tostring);
+        ffi::lua_settable(state, -3);
+
+        push_string(state, "__metatable");
+        ffi::lua_pushboolean(state, 0);
+        ffi::lua_settable(state, -3);
+
+        ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+    }
+
+    ffi::LUA_TTABLE
 }
 
 pub unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
@@ -549,7 +528,32 @@ pub unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
         state,
         &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
     );
-    ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX)
+    let t = ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX);
+
+    if t != ffi::LUA_TTABLE {
+        ffi::lua_pop(state, 1);
+
+        ffi::luaL_checkstack(state, 8, ptr::null());
+
+        ffi::lua_newtable(state);
+        ffi::lua_pushlightuserdata(
+            state,
+            &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+        );
+        ffi::lua_pushvalue(state, -2);
+
+        push_string(state, "__gc");
+        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
+        ffi::lua_settable(state, -3);
+
+        push_string(state, "__metatable");
+        ffi::lua_pushboolean(state, 0);
+        ffi::lua_settable(state, -3);
+
+        ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+    }
+
+    ffi::LUA_TTABLE
 }
 
 static ERROR_METATABLE_REGISTRY_KEY: u8 = 0;
