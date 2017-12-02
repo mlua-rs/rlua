@@ -184,16 +184,18 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         R: ToLuaMulti<'lua>,
         M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
-        Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
-            let userdata = AnyUserData::from_lua(front, lua)?;
-            let userdata = userdata.borrow::<T>()?;
-            method(lua, &userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-        } else {
-            Err(Error::FromLuaConversionError {
-                from: "missing argument",
-                to: "userdata",
-                message: None,
-            })
+        Box::new(move |lua, mut args| {
+            if let Some(front) = args.pop_front() {
+                let userdata = AnyUserData::from_lua(front, lua)?;
+                let userdata = userdata.borrow::<T>()?;
+                method(lua, &userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+            } else {
+                Err(Error::FromLuaConversionError {
+                    from: "missing argument",
+                    to: "userdata",
+                    message: None,
+                })
+            }
         })
     }
 
@@ -203,16 +205,18 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         R: ToLuaMulti<'lua>,
         M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
-        Box::new(move |lua, mut args| if let Some(front) = args.pop_front() {
-            let userdata = AnyUserData::from_lua(front, lua)?;
-            let mut userdata = userdata.borrow_mut::<T>()?;
-            method(lua, &mut userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-        } else {
-            Err(Error::FromLuaConversionError {
-                from: "missing argument",
-                to: "userdata",
-                message: None,
-            })
+        Box::new(move |lua, mut args| {
+            if let Some(front) = args.pop_front() {
+                let userdata = AnyUserData::from_lua(front, lua)?;
+                let mut userdata = userdata.borrow_mut::<T>()?;
+                method(lua, &mut userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+            } else {
+                Err(Error::FromLuaConversionError {
+                    from: "missing argument",
+                    to: "userdata",
+                    message: None,
+                })
+            }
         })
     }
 }

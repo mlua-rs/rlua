@@ -22,13 +22,14 @@ fn test_load_debug() {
         lua.load_debug();
     }
     match lua.eval("debug", None).unwrap() {
-        Value::Table(_) => {},
-        val => {
-            panic!("Expected table for debug library, got {:#?}", val)
-        }
+        Value::Table(_) => {}
+        val => panic!("Expected table for debug library, got {:#?}", val),
     }
     let traceback_output = lua.eval::<String>("debug.traceback()", None).unwrap();
-    assert_eq!(traceback_output.split("\n").next(), "stack traceback:".into());
+    assert_eq!(
+        traceback_output.split("\n").next(),
+        "stack traceback:".into()
+    );
 }
 
 #[test]
@@ -553,8 +554,16 @@ fn test_pcall_xpcall() {
     assert!(lua.exec::<()>("xpcall(function() end)", None).is_err());
 
     // Make sure that the return values from are correct on success
-    assert_eq!(lua.eval::<(bool, String)>("pcall(function(p) return p end, 'foo')", None).unwrap(), (true, "foo".to_owned()));
-    assert_eq!(lua.eval::<(bool, String)>("xpcall(function(p) return p end, print, 'foo')", None).unwrap(), (true, "foo".to_owned()));
+    assert_eq!(
+        lua.eval::<(bool, String)>("pcall(function(p) return p end, 'foo')", None)
+            .unwrap(),
+        (true, "foo".to_owned())
+    );
+    assert_eq!(
+        lua.eval::<(bool, String)>("xpcall(function(p) return p end, print, 'foo')", None)
+            .unwrap(),
+        (true, "foo".to_owned())
+    );
 
     // Make sure that the return values are correct on errors, and that error handling works
 
@@ -633,10 +642,12 @@ fn test_recursive_callback_panic() {
 fn test_set_metatable_nil() {
     let lua = Lua::new();
     lua.exec::<()>(
-    r#"
+        r#"
         a = {}
         setmetatable(a, nil)
-    "#, None).unwrap();
+    "#,
+        None,
+    ).unwrap();
 }
 
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.
