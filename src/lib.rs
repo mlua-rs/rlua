@@ -45,6 +45,7 @@ extern crate libc;
 mod ffi;
 mod error;
 #[macro_use]
+mod macros;
 mod util;
 mod protected;
 mod types;
