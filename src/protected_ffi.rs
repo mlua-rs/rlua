@@ -1,12 +1,16 @@
-use std::os::raw::{c_int, c_void, c_char};
+#![allow(unused)]
+
+use std::os::raw::{c_char, c_int, c_void};
 use std::{mem, ptr};
 
 use ffi;
-use error::{Result};
-use util::{handle_error, pcall_with_traceback};
 
 // Protected version of lua_gettable, uses 3 stack spaces, does not call checkstack.
-pub unsafe fn pgettable(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
+pub unsafe fn pgettable(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    msgh: c_int,
+) -> Result<c_int, c_int> {
     unsafe extern "C" fn gettable(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_gettable(state, -2);
         1
@@ -19,12 +23,20 @@ pub unsafe fn pgettable(state: *mut ffi::lua_State, index: c_int) -> Result<c_in
     ffi::lua_pushvalue(state, -3);
     ffi::lua_remove(state, -4);
 
-    handle_error(state, pcall_with_traceback(state, 2, 1))?;
-    Ok(ffi::lua_type(state, -1))
+    let ret = ffi::lua_pcall(state, 2, 1, msgh);
+    if ret == ffi::LUA_OK {
+        Ok(ffi::lua_type(state, -1))
+    } else {
+        Err(ret)
+    }
 }
 
 // Protected version of lua_settable, uses 4 stack spaces, does not call checkstack.
-pub unsafe fn psettable(state: *mut ffi::lua_State, index: c_int) -> Result<()> {
+pub unsafe fn psettable(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    msgh: c_int,
+) -> Result<(), c_int> {
     unsafe extern "C" fn settable(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_settable(state, -3);
         0
@@ -39,12 +51,20 @@ pub unsafe fn psettable(state: *mut ffi::lua_State, index: c_int) -> Result<()> 
     ffi::lua_remove(state, -5);
     ffi::lua_remove(state, -5);
 
-    handle_error(state, pcall_with_traceback(state, 3, 0))?;
-    Ok(())
+    let ret = ffi::lua_pcall(state, 3, 0, msgh);
+    if ret == ffi::LUA_OK {
+        Ok(())
+    } else {
+        Err(ret)
+    }
 }
 
 // Protected version of luaL_len, uses 2 stack spaces, does not call checkstack.
-pub unsafe fn plen(state: *mut ffi::lua_State, index: c_int) -> Result<ffi::lua_Integer> {
+pub unsafe fn plen(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    msgh: c_int,
+) -> Result<ffi::lua_Integer, c_int> {
     unsafe extern "C" fn len(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_pushinteger(state, ffi::luaL_len(state, -1));
         1
@@ -55,10 +75,14 @@ pub unsafe fn plen(state: *mut ffi::lua_State, index: c_int) -> Result<ffi::lua_
     ffi::lua_pushcfunction(state, len);
     ffi::lua_pushvalue(state, table_index);
 
-    handle_error(state, pcall_with_traceback(state, 1, 1))?;
-    let len = ffi::lua_tointeger(state, -1);
-    ffi::lua_pop(state, 1);
-    Ok(len)
+    let ret = ffi::lua_pcall(state, 1, 1, msgh);
+    if ret == ffi::LUA_OK {
+        let len = ffi::lua_tointeger(state, -1);
+        ffi::lua_pop(state, 1);
+        Ok(len)
+    } else {
+        Err(ret)
+    }
 }
 
 // Protected version of lua_geti, uses 3 stack spaces, does not call checkstack.
@@ -66,7 +90,8 @@ pub unsafe fn pgeti(
     state: *mut ffi::lua_State,
     index: c_int,
     i: ffi::lua_Integer,
-) -> Result<c_int> {
+    msgh: c_int,
+) -> Result<c_int, c_int> {
     unsafe extern "C" fn geti(state: *mut ffi::lua_State) -> c_int {
         let i = ffi::lua_tointeger(state, -1);
         ffi::lua_geti(state, -2, i);
@@ -79,12 +104,16 @@ pub unsafe fn pgeti(
     ffi::lua_pushvalue(state, table_index);
     ffi::lua_pushinteger(state, i);
 
-    handle_error(state, pcall_with_traceback(state, 2, 1))?;
-    Ok(ffi::lua_type(state, -1))
+    let ret = ffi::lua_pcall(state, 2, 1, msgh);
+    if ret == ffi::LUA_OK {
+        Ok(ffi::lua_type(state, -1))
+    } else {
+        Err(ret)
+    }
 }
 
 // Protected version of lua_next, uses 3 stack spaces, does not call checkstack.
-pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
+pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int, msgh: c_int) -> Result<c_int, c_int> {
     unsafe extern "C" fn next(state: *mut ffi::lua_State) -> c_int {
         if ffi::lua_next(state, -2) == 0 {
             0
@@ -101,17 +130,21 @@ pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
     ffi::lua_remove(state, -4);
 
     let stack_start = ffi::lua_gettop(state) - 3;
-    handle_error(state, pcall_with_traceback(state, 2, ffi::LUA_MULTRET))?;
-    let nresults = ffi::lua_gettop(state) - stack_start;
-    if nresults == 0 {
-        Ok(0)
+    let ret = ffi::lua_pcall(state, 2, ffi::LUA_MULTRET, msgh);
+    if ret == ffi::LUA_OK {
+        let nresults = ffi::lua_gettop(state) - stack_start;
+        if nresults == 0 {
+            Ok(0)
+        } else {
+            Ok(1)
+        }
     } else {
-        Ok(1)
+        Err(ret)
     }
 }
 
 // Protected version of lua_newtable, uses 1 stack space, does not call checkstack.
-pub unsafe fn pnewtable(state: *mut ffi::lua_State) -> Result<()> {
+pub unsafe fn pnewtable(state: *mut ffi::lua_State, msgh: c_int) -> Result<(), c_int> {
     unsafe extern "C" fn newtable(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_newtable(state);
         1
@@ -119,12 +152,19 @@ pub unsafe fn pnewtable(state: *mut ffi::lua_State) -> Result<()> {
 
     ffi::lua_pushcfunction(state, newtable);
 
-    handle_error(state, pcall_with_traceback(state, 0, 1))?;
-    Ok(())
+    let ret = ffi::lua_pcall(state, 0, 1, msgh);
+    if ret == ffi::LUA_OK {
+        Ok(())
+    } else {
+        Err(ret)
+    }
 }
 
 // Protected version of lua_newthread, uses 1 stack space, does not call checkstack.
-pub unsafe fn pnewthread(state: *mut ffi::lua_State) -> Result<*mut ffi::lua_State> {
+pub unsafe fn pnewthread(
+    state: *mut ffi::lua_State,
+    msgh: c_int,
+) -> Result<*mut ffi::lua_State, c_int> {
     unsafe extern "C" fn newthread(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_newthread(state);
         1
@@ -132,12 +172,20 @@ pub unsafe fn pnewthread(state: *mut ffi::lua_State) -> Result<*mut ffi::lua_Sta
 
     ffi::lua_pushcfunction(state, newthread);
 
-    handle_error(state, pcall_with_traceback(state, 0, 1))?;
-    Ok(ffi::lua_tothread(state, -1))
+    let ret = ffi::lua_pcall(state, 0, 1, msgh);
+    if ret == ffi::LUA_OK {
+        Ok(ffi::lua_tothread(state, -1))
+    } else {
+        Err(ret)
+    }
 }
 
-// Protected version of lua_newuserdata, uses 2 stack space, does not call checkstack.
-pub unsafe fn pnewuserdata(state: *mut ffi::lua_State, size: usize) -> Result<*mut c_void> {
+// Protected version of lua_newuserdata, uses 2 stack spaces, does not call checkstack.
+pub unsafe fn pnewuserdata(
+    state: *mut ffi::lua_State,
+    size: usize,
+    msgh: c_int,
+) -> Result<*mut c_void, c_int> {
     unsafe extern "C" fn newuserdata(state: *mut ffi::lua_State) -> c_int {
         let size = ffi::lua_touserdata(state, -1) as usize;
         ffi::lua_newuserdata(state, size);
@@ -147,11 +195,21 @@ pub unsafe fn pnewuserdata(state: *mut ffi::lua_State, size: usize) -> Result<*m
     ffi::lua_pushcfunction(state, newuserdata);
     ffi::lua_pushlightuserdata(state, size as *mut c_void);
 
-    handle_error(state, pcall_with_traceback(state, 1, 1))?;
-    Ok(ffi::lua_touserdata(state, -1))
+    let ret = ffi::lua_pcall(state, 1, 1, msgh);
+    if ret == ffi::LUA_OK {
+        Ok(ffi::lua_touserdata(state, -1))
+    } else {
+        Err(ret)
+    }
 }
 
-pub unsafe fn ppushcclosure(state: *mut ffi::lua_State, function: ffi::lua_CFunction, n: c_int) -> Result<()> {
+// Protected version of lua_pushcclosure, uses 2 extra stack spaces, does not call checkstack.
+pub unsafe fn ppushcclosure(
+    state: *mut ffi::lua_State,
+    function: ffi::lua_CFunction,
+    n: c_int,
+    msgh: c_int,
+) -> Result<(), c_int> {
     unsafe extern "C" fn pushcclosure(state: *mut ffi::lua_State) -> c_int {
         let function: ffi::lua_CFunction = mem::transmute(ffi::lua_touserdata(state, -2));
         let n = ffi::lua_touserdata(state, -1) as c_int;
@@ -162,17 +220,26 @@ pub unsafe fn ppushcclosure(state: *mut ffi::lua_State, function: ffi::lua_CFunc
 
     if n == 0 {
         ffi::lua_pushcclosure(state, function, 0);
+        Ok(())
     } else {
         ffi::lua_pushlightuserdata(state, function as *mut c_void);
         ffi::lua_pushlightuserdata(state, n as *mut c_void);
 
-        handle_error(state, pcall_with_traceback(state, n.checked_add(2).unwrap(), 1))?;
+        let ret = ffi::lua_pcall(state, n.checked_add(2).unwrap(), 1, msgh);
+        if ret == ffi::LUA_OK {
+            Ok(())
+        } else {
+            Err(ret)
+        }
     }
-
-    Ok(())
 }
 
-pub unsafe fn ppushlstring(state: *mut ffi::lua_State, s: *const c_char, len: usize) -> Result<*const c_char> {
+pub unsafe fn ppushlstring(
+    state: *mut ffi::lua_State,
+    s: *const c_char,
+    len: usize,
+    msgh: c_int,
+) -> Result<*const c_char, c_int> {
     unsafe extern "C" fn pushlstring(state: *mut ffi::lua_State) -> c_int {
         let s = ffi::lua_touserdata(state, -2) as *const c_char;
         let len = ffi::lua_touserdata(state, -1) as usize;
@@ -183,14 +250,16 @@ pub unsafe fn ppushlstring(state: *mut ffi::lua_State, s: *const c_char, len: us
     ffi::lua_pushlightuserdata(state, s as *mut c_void);
     ffi::lua_pushlightuserdata(state, len as *mut c_void);
 
-    handle_error(state, pcall_with_traceback(state, 2, 1))?;
-
-    // If the value is already a string, I believe that lua_tostring / lua_tolstring never throw
-    // memory errors
-    Ok(ffi::lua_tostring(state, -1))
+    let ret = ffi::lua_pcall(state, 2, 1, msgh);
+    if ret == ffi::LUA_OK {
+        // ffi::lua_tostring does not cause memory errors if the value is already a string
+        Ok(ffi::lua_tostring(state, -1))
+    } else {
+        Err(ret)
+    }
 }
 
-pub unsafe fn prawset(state: *mut ffi::lua_State, index: c_int) -> Result<()> {
+pub unsafe fn prawset(state: *mut ffi::lua_State, index: c_int, msgh: c_int) -> Result<(), c_int> {
     unsafe extern "C" fn rawset(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_rawset(state, -3);
         0
@@ -205,11 +274,20 @@ pub unsafe fn prawset(state: *mut ffi::lua_State, index: c_int) -> Result<()> {
     ffi::lua_remove(state, -5);
     ffi::lua_remove(state, -5);
 
-    handle_error(state, pcall_with_traceback(state, 3, 0))?;
-    Ok(())
+    let ret = ffi::lua_pcall(state, 3, 0, msgh);
+    if ret == ffi::LUA_OK {
+        Ok(())
+    } else {
+        Err(ret)
+    }
 }
 
-pub unsafe fn ptolstring(state: *mut ffi::lua_State, index: c_int, len: *mut usize) -> Result<*const c_char> {
+pub unsafe fn ptolstring(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    len: *mut usize,
+    msgh: c_int,
+) -> Result<*const c_char, c_int> {
     unsafe extern "C" fn tolstring(state: *mut ffi::lua_State) -> c_int {
         let len = ffi::lua_touserdata(state, -2) as *mut usize;
         ffi::lua_tolstring(state, -1, len);
@@ -222,19 +300,21 @@ pub unsafe fn ptolstring(state: *mut ffi::lua_State, index: c_int, len: *mut usi
     ffi::lua_pushlightuserdata(state, len as *mut c_void);
     ffi::lua_pushvalue(state, index);
 
-    match handle_error(state, pcall_with_traceback(state, 2, 1)) {
-        Ok(_) => {
-            ffi::lua_replace(state, index);
-            Ok(ffi::lua_tostring(state, index))
-        }
-        Err(err) => {
-            ffi::lua_pop(state, 1);
-            Err(err)
-        }
+    let ret = ffi::lua_pcall(state, 2, 1, msgh);
+    if ret == ffi::LUA_OK {
+        ffi::lua_replace(state, index);
+        // ffi::lua_tostring does not cause memory errors if the value is already a string
+        Ok(ffi::lua_tostring(state, index))
+    } else {
+        Err(ret)
     }
 }
 
-pub unsafe fn ptostring(state: *mut ffi::lua_State, index: c_int) -> Result<*const c_char> {
+pub unsafe fn ptostring(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    msgh: c_int,
+) -> Result<*const c_char, c_int> {
     unsafe extern "C" fn tostring(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_tolstring(state, -1, ptr::null_mut());
         1
@@ -245,14 +325,12 @@ pub unsafe fn ptostring(state: *mut ffi::lua_State, index: c_int) -> Result<*con
     ffi::lua_pushcfunction(state, tostring);
     ffi::lua_pushvalue(state, index);
 
-    match handle_error(state, pcall_with_traceback(state, 1, 1)) {
-        Ok(_) => {
-            ffi::lua_replace(state, index);
-            Ok(ffi::lua_tostring(state, index))
-        }
-        Err(err) => {
-            ffi::lua_pop(state, 1);
-            Err(err)
-        }
+    let ret = ffi::lua_pcall(state, 1, 1, msgh);
+    if ret == ffi::LUA_OK {
+        ffi::lua_replace(state, index);
+        // ffi::lua_tostring does not cause memory errors if the value is already a string
+        Ok(ffi::lua_tostring(state, index))
+    } else {
+        Err(ret)
     }
 }

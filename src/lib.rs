@@ -43,11 +43,11 @@
 extern crate libc;
 
 mod ffi;
+mod protected_ffi;
 mod error;
 #[macro_use]
 mod macros;
 mod util;
-mod protected;
 mod types;
 mod lua;
 mod conversion;

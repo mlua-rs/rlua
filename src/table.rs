@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 use ffi;
 use error::Result;
 use util::*;
-use protected::*;
 use types::{Integer, LuaRef};
 use lua::{FromLua, ToLua};
 

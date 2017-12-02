@@ -93,6 +93,111 @@ where
     res
 }
 
+// Protected version of lua_gettable, uses 3 stack spaces, does not call checkstack.
+pub unsafe fn pgettable(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
+    unsafe extern "C" fn gettable(state: *mut ffi::lua_State) -> c_int {
+        ffi::lua_gettable(state, -2);
+        1
+    }
+
+    let table_index = ffi::lua_absindex(state, index);
+
+    ffi::lua_pushcfunction(state, gettable);
+    ffi::lua_pushvalue(state, table_index);
+    ffi::lua_pushvalue(state, -3);
+    ffi::lua_remove(state, -4);
+
+    handle_error(state, pcall_with_traceback(state, 2, 1))?;
+    Ok(ffi::lua_type(state, -1))
+}
+
+// Protected version of lua_settable, uses 4 stack spaces, does not call checkstack.
+pub unsafe fn psettable(state: *mut ffi::lua_State, index: c_int) -> Result<()> {
+    unsafe extern "C" fn settable(state: *mut ffi::lua_State) -> c_int {
+        ffi::lua_settable(state, -3);
+        0
+    }
+
+    let table_index = ffi::lua_absindex(state, index);
+
+    ffi::lua_pushcfunction(state, settable);
+    ffi::lua_pushvalue(state, table_index);
+    ffi::lua_pushvalue(state, -4);
+    ffi::lua_pushvalue(state, -4);
+    ffi::lua_remove(state, -5);
+    ffi::lua_remove(state, -5);
+
+    handle_error(state, pcall_with_traceback(state, 3, 0))?;
+    Ok(())
+}
+
+// Protected version of luaL_len, uses 2 stack spaces, does not call checkstack.
+pub unsafe fn plen(state: *mut ffi::lua_State, index: c_int) -> Result<ffi::lua_Integer> {
+    unsafe extern "C" fn len(state: *mut ffi::lua_State) -> c_int {
+        ffi::lua_pushinteger(state, ffi::luaL_len(state, -1));
+        1
+    }
+
+    let table_index = ffi::lua_absindex(state, index);
+
+    ffi::lua_pushcfunction(state, len);
+    ffi::lua_pushvalue(state, table_index);
+
+    handle_error(state, pcall_with_traceback(state, 1, 1))?;
+    let len = ffi::lua_tointeger(state, -1);
+    ffi::lua_pop(state, 1);
+    Ok(len)
+}
+
+// Protected version of lua_geti, uses 3 stack spaces, does not call checkstack.
+pub unsafe fn pgeti(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    i: ffi::lua_Integer,
+) -> Result<c_int> {
+    unsafe extern "C" fn geti(state: *mut ffi::lua_State) -> c_int {
+        let i = ffi::lua_tointeger(state, -1);
+        ffi::lua_geti(state, -2, i);
+        1
+    }
+
+    let table_index = ffi::lua_absindex(state, index);
+
+    ffi::lua_pushcfunction(state, geti);
+    ffi::lua_pushvalue(state, table_index);
+    ffi::lua_pushinteger(state, i);
+
+    handle_error(state, pcall_with_traceback(state, 2, 1))?;
+    Ok(ffi::lua_type(state, -1))
+}
+
+// Protected version of lua_next, uses 3 stack spaces, does not call checkstack.
+pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
+    unsafe extern "C" fn next(state: *mut ffi::lua_State) -> c_int {
+        if ffi::lua_next(state, -2) == 0 {
+            0
+        } else {
+            2
+        }
+    }
+
+    let table_index = ffi::lua_absindex(state, index);
+
+    ffi::lua_pushcfunction(state, next);
+    ffi::lua_pushvalue(state, table_index);
+    ffi::lua_pushvalue(state, -3);
+    ffi::lua_remove(state, -4);
+
+    let stack_start = ffi::lua_gettop(state) - 3;
+    handle_error(state, pcall_with_traceback(state, 2, ffi::LUA_MULTRET))?;
+    let nresults = ffi::lua_gettop(state) - stack_start;
+    if nresults == 0 {
+        Ok(0)
+    } else {
+        Ok(1)
+    }
+}
+
 // If the return code indicates an error, pops the error off of the stack and
 // returns Err. If the error is actually a WrappedPanic, clears the current lua
 // stack and continues the panic.  If the error on the top of the stack is
@@ -476,14 +581,16 @@ unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool {
 
 unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
-        callback_error(state, || if is_wrapped_error(state, -1) {
-            let error = get_userdata::<WrappedError>(state, -1);
-            push_string(state, &(*error).0.to_string());
-            ffi::lua_remove(state, -2);
+        callback_error(state, || {
+            if is_wrapped_error(state, -1) {
+                let error = get_userdata::<WrappedError>(state, -1);
+                push_string(state, &(*error).0.to_string());
+                ffi::lua_remove(state, -2);
 
-            Ok(1)
-        } else {
-            panic!("internal error: userdata mismatch in Error metamethod");
+                Ok(1)
+            } else {
+                panic!("internal error: userdata mismatch in Error metamethod");
+            }
         })
     }
 
