@@ -1,7 +1,6 @@
-//! Bindings to the Lua 5.3 C API.
-
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(unused)]
 
 use std::ptr;
 use std::os::raw::{c_char, c_double, c_int, c_longlong, c_void};

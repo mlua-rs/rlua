@@ -42,10 +42,11 @@
 
 extern crate libc;
 
-pub mod ffi;
+mod ffi;
+mod error;
 #[macro_use]
 mod util;
-mod error;
+mod protected;
 mod types;
 mod lua;
 mod conversion;
