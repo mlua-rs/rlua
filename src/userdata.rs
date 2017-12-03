@@ -173,9 +173,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         R: ToLuaMulti<'lua>,
         F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
     {
-        Box::new(move |lua, args| {
-            function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-        })
+        Box::new(move |lua, args| function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua))
     }
 
     fn box_method<A, R, M>(mut method: M) -> Callback<'lua>
@@ -332,9 +330,8 @@ impl<'lua> AnyUserData<'lua> {
     /// Returns a `UserDataBorrowError` if the userdata is already mutably borrowed. Returns a
     /// `UserDataTypeMismatch` if the userdata is not of type `T`.
     pub fn borrow<T: UserData>(&self) -> Result<Ref<T>> {
-        self.inspect(|cell| {
-            Ok(cell.try_borrow().map_err(|_| Error::UserDataBorrowError)?)
-        }).ok_or(Error::UserDataTypeMismatch)?
+        self.inspect(|cell| Ok(cell.try_borrow().map_err(|_| Error::UserDataBorrowError)?))
+            .ok_or(Error::UserDataTypeMismatch)?
     }
 
     /// Borrow this userdata mutably if it is of type `T`.
@@ -463,14 +460,14 @@ mod tests {
         impl UserData for MyUserData {
             fn add_methods(methods: &mut UserDataMethods<Self>) {
                 methods.add_method("get", |_, data, ()| Ok(data.0));
-                methods
-                    .add_meta_function(MetaMethod::Add, |_, (lhs, rhs): (MyUserData, MyUserData)| {
-                        Ok(MyUserData(lhs.0 + rhs.0))
-                    });
-                methods
-                    .add_meta_function(MetaMethod::Sub, |_, (lhs, rhs): (MyUserData, MyUserData)| {
-                        Ok(MyUserData(lhs.0 - rhs.0))
-                    });
+                methods.add_meta_function(
+                    MetaMethod::Add,
+                    |_, (lhs, rhs): (MyUserData, MyUserData)| Ok(MyUserData(lhs.0 + rhs.0)),
+                );
+                methods.add_meta_function(
+                    MetaMethod::Sub,
+                    |_, (lhs, rhs): (MyUserData, MyUserData)| Ok(MyUserData(lhs.0 - rhs.0)),
+                );
                 methods.add_meta_method(MetaMethod::Index, |_, data, index: String| {
                     if index.to_str()? == "inner" {
                         Ok(data.0)
