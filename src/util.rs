@@ -107,8 +107,10 @@ pub unsafe fn pgettable(state: *mut ffi::lua_State, index: c_int) -> Result<c_in
     ffi::lua_pushvalue(state, -3);
     ffi::lua_remove(state, -4);
 
-    handle_error(state, pcall_with_traceback(state, 2, 1))?;
-    Ok(ffi::lua_type(state, -1))
+    match pcall_with_traceback(state, 2, 1) {
+        ffi::LUA_OK => Ok(ffi::lua_type(state, -1)),
+        err => Err(pop_error(state, err)),
+    }
 }
 
 // Protected version of lua_settable, uses 4 stack spaces, does not call checkstack.
@@ -127,8 +129,10 @@ pub unsafe fn psettable(state: *mut ffi::lua_State, index: c_int) -> Result<()> 
     ffi::lua_remove(state, -5);
     ffi::lua_remove(state, -5);
 
-    handle_error(state, pcall_with_traceback(state, 3, 0))?;
-    Ok(())
+    match pcall_with_traceback(state, 3, 0) {
+        ffi::LUA_OK => Ok(()),
+        err => Err(pop_error(state, err)),
+    }
 }
 
 // Protected version of luaL_len, uses 2 stack spaces, does not call checkstack.
@@ -143,10 +147,14 @@ pub unsafe fn plen(state: *mut ffi::lua_State, index: c_int) -> Result<ffi::lua_
     ffi::lua_pushcfunction(state, len);
     ffi::lua_pushvalue(state, table_index);
 
-    handle_error(state, pcall_with_traceback(state, 1, 1))?;
-    let len = ffi::lua_tointeger(state, -1);
-    ffi::lua_pop(state, 1);
-    Ok(len)
+    match pcall_with_traceback(state, 1, 1) {
+        ffi::LUA_OK => {
+            let len = ffi::lua_tointeger(state, -1);
+            ffi::lua_pop(state, 1);
+            Ok(len)
+        }
+        err => Err(pop_error(state, err)),
+    }
 }
 
 // Protected version of lua_geti, uses 3 stack spaces, does not call checkstack.
@@ -167,8 +175,10 @@ pub unsafe fn pgeti(
     ffi::lua_pushvalue(state, table_index);
     ffi::lua_pushinteger(state, i);
 
-    handle_error(state, pcall_with_traceback(state, 2, 1))?;
-    Ok(ffi::lua_type(state, -1))
+    match pcall_with_traceback(state, 2, 1) {
+        ffi::LUA_OK => Ok(ffi::lua_type(state, -1)),
+        err => Err(pop_error(state, err)),
+    }
 }
 
 // Protected version of lua_next, uses 3 stack spaces, does not call checkstack.
@@ -189,25 +199,31 @@ pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
     ffi::lua_remove(state, -4);
 
     let stack_start = ffi::lua_gettop(state) - 3;
-    handle_error(state, pcall_with_traceback(state, 2, ffi::LUA_MULTRET))?;
-    let nresults = ffi::lua_gettop(state) - stack_start;
-    if nresults == 0 {
-        Ok(0)
-    } else {
-        Ok(1)
+    match pcall_with_traceback(state, 2, ffi::LUA_MULTRET) {
+        ffi::LUA_OK => {
+            let nresults = ffi::lua_gettop(state) - stack_start;
+            if nresults == 0 {
+                Ok(0)
+            } else {
+                Ok(1)
+            }
+        }
+        err => Err(pop_error(state, err)),
     }
 }
 
-// If the return code indicates an error, pops the error off of the stack and
-// returns Err. If the error is actually a WrappedPanic, clears the current lua
-// stack and continues the panic.  If the error on the top of the stack is
-// actually a WrappedError, just returns it.  Otherwise, interprets the error as
-// the appropriate lua error.
-pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()> {
-    if err == ffi::LUA_OK || err == ffi::LUA_YIELD {
-        Ok(())
-    } else if let Some(err) = pop_wrapped_error(state) {
-        Err(err)
+// Pops an error off of the stack and returns it. If the error is actually a WrappedPanic, clears
+// the current lua stack and continues the panic.  If the error on the top of the stack is actually
+// a WrappedError, just returns it.  Otherwise, interprets the error as the appropriate lua error.
+pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
+    lua_assert!(
+        state,
+        err_code != ffi::LUA_OK && err_code != ffi::LUA_YIELD,
+        "pop_error called with non-error return code"
+    );
+
+    if let Some(err) = pop_wrapped_error(state) {
+        err
     } else if is_wrapped_panic(state, -1) {
         let panic = get_userdata::<WrappedPanic>(state, -1);
         if let Some(p) = (*panic).0.take() {
@@ -227,7 +243,7 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
         };
         ffi::lua_pop(state, 1);
 
-        Err(match err {
+        match err_code {
             ffi::LUA_ERRRUN => Error::RuntimeError(err_string),
             ffi::LUA_ERRSYNTAX => {
                 Error::SyntaxError {
@@ -258,7 +274,7 @@ pub unsafe fn handle_error(state: *mut ffi::lua_State, err: c_int) -> Result<()>
                 process::abort()
             }
             _ => lua_panic!(state, "internal error: unrecognized lua error code"),
-        })
+        }
     }
 }
 
@@ -293,7 +309,7 @@ pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c
 
 // In the context of a lua callback, this will call the given function and if the given function
 // returns an error, *or if the given function panics*, this will result in a call to lua_error (a
-// longjmp).  The error or panic is wrapped in such a way that when calling handle_error back on
+// longjmp).  The error or panic is wrapped in such a way that when calling pop_error back on
 // the rust side, it will resume the panic.
 pub unsafe fn callback_error<R, F>(state: *mut ffi::lua_State, f: F) -> R
 where
@@ -313,8 +329,8 @@ where
 }
 
 // Takes an error at the top of the stack, and if it is a WrappedError, converts it to an
-// Error::CallbackError with a traceback.  If it is a lua error, creates a new string error with a
-// printed traceback, and if it is a WrappedPanic, does not modify it.
+// Error::CallbackError with a traceback, if it is some lua type, prints the error along with a
+// traceback, and if it is a WrappedPanic, does not modify it.
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     if let Some(error) = pop_wrapped_error(state) {
         ffi::luaL_traceback(state, state, ptr::null(), 0);
@@ -345,29 +361,13 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
 // ffi::lua_pcall with a message handler that gives a nice traceback.  If the
 // caught error is actually a Error, will simply pass the error along.  Does
 // not call checkstack, and uses 2 extra stack spaces.
-pub unsafe fn pcall_with_traceback(
-    state: *mut ffi::lua_State,
-    nargs: c_int,
-    nresults: c_int,
-) -> c_int {
+unsafe fn pcall_with_traceback(state: *mut ffi::lua_State, nargs: c_int, nresults: c_int) -> c_int {
     let msgh_position = ffi::lua_gettop(state) - nargs;
     ffi::lua_pushcfunction(state, error_traceback);
     ffi::lua_insert(state, msgh_position);
     let ret = ffi::lua_pcall(state, nargs, nresults, msgh_position);
     ffi::lua_remove(state, msgh_position);
     ret
-}
-
-pub unsafe fn resume_with_traceback(
-    state: *mut ffi::lua_State,
-    from: *mut ffi::lua_State,
-    nargs: c_int,
-) -> c_int {
-    let res = ffi::lua_resume(state, from, nargs);
-    if res != ffi::LUA_OK && res != ffi::LUA_YIELD {
-        error_traceback(state);
-    }
-    res
 }
 
 // A variant of pcall that does not allow lua to catch panic errors from callback_error

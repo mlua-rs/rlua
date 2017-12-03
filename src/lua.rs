@@ -205,21 +205,23 @@ impl<'lua> Function<'lua> {
                 let nargs = args.len() as c_int;
                 check_stack(lua.state, nargs + 3);
 
+                ffi::lua_pushcfunction(lua.state, error_traceback);
                 let stack_start = ffi::lua_gettop(lua.state);
                 lua.push_ref(lua.state, &self.0);
                 for arg in args {
                     lua.push_value(lua.state, arg);
                 }
-                handle_error(
-                    lua.state,
-                    pcall_with_traceback(lua.state, nargs, ffi::LUA_MULTRET),
-                )?;
+                let ret = ffi::lua_pcall(lua.state, nargs, ffi::LUA_MULTRET, stack_start);
+                if ret != ffi::LUA_OK {
+                    return Err(pop_error(lua.state, ret));
+                }
                 let nresults = ffi::lua_gettop(lua.state) - stack_start;
                 let mut results = MultiValue::new();
                 check_stack(lua.state, 1);
                 for _ in 0..nresults {
                     results.push_front(lua.pop_value(lua.state));
                 }
+                ffi::lua_pop(lua.state, 1);
                 R::from_lua_multi(results, lua)
             })
         }
@@ -391,10 +393,11 @@ impl<'lua> Thread<'lua> {
                     lua.push_value(thread_state, arg);
                 }
 
-                handle_error(
-                    thread_state,
-                    resume_with_traceback(thread_state, lua.state, nargs),
-                )?;
+                let ret = ffi::lua_resume(thread_state, lua.state, nargs);
+                if ret != ffi::LUA_OK && ret != ffi::LUA_YIELD {
+                    error_traceback(thread_state);
+                    return Err(pop_error(thread_state, ret));
+                }
 
                 let nresults = ffi::lua_gettop(thread_state);
                 let mut results = MultiValue::new();
@@ -442,6 +445,14 @@ impl Drop for Lua {
     fn drop(&mut self) {
         unsafe {
             if !self.ephemeral {
+                if cfg!(test) {
+                    let top = ffi::lua_gettop(self.state);
+                    if top != 0 {
+                        eprintln!("Lua stack leak detected, stack top is {}", top);
+                        ::std::process::abort()
+                    }
+                }
+
                 ffi::lua_close(self.state);
             }
         }
@@ -578,33 +589,31 @@ impl Lua {
             stack_err_guard(self.state, 0, || {
                 check_stack(self.state, 1);
 
-                handle_error(
-                    self.state,
-                    if let Some(name) = name {
-                        let name = CString::new(name.to_owned()).map_err(|e| {
-                            Error::ToLuaConversionError {
-                                from: "&str",
-                                to: "string",
-                                message: Some(e.to_string()),
-                            }
-                        })?;
-                        ffi::luaL_loadbuffer(
-                            self.state,
-                            source.as_ptr() as *const c_char,
-                            source.len(),
-                            name.as_ptr(),
-                        )
-                    } else {
-                        ffi::luaL_loadbuffer(
-                            self.state,
-                            source.as_ptr() as *const c_char,
-                            source.len(),
-                            ptr::null(),
-                        )
-                    },
-                )?;
-
-                Ok(Function(self.pop_ref(self.state)))
+                match if let Some(name) = name {
+                    let name = CString::new(name.to_owned()).map_err(|e| {
+                        Error::ToLuaConversionError {
+                            from: "&str",
+                            to: "string",
+                            message: Some(e.to_string()),
+                        }
+                    })?;
+                    ffi::luaL_loadbuffer(
+                        self.state,
+                        source.as_ptr() as *const c_char,
+                        source.len(),
+                        name.as_ptr(),
+                    )
+                } else {
+                    ffi::luaL_loadbuffer(
+                        self.state,
+                        source.as_ptr() as *const c_char,
+                        source.len(),
+                        ptr::null(),
+                    )
+                } {
+                    ffi::LUA_OK => Ok(Function(self.pop_ref(self.state))),
+                    err => Err(pop_error(self.state, err)),
+                }
             })
         }
     }
