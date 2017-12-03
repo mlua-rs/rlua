@@ -312,6 +312,36 @@ where
     }
 }
 
+// Takes an error at the top of the stack, and if it is a WrappedError, converts it to an
+// Error::CallbackError with a traceback.  If it is a lua error, creates a new string error with a
+// printed traceback, and if it is a WrappedPanic, does not modify it.
+pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
+    if let Some(error) = pop_wrapped_error(state) {
+        ffi::luaL_traceback(state, state, ptr::null(), 0);
+        let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
+            .to_string_lossy()
+            .into_owned();
+        push_wrapped_error(
+            state,
+            Error::CallbackError {
+                traceback,
+                cause: Arc::new(error),
+            },
+        );
+        ffi::lua_remove(state, -2);
+    } else if !is_wrapped_panic(state, 1) {
+        let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
+        let s = if s.is_null() {
+            cstr!("<unprintable Rust panic>")
+        } else {
+            s
+        };
+        ffi::luaL_traceback(state, state, s, 0);
+        ffi::lua_remove(state, -2);
+    }
+    1
+}
+
 // ffi::lua_pcall with a message handler that gives a nice traceback.  If the
 // caught error is actually a Error, will simply pass the error along.  Does
 // not call checkstack, and uses 2 extra stack spaces.
@@ -320,35 +350,8 @@ pub unsafe fn pcall_with_traceback(
     nargs: c_int,
     nresults: c_int,
 ) -> c_int {
-    unsafe extern "C" fn message_handler(state: *mut ffi::lua_State) -> c_int {
-        if let Some(error) = pop_wrapped_error(state) {
-            ffi::luaL_traceback(state, state, ptr::null(), 0);
-            let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
-                .to_string_lossy()
-                .into_owned();
-            push_wrapped_error(
-                state,
-                Error::CallbackError {
-                    traceback,
-                    cause: Arc::new(error),
-                },
-            );
-            ffi::lua_remove(state, -2);
-        } else if !is_wrapped_panic(state, 1) {
-            let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
-            let s = if s.is_null() {
-                cstr!("<unprintable Rust panic>")
-            } else {
-                s
-            };
-            ffi::luaL_traceback(state, state, s, 0);
-            ffi::lua_remove(state, -2);
-        }
-        1
-    }
-
     let msgh_position = ffi::lua_gettop(state) - nargs;
-    ffi::lua_pushcfunction(state, message_handler);
+    ffi::lua_pushcfunction(state, error_traceback);
     ffi::lua_insert(state, msgh_position);
     let ret = ffi::lua_pcall(state, nargs, nresults, msgh_position);
     ffi::lua_remove(state, msgh_position);
@@ -362,29 +365,7 @@ pub unsafe fn resume_with_traceback(
 ) -> c_int {
     let res = ffi::lua_resume(state, from, nargs);
     if res != ffi::LUA_OK && res != ffi::LUA_YIELD {
-        if let Some(error) = pop_wrapped_error(state) {
-            ffi::luaL_traceback(state, state, ptr::null(), 0);
-            let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
-                .to_str()
-                .unwrap_or_else(|_| "<could not capture traceback>")
-                .to_owned();
-            push_wrapped_error(
-                state,
-                Error::CallbackError {
-                    traceback,
-                    cause: Arc::new(error),
-                },
-            );
-            ffi::lua_remove(state, -2);
-        } else if !is_wrapped_panic(state, 1) {
-            let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
-            if !s.is_null() {
-                ffi::luaL_traceback(state, state, s, 0);
-            } else {
-                ffi::luaL_traceback(state, state, cstr!("<unprintable lua error>"), 0);
-            }
-            ffi::lua_remove(state, -2);
-        }
+        error_traceback(state);
     }
     res
 }
@@ -493,9 +474,6 @@ pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
     main_state
 }
 
-pub struct WrappedError(pub Error);
-pub struct WrappedPanic(pub Option<Box<Any + Send>>);
-
 // Pushes a WrappedError::Error to the top of the stack
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
     ffi::luaL_checkstack(state, 2, ptr::null());
@@ -503,16 +481,6 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
     push_userdata(state, WrappedError(err));
 
     get_error_metatable(state);
-    ffi::lua_setmetatable(state, -2);
-}
-
-// Pushes a WrappedError::Panic to the top of the stack
-pub unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>) {
-    ffi::luaL_checkstack(state, 2, ptr::null());
-
-    push_userdata(state, WrappedPanic(Some(panic)));
-
-    get_panic_metatable(state);
     ffi::lua_setmetatable(state, -2);
 }
 
@@ -527,6 +495,19 @@ pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<Error> {
         ffi::lua_pop(state, 1);
         Some(err)
     }
+}
+
+struct WrappedError(pub Error);
+struct WrappedPanic(pub Option<Box<Any + Send>>);
+
+// Pushes a WrappedError::Panic to the top of the stack
+unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>) {
+    ffi::luaL_checkstack(state, 2, ptr::null());
+
+    push_userdata(state, WrappedPanic(Some(panic)));
+
+    get_panic_metatable(state);
+    ffi::lua_setmetatable(state, -2);
 }
 
 // Checks if the value at the given index is a WrappedError
