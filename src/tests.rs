@@ -428,8 +428,7 @@ fn test_pcall_xpcall() {
 }
 
 #[test]
-#[should_panic]
-fn test_recursive_callback_panic() {
+fn test_recursive_callback_error() {
     let lua = Lua::new();
 
     let mut v = Some(Box::new(123));
@@ -440,11 +439,7 @@ fn test_recursive_callback_panic() {
             // Produce a mutable reference
             let r = v.as_mut().unwrap();
             // Whoops, this will recurse into the function and produce another mutable reference!
-            lua.globals()
-                .get::<_, Function>("f")
-                .unwrap()
-                .call::<_, ()>(true)
-                .unwrap();
+            lua.globals().get::<_, Function>("f")?.call::<_, ()>(true)?;
             println!("Should not get here, mutable aliasing has occurred!");
             println!("value at {:p}", r as *mut _);
             println!("value is {}", r);
@@ -453,11 +448,13 @@ fn test_recursive_callback_panic() {
         Ok(())
     }).unwrap();
     lua.globals().set("f", f).unwrap();
-    lua.globals()
-        .get::<_, Function>("f")
-        .unwrap()
-        .call::<_, ()>(false)
-        .unwrap();
+    assert!(
+        lua.globals()
+            .get::<_, Function>("f")
+            .unwrap()
+            .call::<_, ()>(false)
+            .is_err()
+    )
 }
 
 #[test]
@@ -490,7 +487,8 @@ fn test_gc_error() {
         None,
     ) {
         Err(Error::GarbageCollectorError(_)) => {}
-        _ => panic!("__gc error did not result in correct type"),
+        Err(e) => panic!("__gc error did not result in correct error, instead: {}", e),
+        Ok(()) => panic!("__gc error did not result in error"),
     }
 }
 

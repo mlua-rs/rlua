@@ -36,9 +36,8 @@ allows for a much more flexible API.
 
 There are currently a few notable missing pieces of this API:
 
-  * Complete panic / abort safety for scripts.  This is a near term goal, but
-    currently there are ways to cause panics / aborts with lua scripts which are
-    not considered a bug.
+  * Complete panic / abort safety.  This is a near term goal, but currently
+    there are ways to cause panics / aborts with the API and with lua scripts.
   * Security limits on Lua code such as total instruction limits and control
     over which potentially dangerous libraries (e.g. io) are available to
     scripts.
@@ -78,12 +77,11 @@ safety level of the crate "Work In Progress".  Still, UB is considered the most
 serious kind of bug, so if you find the ability to cause UB with this API *at
 all*, please file a bug report.
 
-There are, however, a few ways to cause *panics* and even *aborts* with this API
-that are not currently considered bugs.  Usually these panics or aborts are
-alternatives to what would otherwise be unsafety.  A near term goal of this
-project is to remove the ability for lua to cause a panic or abort, and then
-panic / abort behavior will be considered a bug just like UB is, but that is
-currently not the case.
+There are, however, currently a few known ways to cause *panics* and even
+*aborts* with this API.  There is a near term goal to completely eliminate all
+ways to cause panics / aborts from scripts, so many of these can be considered
+bugs, but since they're known only file a bug repor if you notice any behavior
+that does not match what's described here.
 
 Panic / abort considerations when using this API:
 
@@ -102,33 +100,29 @@ Panic / abort considerations when using this API:
     `LUA_USE_APICHECK` it would generally be unsafe.
   * The library internally calls lua_checkstack to ensure that there is
     sufficient stack space, and if the stack cannot be sufficiently grown this
-    is a panic.  There should not be a way to cause this using the API, if you
-    encounter this, it is a bug.
-  * This API attempts only to handle errors in Lua C API functions that can
-    cause an error either directly or by running arbitrary Lua code directly,
-    not functions that can cause memory errors (marked as 'm' in the Lua C API
-    docs).  This means that we must take care to ensure that gc or memory errors
-    cannot occur, because this would unsafely longjmp potentially across rust
-    frames.  The allocator provided to lua is libc::malloc with an extra guard
-    to ensure that OOM errors are immediate aborts, because otherwise this would
-    be unsafe.  Similarly, 'setmetatable' is wrapped so that any `__gc`
-    metamethod specified in lua scripts will *abort* if the metamethod causes an
-    error rather than longjmp like a normal error would.  Lua objects can also
-    be resurrected with user provided `__gc` metamethods
-    (See [here](https://www.lua.org/manual/5.3/manual.html#2.5.1) for details),
-    and this includes userdata, so it is possible to trigger a panic from lua by
-    resurrecting a userdata and re-using it after it has been garbage collected.
-    It is an eventual goal of the library to ensure that lua scripts cannot
-    cause panics or aborts, but currently this is not true and this is a known
-    limitation.  Lua scripts should NOT be able to cause unsafety, though, this
-    is always considered a bug.
+    is a panic.  There should not be a way to cause this using this API, and if
+    you encounter this, it is a bug.
+  * Previous to version 0.10, `rlua` had a complicated system to guard against
+    LUA_ERRGCMM, and this system could cause aborts.  This is no longer the case
+    as of version 0.10, `rlua` now attempts to handle all errors that the Lua C
+    API can generate, including functions that can cause memory errors (any
+    function marked as 'v', 'e', or 'm' in the Lua C API docs).  This is,
+    however, extremely complicated and difficult to test, so if there is any
+    indication when using this API that a Lua error (longjmp) is being triggered
+    without being turned into an `rlua::Error`, *please please report this as a
+    bug*.
+  * The internal Lua allocator is set to use `realloc` from `libc`, but it is
+    wrapped in such a way that OOM errors are guaranteed to abort.  This is not
+    such a big deal, as this matches the behavior of rust itself.  This allows
+    the internals of `rlua` to, in certain rare cases, call 'm' Lua C API
+    functions with the garbage collector disabled and know that these cannot
+    error.  Though this is not a problem now, this will need to be changed in
+    order to add allocation limits to Lua instances.
   * There are currently no recursion limits on callbacks.  This could cause one
     of two problems, either the API will run out of stack space and cause a
     panic in Rust, or more likely it will cause an internal `LUA_USE_APICHECK`
     abort, from exceeding LUAI_MAXCCALLS.  This may be a source of unsafety if
     `LUA_USE_APICHECK` is disabled, and is considered a bug.
-  * All callbacks in `rlua` are FnMut, so if you trigger your own callback
-    recursively, currently this will panic.
   * There are currently no checks on argument sizes, and I think you may be able
     to cause an abort by providing a large enough `rlua::Variadic`.  I believe
     this would be unsafe without `LUA_USE_APICHECK` and should be considered a

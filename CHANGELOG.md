@@ -1,3 +1,9 @@
+## [0.10.0]
+- Handle all 'm' functions in the Lua C API correctly, remove LUA_ERRGCMM hacks.
+- Lots and lots of internal changes to support handling all 'm' errors
+- Change the API in a lot of places due to functions that can trigger the gc now
+  potentially causing Error::GarbageCollectorError errors.
+
 ## [0.9.7]
 - Add unsafe function to load the debug Lua module (thanks @Timidger!)
 - Fix setmetatable wrapper with nil metatable (thanks again to @Timidger!)

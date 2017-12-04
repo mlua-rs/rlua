@@ -799,14 +799,9 @@ impl Lua {
                 };
 
                 let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1));
-                let mut func = if let Ok(func) = (*func).try_borrow_mut() {
-                    func
-                } else {
-                    lua_panic!(
-                        state,
-                        "recursive callback function call would mutably borrow function twice"
-                    );
-                };
+                let mut func = (*func)
+                    .try_borrow_mut()
+                    .map_err(|_| Error::RecursiveCallbackError)?;
 
                 let nargs = ffi::lua_gettop(state);
                 let mut args = MultiValue::new();

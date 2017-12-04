@@ -26,6 +26,11 @@ pub enum Error {
     ///
     /// The Lua VM returns this error when there is an error running a `__gc` metamethod.
     GarbageCollectorError(String),
+    /// A callback has triggered Lua code that has called the same callback again.
+    ///
+    /// This is an error, since `rlua` callbacks are FnMut an the functions can only be mutably
+    /// borrowed once.
+    RecursiveCallbackError,
     /// A Rust value could not be converted to a Lua value.
     ToLuaConversionError {
         /// Name of the Rust type that could not be converted.
@@ -110,6 +115,7 @@ impl fmt::Display for Error {
             Error::GarbageCollectorError(ref msg) => {
                 write!(fmt, "garbage collector error: {}", msg)
             }
+            Error::RecursiveCallbackError => write!(fmt, "callback called recursively"),
             Error::ToLuaConversionError {
                 from,
                 to,
@@ -150,6 +156,7 @@ impl StdError for Error {
             Error::SyntaxError { .. } => "syntax error",
             Error::RuntimeError(_) => "runtime error",
             Error::GarbageCollectorError(_) => "garbage collector error",
+            Error::RecursiveCallbackError => "callback called recursively",
             Error::ToLuaConversionError { .. } => "conversion error to lua",
             Error::FromLuaConversionError { .. } => "conversion error from lua",
             Error::CoroutineInactive => "attempt to resume inactive coroutine",
