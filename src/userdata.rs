@@ -319,8 +319,12 @@ pub struct AnyUserData<'lua>(pub(crate) LuaRef<'lua>);
 
 impl<'lua> AnyUserData<'lua> {
     /// Checks whether the type of this userdata is `T`.
-    pub fn is<T: UserData>(&self) -> bool {
-        self.inspect(|_: &RefCell<T>| ()).is_some()
+    pub fn is<T: UserData>(&self) -> Result<bool> {
+        match self.inspect(|_: &RefCell<T>| Ok(())) {
+            Ok(()) => Ok(true),
+            Err(Error::UserDataTypeMismatch) => Ok(false),
+            Err(err) => Err(err),
+        }
     }
 
     /// Borrow this userdata immutably if it is of type `T`.
@@ -331,7 +335,6 @@ impl<'lua> AnyUserData<'lua> {
     /// `UserDataTypeMismatch` if the userdata is not of type `T`.
     pub fn borrow<T: UserData>(&self) -> Result<Ref<T>> {
         self.inspect(|cell| Ok(cell.try_borrow().map_err(|_| Error::UserDataBorrowError)?))
-            .ok_or(Error::UserDataTypeMismatch)?
     }
 
     /// Borrow this userdata mutably if it is of type `T`.
@@ -344,13 +347,13 @@ impl<'lua> AnyUserData<'lua> {
         self.inspect(|cell| {
             Ok(cell.try_borrow_mut()
                 .map_err(|_| Error::UserDataBorrowMutError)?)
-        }).ok_or(Error::UserDataTypeMismatch)?
+        })
     }
 
-    fn inspect<'a, T, R, F>(&'a self, func: F) -> Option<R>
+    fn inspect<'a, T, R, F>(&'a self, func: F) -> Result<R>
     where
         T: UserData,
-        F: FnOnce(&'a RefCell<T>) -> R,
+        F: FnOnce(&'a RefCell<T>) -> Result<R>,
     {
         unsafe {
             let lua = self.0.lua;
@@ -368,16 +371,16 @@ impl<'lua> AnyUserData<'lua> {
                 ffi::lua_rawgeti(
                     lua.state,
                     ffi::LUA_REGISTRYINDEX,
-                    lua.userdata_metatable::<T>() as ffi::lua_Integer,
+                    lua.userdata_metatable::<T>()? as ffi::lua_Integer,
                 );
 
                 if ffi::lua_rawequal(lua.state, -1, -2) == 0 {
                     ffi::lua_pop(lua.state, 3);
-                    None
+                    Err(Error::UserDataTypeMismatch)
                 } else {
                     let res = func(&*get_userdata::<RefCell<T>>(lua.state, -3));
                     ffi::lua_pop(lua.state, 3);
-                    Some(res)
+                    res
                 }
             })
         }
@@ -401,13 +404,13 @@ mod tests {
 
         let lua = Lua::new();
 
-        let userdata1 = lua.create_userdata(UserData1(1));
-        let userdata2 = lua.create_userdata(UserData2(Box::new(2)));
+        let userdata1 = lua.create_userdata(UserData1(1)).unwrap();
+        let userdata2 = lua.create_userdata(UserData2(Box::new(2))).unwrap();
 
-        assert!(userdata1.is::<UserData1>());
-        assert!(!userdata1.is::<UserData2>());
-        assert!(userdata2.is::<UserData2>());
-        assert!(!userdata2.is::<UserData1>());
+        assert!(userdata1.is::<UserData1>().unwrap());
+        assert!(!userdata1.is::<UserData2>().unwrap());
+        assert!(userdata2.is::<UserData2>().unwrap());
+        assert!(!userdata2.is::<UserData1>().unwrap());
 
         assert_eq!(userdata1.borrow::<UserData1>().unwrap().0, 1);
         assert_eq!(*userdata2.borrow::<UserData2>().unwrap().0, 2);
@@ -429,7 +432,7 @@ mod tests {
 
         let lua = Lua::new();
         let globals = lua.globals();
-        let userdata = lua.create_userdata(MyUserData(42));
+        let userdata = lua.create_userdata(MyUserData(42)).unwrap();
         globals.set("userdata", userdata.clone()).unwrap();
         lua.exec::<()>(
             r#"

@@ -545,23 +545,25 @@ impl Lua {
     }
 
     /// Pass a `&str` slice to Lua, creating and returning an interned Lua string.
-    pub fn create_string(&self, s: &str) -> String {
+    pub fn create_string(&self, s: &str) -> Result<String> {
         unsafe {
             stack_guard(self.state, 0, || {
                 check_stack(self.state, 2);
                 ffi::lua_pushlstring(self.state, s.as_ptr() as *const c_char, s.len());
-                String(self.pop_ref(self.state))
+                Ok(String(self.pop_ref(self.state)))
             })
         }
     }
 
     /// Creates and returns a new table.
-    pub fn create_table(&self) -> Table {
+    pub fn create_table(&self) -> Result<Table> {
         unsafe {
             stack_guard(self.state, 0, || {
-                check_stack(self.state, 2);
-                ffi::lua_newtable(self.state);
-                Table(self.pop_ref(self.state))
+                check_stack(self.state, 4);
+                protect_lua_call(self.state, 0, 1, |state| {
+                    ffi::lua_newtable(state);
+                })?;
+                Ok(Table(self.pop_ref(self.state)))
             })
         }
     }
@@ -575,8 +577,10 @@ impl Lua {
     {
         unsafe {
             stack_err_guard(self.state, 0, || {
-                check_stack(self.state, 3);
-                ffi::lua_newtable(self.state);
+                check_stack(self.state, 6);
+                protect_lua_call(self.state, 0, 1, |state| {
+                    ffi::lua_newtable(state);
+                })?;
 
                 for (k, v) in cont {
                     self.push_value(self.state, k.to_lua(self)?);
@@ -640,7 +644,7 @@ impl Lua {
     /// #     try_main().unwrap();
     /// # }
     /// ```
-    pub fn create_function<'lua, A, R, F>(&'lua self, mut func: F) -> Function<'lua>
+    pub fn create_function<'lua, A, R, F>(&'lua self, mut func: F) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
@@ -654,7 +658,7 @@ impl Lua {
     /// Wraps a Lua function into a new thread (or coroutine).
     ///
     /// Equivalent to `coroutine.create`.
-    pub fn create_thread<'lua>(&'lua self, func: Function<'lua>) -> Thread<'lua> {
+    pub fn create_thread<'lua>(&'lua self, func: Function<'lua>) -> Result<Thread<'lua>> {
         unsafe {
             stack_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
@@ -662,18 +666,18 @@ impl Lua {
                 let thread_state = ffi::lua_newthread(self.state);
                 self.push_ref(thread_state, &func.0);
 
-                Thread(self.pop_ref(self.state))
+                Ok(Thread(self.pop_ref(self.state)))
             })
         }
     }
 
     /// Create a Lua userdata object from a custom userdata type.
-    pub fn create_userdata<T>(&self, data: T) -> AnyUserData
+    pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData>
     where
         T: UserData,
     {
         unsafe {
-            stack_guard(self.state, 0, move || {
+            stack_err_guard(self.state, 0, move || {
                 check_stack(self.state, 3);
 
                 push_userdata::<RefCell<T>>(self.state, RefCell::new(data));
@@ -681,12 +685,12 @@ impl Lua {
                 ffi::lua_rawgeti(
                     self.state,
                     ffi::LUA_REGISTRYINDEX,
-                    self.userdata_metatable::<T>() as ffi::lua_Integer,
+                    self.userdata_metatable::<T>()? as ffi::lua_Integer,
                 );
 
                 ffi::lua_setmetatable(self.state, -2);
 
-                AnyUserData(self.pop_ref(self.state))
+                Ok(AnyUserData(self.pop_ref(self.state)))
             })
         }
     }
@@ -942,7 +946,7 @@ impl Lua {
         }
     }
 
-    pub(crate) unsafe fn userdata_metatable<T: UserData>(&self) -> c_int {
+    pub(crate) unsafe fn userdata_metatable<T: UserData>(&self) -> Result<c_int> {
         // Used if both an __index metamethod is set and regular methods, checks methods table
         // first, then __index metamethod.
         unsafe extern "C" fn meta_index_impl(state: *mut ffi::lua_State) -> c_int {
@@ -963,7 +967,7 @@ impl Lua {
             }
         }
 
-        stack_guard(self.state, 0, move || {
+        stack_err_guard(self.state, 0, move || {
             check_stack(self.state, 5);
 
             ffi::lua_pushlightuserdata(
@@ -975,7 +979,7 @@ impl Lua {
             ffi::lua_pop(self.state, 1);
 
             if let Some(table_id) = (*registered_userdata).get(&TypeId::of::<T>()) {
-                return *table_id;
+                return Ok(*table_id);
             }
 
             let mut methods = UserDataMethods {
@@ -997,7 +1001,7 @@ impl Lua {
                     push_string(self.state, &k);
                     self.push_value(
                         self.state,
-                        Value::Function(self.create_callback_function(m)),
+                        Value::Function(self.create_callback_function(m)?),
                     );
                     ffi::lua_rawset(self.state, -3);
                 }
@@ -1012,7 +1016,7 @@ impl Lua {
                     ffi::lua_gettable(self.state, -3);
                     self.push_value(
                         self.state,
-                        Value::Function(self.create_callback_function(m)),
+                        Value::Function(self.create_callback_function(m)?),
                     );
                     ffi::lua_pushcclosure(self.state, meta_index_impl, 2);
                     ffi::lua_rawset(self.state, -3);
@@ -1045,7 +1049,7 @@ impl Lua {
                     push_string(self.state, name);
                     self.push_value(
                         self.state,
-                        Value::Function(self.create_callback_function(m)),
+                        Value::Function(self.create_callback_function(m)?),
                     );
                     ffi::lua_rawset(self.state, -3);
                 }
@@ -1061,7 +1065,7 @@ impl Lua {
 
             let id = ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX);
             (*registered_userdata).insert(TypeId::of::<T>(), id);
-            id
+            Ok(id)
         })
     }
 
@@ -1173,7 +1177,7 @@ impl Lua {
         }
     }
 
-    fn create_callback_function<'lua>(&'lua self, func: Callback<'lua>) -> Function<'lua> {
+    fn create_callback_function<'lua>(&'lua self, func: Callback<'lua>) -> Result<Function<'lua>> {
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, || {
                 let lua = Lua {
@@ -1227,7 +1231,7 @@ impl Lua {
 
                 ffi::lua_pushcclosure(self.state, callback_call_impl, 1);
 
-                Function(self.pop_ref(self.state))
+                Ok(Function(self.pop_ref(self.state)))
             })
         }
     }

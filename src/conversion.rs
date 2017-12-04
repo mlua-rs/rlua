@@ -111,7 +111,7 @@ impl<'lua> FromLua<'lua> for AnyUserData<'lua> {
 
 impl<'lua, T: UserData> ToLua<'lua> for T {
     fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>> {
-        Ok(Value::UserData(lua.create_userdata(self)))
+        Ok(Value::UserData(lua.create_userdata(self)?))
     }
 }
 
@@ -184,7 +184,7 @@ impl<'lua> FromLua<'lua> for LightUserData {
 
 impl<'lua> ToLua<'lua> for StdString {
     fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>> {
-        Ok(Value::String(lua.create_string(&self)))
+        Ok(Value::String(lua.create_string(&self)?))
     }
 }
 
@@ -196,7 +196,7 @@ impl<'lua> FromLua<'lua> for StdString {
 
 impl<'lua, 'a> ToLua<'lua> for &'a str {
     fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>> {
-        Ok(Value::String(lua.create_string(self)))
+        Ok(Value::String(lua.create_string(self)?))
     }
 }
 

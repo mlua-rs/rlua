@@ -142,7 +142,7 @@ fn test_rust_function() {
     ).unwrap();
 
     let lua_function = globals.get::<_, Function>("lua_function").unwrap();
-    let rust_function = lua.create_function(|_, ()| Ok("hello"));
+    let rust_function = lua.create_function(|_, ()| Ok("hello")).unwrap();
 
     globals.set("rust_function", rust_function).unwrap();
     assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
@@ -271,7 +271,7 @@ fn test_error() {
     ).unwrap();
 
     let rust_error_function =
-        lua.create_function(|_, ()| -> Result<()> { Err(TestError.to_lua_err()) });
+        lua.create_function(|_, ()| -> Result<()> { Err(TestError.to_lua_err()) }).unwrap();
     globals
         .set("rust_error_function", rust_error_function)
         .unwrap();
@@ -338,7 +338,7 @@ fn test_error() {
         )?;
         let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
             panic!("expected panic, this panic should be caught in rust")
-        });
+        }).unwrap();
         globals.set("rust_panic_function", rust_panic_function)?;
 
         let rust_panic = globals.get::<_, Function>("rust_panic")?;
@@ -364,7 +364,7 @@ fn test_error() {
         )?;
         let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
             panic!("expected panic, this panic should be caught in rust")
-        });
+        }).unwrap();
         globals.set("rust_panic_function", rust_panic_function)?;
 
         let rust_panic = globals.get::<_, Function>("rust_panic")?;
@@ -393,7 +393,7 @@ fn test_thread() {
             "#,
             None,
         ).unwrap(),
-    );
+    ).unwrap();
 
     assert_eq!(thread.status(), ThreadStatus::Resumable);
     assert_eq!(thread.resume::<_, i64>(0).unwrap(), 0);
@@ -418,7 +418,7 @@ fn test_thread() {
             "#,
             None,
         ).unwrap(),
-    );
+    ).unwrap();
 
     for i in 0..4 {
         accumulate.resume::<_, ()>(i).unwrap();
@@ -472,8 +472,8 @@ fn test_result_conversions() {
         Ok(Err::<String, _>(
             "only through failure can we succeed".to_lua_err(),
         ))
-    });
-    let ok = lua.create_function(|_, ()| Ok(Ok::<_, Error>("!".to_owned())));
+    }).unwrap();
+    let ok = lua.create_function(|_, ()| Ok(Ok::<_, Error>("!".to_owned()))).unwrap();
 
     globals.set("err", err).unwrap();
     globals.set("ok", ok).unwrap();
@@ -519,7 +519,7 @@ fn test_num_conversion() {
 #[test]
 fn coroutine_from_closure() {
     let lua = Lua::new();
-    let thrd_main = lua.create_function(|_, ()| Ok(()));
+    let thrd_main = lua.create_function(|_, ()| Ok(())).unwrap();
     lua.globals().set("main", thrd_main).unwrap();
     let thrd: Thread = lua.eval("coroutine.create(main)", None).unwrap();
     thrd.resume::<_, ()>(()).unwrap();
@@ -533,9 +533,9 @@ fn coroutine_panic() {
         // whoops, 'main' has a wrong type
         let _coro: u32 = lua.globals().get("main").unwrap();
         Ok(())
-    });
+    }).unwrap();
     lua.globals().set("main", thrd_main.clone()).unwrap();
-    let thrd: Thread = lua.create_thread(thrd_main);
+    let thrd: Thread = lua.create_thread(thrd_main).unwrap();
     thrd.resume::<_, ()>(()).unwrap();
 }
 
@@ -625,7 +625,7 @@ fn test_recursive_callback_panic() {
         }
 
         Ok(())
-    });
+    }).unwrap();
     lua.globals().set("f", f).unwrap();
     lua.globals()
         .get::<_, Function>("f")

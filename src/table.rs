@@ -452,7 +452,7 @@ mod tests {
         let lua = Lua::new();
         let globals = lua.globals();
 
-        globals.set("table", lua.create_table()).unwrap();
+        globals.set("table", lua.create_table().unwrap()).unwrap();
         let table1: Table = globals.get("table").unwrap();
         let table2: Table = globals.get("table").unwrap();
 
@@ -588,10 +588,10 @@ mod tests {
     fn test_metatable() {
         let lua = Lua::new();
 
-        let table = lua.create_table();
-        let metatable = lua.create_table();
+        let table = lua.create_table().unwrap();
+        let metatable = lua.create_table().unwrap();
         metatable
-            .set("__index", lua.create_function(|_, ()| Ok("index_value")))
+            .set("__index", lua.create_function(|_, ()| Ok("index_value")).unwrap())
             .unwrap();
         table.set_metatable(Some(metatable));
         assert_eq!(table.get::<_, String>("any_key").unwrap(), "index_value");

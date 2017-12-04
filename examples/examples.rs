@@ -41,13 +41,13 @@ fn examples() -> Result<()> {
 
     // You can create and manage lua tables
 
-    let array_table = lua.create_table();
+    let array_table = lua.create_table()?;
     array_table.set(1, "one")?;
     array_table.set(2, "two")?;
     array_table.set(3, "three")?;
     assert_eq!(array_table.len()?, 3);
 
-    let map_table = lua.create_table();
+    let map_table = lua.create_table()?;
     map_table.set("one", 1)?;
     map_table.set("two", 2)?;
     map_table.set("three", 3)?;
@@ -91,7 +91,7 @@ fn examples() -> Result<()> {
         // Lua callbacks return rlua::Result, an Ok value is a normal return, and an Err return
         // turns into a Lua 'error'.  Again, any type that is convertible to lua may be returned.
         Ok(list1 == list2)
-    });
+    })?;
     globals.set("check_equal", check_equal)?;
 
     // You can also accept runtime variadic arguments to rust callbacks.
@@ -99,7 +99,7 @@ fn examples() -> Result<()> {
     let join = lua.create_function(|_, strings: Variadic<String>| {
         // (This is quadratic!, it's just an example!)
         Ok(strings.iter().fold("".to_owned(), |a, b| a + b))
-    });
+    })?;
     globals.set("join", join)?;
 
     assert_eq!(
@@ -132,7 +132,7 @@ fn examples() -> Result<()> {
         }
     }
 
-    let vec2_constructor = lua.create_function(|_, (x, y): (f32, f32)| Ok(Vec2(x, y)));
+    let vec2_constructor = lua.create_function(|_, (x, y): (f32, f32)| Ok(Vec2(x, y)))?;
     globals.set("vec2", vec2_constructor)?;
 
     assert!(lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()", None)? - 5.0 < f32::EPSILON);

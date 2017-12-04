@@ -121,7 +121,7 @@ mod tests {
         F: FnOnce(String),
     {
         let lua = Lua::new();
-        let string = lua.create_string(s);
+        let string = lua.create_string(s).unwrap();
         f(string);
     }
 

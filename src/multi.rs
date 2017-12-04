@@ -68,7 +68,7 @@ impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
 ///
 /// let add = lua.create_function(|_, vals: Variadic<f64>| -> Result<f64> {
 ///     Ok(vals.iter().sum())
-/// });
+/// }).unwrap();
 /// lua.globals().set("add", add)?;
 /// assert_eq!(lua.eval::<f64>("add(3, 2, 5)", None)?, 10.0);
 /// # Ok(())
