@@ -7,7 +7,8 @@ use ffi;
 use error::*;
 use util::*;
 use types::{Callback, LuaRef};
-use lua::{FromLua, FromLuaMulti, Lua, ToLuaMulti};
+use value::{FromLua, FromLuaMulti, ToLuaMulti};
+use lua::Lua;
 
 /// Kinds of metamethods that can be overridden.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]

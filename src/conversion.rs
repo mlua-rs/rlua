@@ -9,7 +9,8 @@ use table::Table;
 use userdata::{AnyUserData, UserData};
 use function::Function;
 use thread::Thread;
-use lua::{FromLua, Lua, Nil, ToLua, Value};
+use value::{FromLua, Nil, ToLua, Value};
+use lua::Lua;
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {

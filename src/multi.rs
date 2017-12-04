@@ -3,6 +3,7 @@ use std::iter::FromIterator;
 use std::result::Result as StdResult;
 
 use error::*;
+use value::*;
 use lua::*;
 
 /// Result is convertible to `MultiValue` following the common Lua idiom of returning the result

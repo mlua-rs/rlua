@@ -3,7 +3,8 @@ use std::os::raw::{c_int, c_void};
 
 use ffi;
 use error::Result;
-use lua::{Lua, MultiValue};
+use value::MultiValue;
+use lua::Lua;
 
 /// Type of Lua integer numbers.
 pub type Integer = ffi::lua_Integer;

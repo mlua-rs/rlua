@@ -4,7 +4,7 @@ use ffi;
 use error::*;
 use util::*;
 use types::LuaRef;
-use lua::{FromLuaMulti, MultiValue, ToLuaMulti};
+use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
 /// Status of a Lua thread (or coroutine).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

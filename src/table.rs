@@ -4,7 +4,7 @@ use ffi;
 use error::Result;
 use util::*;
 use types::{Integer, LuaRef};
-use lua::{FromLua, ToLua};
+use value::{FromLua, ToLua};
 
 /// Handle to an internal Lua table.
 #[derive(Clone, Debug)]
@@ -436,7 +436,8 @@ where
 mod tests {
     use super::Table;
     use error::Result;
-    use lua::{Lua, Nil, Value};
+    use value::{Nil, Value};
+    use lua::Lua;
 
     #[test]
     fn test_set_get() {

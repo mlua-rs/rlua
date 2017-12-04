@@ -4,7 +4,7 @@ use ffi;
 use error::*;
 use util::*;
 use types::LuaRef;
-use lua::{FromLuaMulti, MultiValue, ToLuaMulti};
+use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
 /// Handle to an internal Lua function.
 #[derive(Clone, Debug)]

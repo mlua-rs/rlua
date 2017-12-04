@@ -47,6 +47,7 @@ mod error;
 #[macro_use]
 mod macros;
 mod util;
+mod value;
 mod types;
 mod lua;
 mod conversion;
@@ -68,6 +69,7 @@ pub use table::{Table, TablePairs, TableSequence};
 pub use function::Function;
 pub use thread::{Thread, ThreadStatus};
 pub use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
-pub use lua::{FromLua, FromLuaMulti, Lua, MultiValue, Nil, ToLua, ToLuaMulti, Value};
+pub use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
+pub use lua::Lua;
 
 pub mod prelude;
