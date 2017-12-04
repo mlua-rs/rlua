@@ -646,6 +646,28 @@ fn test_set_metatable_nil() {
     ).unwrap();
 }
 
+#[test]
+fn test_gc_error() {
+    let lua = Lua::new();
+    match lua.exec::<()>(
+        r#"
+                val = nil
+                table = {}
+                setmetatable(table, {
+                    __gc = function()
+                        error("gcwascalled")
+                    end
+                })
+                table = nil
+                collectgarbage("collect")
+            "#,
+        None,
+    ) {
+        Err(Error::GarbageCollectorError(_)) => {}
+        _ => panic!("__gc error did not result in correct type"),
+    }
+}
+
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.
 /*
 #[test]

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::error::Error as StdError;
 use std::result::Result as StdResult;
 
-/// Error type returned by rlua methods.
+/// Error type returned by `rlua` methods.
 #[derive(Debug, Clone)]
 pub enum Error {
     /// Syntax error while parsing Lua source code.
@@ -22,6 +22,10 @@ pub enum Error {
     /// Among other things, this includes invoking operators on wrong types (such as calling or
     /// indexing a `nil` value).
     RuntimeError(String),
+    /// Lua garbage collector error, aka `LUA_ERRGCMM`.
+    ///
+    /// The Lua VM returns this error when there is an error running a `__gc` metamethod.
+    GarbageCollectorError(String),
     /// A Rust value could not be converted to a Lua value.
     ToLuaConversionError {
         /// Name of the Rust type that could not be converted.
@@ -95,7 +99,7 @@ pub enum Error {
     ExternalError(Arc<StdError + Send + Sync>),
 }
 
-/// A specialized `Result` type used by rlua's API.
+/// A specialized `Result` type used by `rlua`'s API.
 pub type Result<T> = StdResult<T, Error>;
 
 impl fmt::Display for Error {
@@ -103,6 +107,7 @@ impl fmt::Display for Error {
         match *self {
             Error::SyntaxError { ref message, .. } => write!(fmt, "syntax error: {}", message),
             Error::RuntimeError(ref msg) => write!(fmt, "runtime error: {}", msg),
+            Error::GarbageCollectorError(ref msg) => write!(fmt, "garbage collector error: {}", msg),
             Error::ToLuaConversionError {
                 from,
                 to,
@@ -142,6 +147,7 @@ impl StdError for Error {
         match *self {
             Error::SyntaxError { .. } => "syntax error",
             Error::RuntimeError(_) => "runtime error",
+            Error::GarbageCollectorError(_) => "garbage collector error",
             Error::ToLuaConversionError { .. } => "conversion error to lua",
             Error::FromLuaConversionError { .. } => "conversion error from lua",
             Error::CoroutineInactive => "attempt to resume inactive coroutine",

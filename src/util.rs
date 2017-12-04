@@ -201,15 +201,11 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
             ffi::LUA_ERRMEM => {
                 // This should be impossible, as we set the lua allocator to one that aborts
                 // instead of failing.
-                eprintln!("Lua memory error, aborting!");
+                eprintln!("impossible Lua allocation error, aborting!");
                 process::abort()
             }
             ffi::LUA_ERRGCMM => {
-                // This should be impossible, since we wrap setmetatable to protect __gc
-                // metamethods, but if we do end up here then the same logic as setmetatable
-                // applies and we must abort.
-                eprintln!("Lua error during __gc, aborting!");
-                process::abort()
+                Error::GarbageCollectorError(err_string)
             }
             _ => lua_panic!(state, "internal error: unrecognized lua error code"),
         }
@@ -352,43 +348,6 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_insert(state, 2);
         ffi::lua_gettop(state) - 1
     }
-}
-
-// Safely call setmetatable, if a __gc function is given, will wrap it in pcall, and panic on error.
-pub unsafe extern "C" fn safe_setmetatable(state: *mut ffi::lua_State) -> c_int {
-    if ffi::lua_gettop(state) < 2 {
-        ffi::lua_pushstring(state, cstr!("not enough arguments to setmetatable"));
-        ffi::lua_error(state);
-    }
-
-    // Wrapping the __gc method in setmetatable ONLY works because Lua 5.3 only honors the __gc
-    // method when it exists upon calling setmetatable, and ignores it if it is set later.
-    ffi::lua_pushstring(state, cstr!("__gc"));
-    if ffi::lua_istable(state, -2) == 1 && ffi::lua_rawget(state, -2) == ffi::LUA_TFUNCTION {
-        unsafe extern "C" fn safe_gc(state: *mut ffi::lua_State) -> c_int {
-            ffi::lua_pushvalue(state, ffi::lua_upvalueindex(1));
-            ffi::lua_insert(state, 1);
-            if ffi::lua_pcall(state, 1, 0, 0) != ffi::LUA_OK {
-                // If a user supplied __gc metamethod causes an error, we must always abort.  We may
-                // be inside a protected context due to being in a callback, but inside an
-                // unprotected ffi call that can cause memory errors, so may be at risk of
-                // longjmping over arbitrary rust.
-                eprintln!("Lua error during __gc, aborting!");
-                process::abort()
-            } else {
-                ffi::lua_gettop(state)
-            }
-        }
-
-        ffi::lua_pushcclosure(state, safe_gc, 1);
-        ffi::lua_pushstring(state, cstr!("__gc"));
-        ffi::lua_insert(state, -2);
-        ffi::lua_rawset(state, -3);
-    } else {
-        ffi::lua_pop(state, 1);
-    }
-    ffi::lua_setmetatable(state, -2);
-    1
 }
 
 // Does not call checkstack, uses 1 stack space
@@ -593,12 +552,12 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
     ffi::LUA_TTABLE
 }
 
-// Runs the given function with the Lua garbage collector disabled.  `rlua` assumes that all memory
-// errors are aborts, so in this way, 'm' functions that may also cause a `__gc` metamethod error
-// are guaranteed not to cause a Lua error (longjmp).  The given function should never panic or
-// longjmp, because this could inadverntently disable the gc.  This is useful when error handling
-// must allocate, and `__gc` errors at that time would shadow more important errors, or be extremely
-// difficult to handle safely.
+// Runs the given function with the Lua garbage collector disabled.  `rlua` assumes that all
+// allocation failures are aborts, so when the garbage collector is disabled, 'm' functions that can
+// cause either an allocation error or a a `__gc` metamethod error are prevented from causing errors
+// at all.  The given function should never panic or longjmp, because this could inadverntently
+// disable the gc.  This is useful when error handling must allocate, and `__gc` errors at that time
+// would shadow more important errors, or be extremely difficult to handle safely.
 unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) -> R {
     if ffi::lua_gc(state, ffi::LUA_GCISRUNNING, 0) != 0 {
         ffi::lua_gc(state, ffi::LUA_GCSTOP, 0);

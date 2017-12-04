@@ -1110,8 +1110,11 @@ impl Lua {
             } else {
                 let p = libc::realloc(ptr as *mut libc::c_void, nsize);
                 if p.is_null() {
-                    // We must abort on OOM, because otherwise this will result in an unsafe
-                    // longjmp.
+                    // We require that OOM results in an abort, and that the lua allocator function
+                    // never errors.  Since this is what rust itself normally does on OOM, this is
+                    // not really a huge loss.  Importantly, this allows us to turn off the gc, and
+                    // then know that calling Lua API functions marked as 'm' will not result in a
+                    // 'longjmp' error while the gc is off.
                     eprintln!("Out of memory in Lua allocation, aborting!");
                     process::abort()
                 } else {
@@ -1191,10 +1194,6 @@ impl Lua {
 
             push_string(state, "xpcall").unwrap();
             ffi::lua_pushcfunction(state, safe_xpcall);
-            ffi::lua_rawset(state, -3);
-
-            push_string(state, "setmetatable").unwrap();
-            ffi::lua_pushcfunction(state, safe_setmetatable);
             ffi::lua_rawset(state, -3);
 
             ffi::lua_pop(state, 1);

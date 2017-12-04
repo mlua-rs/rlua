@@ -435,7 +435,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::Table;
-    use error::Result;
+    use error::{Result};
     use lua::{Lua, Nil, Value};
 
     #[test]
@@ -556,33 +556,6 @@ mod tests {
         assert_eq!(tin.get::<_, i64>(1).unwrap(), 1);
         assert_eq!(tin.get::<_, i64>(2).unwrap(), 2);
         assert_eq!(tin.get::<_, i64>(3).unwrap(), 3);
-    }
-
-    #[test]
-    fn test_setmetatable_gc() {
-        let lua = Lua::new();
-        lua.exec::<()>(
-            r#"
-                val = nil
-                table = {}
-                setmetatable(table, {
-                    __gc = function()
-                        val = "gcwascalled"
-                    end
-                })
-                table_badgc = {}
-                setmetatable(table_badgc, {
-                    __gc = "what's a gc"
-                })
-                table = nil
-                table_badgc = nil
-                collectgarbage("collect")
-            "#,
-            None,
-        ).unwrap();
-
-        let globals = lua.globals();
-        assert_eq!(globals.get::<_, String>("val").unwrap(), "gcwascalled");
     }
 
     #[test]
