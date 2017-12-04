@@ -142,6 +142,8 @@ impl<'lua> Thread<'lua> {
 
 #[cfg(test)]
 mod tests {
+    use std::panic::catch_unwind;
+
     use super::{Thread, ThreadStatus};
     use error::Error;
     use function::Function;
@@ -243,8 +245,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn coroutine_panic() {
+        // check that coroutines propagate panics correctly
         let lua = Lua::new();
         let thrd_main = lua.create_function(|lua, ()| {
             // whoops, 'main' has a wrong type
@@ -253,6 +255,10 @@ mod tests {
         }).unwrap();
         lua.globals().set("main", thrd_main.clone()).unwrap();
         let thrd: Thread = lua.create_thread(thrd_main).unwrap();
-        thrd.resume::<_, ()>(()).unwrap();
+
+        match catch_unwind(|| thrd.resume::<_, ()>(())) {
+            Ok(r) => panic!("coroutine panic not propagated, instead returned {:?}", r),
+            Err(_) => {}
+        }
     }
 }

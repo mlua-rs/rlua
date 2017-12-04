@@ -28,7 +28,7 @@ where
     lua_assert!(
         state,
         expected >= 0,
-        "internal stack error: too many values would be popped"
+        "too many stack values would be popped"
     );
 
     let res = op();
@@ -37,7 +37,7 @@ where
     lua_assert!(
         state,
         ffi::lua_gettop(state) == expected,
-        "internal stack error: expected stack to be {}, got {}",
+        "expected stack to be {}, got {}",
         expected,
         top
     );
@@ -62,7 +62,7 @@ where
     lua_assert!(
         state,
         expected >= 0,
-        "internal stack error: too many values would be popped"
+        "too many stack values would be popped"
     );
 
     let res = op();
@@ -72,7 +72,7 @@ where
         lua_assert!(
             state,
             ffi::lua_gettop(state) == expected,
-            "internal stack error: expected stack to be {}, got {}",
+            "expected stack to be {}, got {}",
             expected,
             top
         );
@@ -80,7 +80,7 @@ where
         lua_assert!(
             state,
             top >= expected,
-            "internal stack error: {} too many values popped",
+            "{} too many stack values popped",
             top - expected
         );
         if top > expected {
@@ -164,12 +164,13 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
     if let Some(err) = pop_wrapped_error(state) {
         err
     } else if is_wrapped_panic(state, -1) {
-        let panic = get_userdata::<WrappedPanic>(state, -1);
+        let panic = get_userdata::<WrappedPanic>(state, -1)
+            .expect("WrappedPanic was somehow resurrected after garbage collection");
         if let Some(p) = (*panic).0.take() {
             ffi::lua_settop(state, 0);
             resume_unwind(p);
         } else {
-            lua_panic!(state, "internal error: panic was resumed twice")
+            lua_panic!(state, "panic was resumed twice")
         }
     } else {
         let err_string = gc_guard(state, || {
@@ -205,7 +206,7 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
                 process::abort()
             }
             ffi::LUA_ERRGCMM => Error::GarbageCollectorError(err_string),
-            _ => lua_panic!(state, "internal error: unrecognized lua error code"),
+            _ => lua_panic!(state, "unrecognized lua error code"),
         }
     }
 }
@@ -224,11 +225,14 @@ pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
     })
 }
 
-pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
+// Returns None in the case that the userdata has already been garbage collected.
+pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> Result<*mut T> {
     let ud = ffi::lua_touserdata(state, index) as *mut Option<T>;
-    lua_assert!(state, !ud.is_null());
-    lua_assert!(state, (*ud).is_some(), "access of expired userdata");
-    (*ud).as_mut().unwrap()
+    lua_assert!(state, !ud.is_null(), "userdata pointer is null");
+    (*ud)
+        .as_mut()
+        .map(|v| v as *mut T)
+        .ok_or(Error::ExpiredUserData)
 }
 
 pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
@@ -377,7 +381,8 @@ pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<Error> {
     if ffi::lua_gettop(state) == 0 || !is_wrapped_error(state, -1) {
         None
     } else {
-        let err = &*get_userdata::<WrappedError>(state, -1);
+        let err = &*get_userdata::<WrappedError>(state, -1)
+            .expect("WrappedError was somehow resurrected after garbage collection");
         let err = err.0.clone();
         ffi::lua_pop(state, 1);
         Some(err)
@@ -457,7 +462,8 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
         callback_error(state, || {
             if is_wrapped_error(state, -1) {
-                let error = get_userdata::<WrappedError>(state, -1);
+                let error = get_userdata::<WrappedError>(state, -1)
+                    .expect("WrappedError was somehow resurrected after garbage collection");
                 let error_str = (*error).0.to_string();
                 gc_guard(state, || {
                     ffi::lua_pushlstring(
@@ -470,7 +476,7 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
 
                 Ok(1)
             } else {
-                panic!("internal error: userdata mismatch in Error metamethod");
+                panic!("userdata mismatch in Error metamethod");
             }
         })
     }

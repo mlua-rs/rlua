@@ -448,13 +448,20 @@ fn test_recursive_callback_error() {
         Ok(())
     }).unwrap();
     lua.globals().set("f", f).unwrap();
-    assert!(
-        lua.globals()
-            .get::<_, Function>("f")
-            .unwrap()
-            .call::<_, ()>(false)
-            .is_err()
-    )
+    match lua.globals()
+        .get::<_, Function>("f")
+        .unwrap()
+        .call::<_, ()>(false)
+    {
+        Err(Error::CallbackError { ref cause, .. }) => match *cause.as_ref() {
+            Error::CallbackError { ref cause, .. } => match *cause.as_ref() {
+                Error::RecursiveCallbackError { .. } => {}
+                ref other => panic!("incorrect result: {:?}", other),
+            },
+            ref other => panic!("incorrect result: {:?}", other),
+        },
+        other => panic!("incorrect result: {:?}", other),
+    };
 }
 
 #[test]

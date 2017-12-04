@@ -16,14 +16,14 @@ macro_rules! lua_panic {
     ($state:expr, $msg:expr) => {
         {
             $crate::ffi::lua_settop($state, 0);
-            panic!(concat!("rlua: ", $msg));
+            panic!(concat!("rlua internal error: ", $msg));
         }
     };
 
     ($state:expr, $fmt:expr, $($arg:tt)+) => {
         {
             $crate::ffi::lua_settop($state, 0);
-            panic!(concat!("rlua: ", $fmt), $($arg)+);
+            panic!(concat!("rlua internal error: ", $fmt), $($arg)+);
         }
     };
 }
@@ -40,14 +40,14 @@ macro_rules! lua_assert {
     ($state:expr, $cond:expr, $msg:expr) => {
         if !$cond {
             $crate::ffi::lua_settop($state, 0);
-            panic!(concat!("rlua: ", $msg));
+            panic!(concat!("rlua internal error: ", $msg));
         }
     };
 
     ($state:expr, $cond:expr, $fmt:expr, $($arg:tt)+) => {
         if !$cond {
             $crate::ffi::lua_settop($state, 0);
-            panic!(concat!("rlua: ", $fmt), $($arg)+);
+            panic!(concat!("rlua internal error: ", $fmt), $($arg)+);
         }
     };
 }

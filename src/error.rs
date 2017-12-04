@@ -31,6 +31,12 @@ pub enum Error {
     /// This is an error, since `rlua` callbacks are FnMut an the functions can only be mutably
     /// borrowed once.
     RecursiveCallbackError,
+    /// Lua code has accessed a [`UserData`] value that was already garbage collected
+    ///
+    /// This can happen when a [`UserData`] has a custom `__gc` metamethod, this method resurrects
+    /// the [`UserData`], and then the [`UserData`] is subsequently accessed.
+    /// [`UserData`]: trait.UserData.html
+    ExpiredUserData,
     /// A Rust value could not be converted to a Lua value.
     ToLuaConversionError {
         /// Name of the Rust type that could not be converted.
@@ -116,6 +122,10 @@ impl fmt::Display for Error {
                 write!(fmt, "garbage collector error: {}", msg)
             }
             Error::RecursiveCallbackError => write!(fmt, "callback called recursively"),
+            Error::ExpiredUserData => write!(
+                fmt,
+                "access of userdata which has already been garbage collected"
+            ),
             Error::ToLuaConversionError {
                 from,
                 to,
@@ -157,6 +167,7 @@ impl StdError for Error {
             Error::RuntimeError(_) => "runtime error",
             Error::GarbageCollectorError(_) => "garbage collector error",
             Error::RecursiveCallbackError => "callback called recursively",
+            Error::ExpiredUserData => "access of userdata which has already been garbage collected",
             Error::ToLuaConversionError { .. } => "conversion error to lua",
             Error::FromLuaConversionError { .. } => "conversion error from lua",
             Error::CoroutineInactive => "attempt to resume inactive coroutine",

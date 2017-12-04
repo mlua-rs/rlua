@@ -567,7 +567,7 @@ impl Lua {
                 &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
             );
             ffi::lua_gettable(self.state, ffi::LUA_REGISTRYINDEX);
-            let registered_userdata = get_userdata::<HashMap<TypeId, c_int>>(self.state, -1);
+            let registered_userdata = get_userdata::<HashMap<TypeId, c_int>>(self.state, -1)?;
             ffi::lua_pop(self.state, 1);
 
             if let Some(table_id) = (*registered_userdata).get(&TypeId::of::<T>()) {
@@ -798,7 +798,7 @@ impl Lua {
                     ephemeral: true,
                 };
 
-                let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1));
+                let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1))?;
                 let mut func = (*func)
                     .try_borrow_mut()
                     .map_err(|_| Error::RecursiveCallbackError)?;
