@@ -99,11 +99,10 @@ where
 // not call checkstack.
 pub unsafe fn protect_lua_call<F, R>(state: *mut ffi::lua_State, nargs: c_int, nresults: c_int, f: F) -> Result<R>
     where F: FnMut(*mut ffi::lua_State) -> R,
-    R: Copy,
 {
     struct Params<F, R> {
         function: F,
-        ret: R,
+        ret: Option<R>,
         nresults: c_int,
     }
 
@@ -112,7 +111,7 @@ pub unsafe fn protect_lua_call<F, R>(state: *mut ffi::lua_State, nargs: c_int, n
     {
         let params = ffi::lua_touserdata(state, -1) as *mut Params<F, R>;
         ffi::lua_pop(state, 1);
-        ptr::write(&mut (*params).ret, ((*params).function)(state));
+        (*params).ret = Some(((*params).function)(state));
         if (*params).nresults == ffi::LUA_MULTRET {
             ffi::lua_gettop(state)
         } else {
@@ -128,7 +127,7 @@ pub unsafe fn protect_lua_call<F, R>(state: *mut ffi::lua_State, nargs: c_int, n
 
     let mut params = Params {
         function: f,
-        ret: mem::uninitialized(),
+        ret: None,
         nresults,
     };
 
@@ -139,7 +138,7 @@ pub unsafe fn protect_lua_call<F, R>(state: *mut ffi::lua_State, nargs: c_int, n
     ffi::lua_remove(state, stack_start + 1);
 
     if ret == ffi::LUA_OK {
-        Ok(params.ret)
+        Ok(params.ret.unwrap())
     } else {
         Err(pop_error(state, ret))
     }
@@ -166,15 +165,14 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
             lua_panic!(state, "internal error: panic was resumed twice")
         }
     } else {
-        let err_string = if let Some(s) = ffi::lua_tolstring(state, -1, ptr::null_mut()).as_ref() {
-            CStr::from_ptr(s)
-                .to_str()
-                .unwrap_or_else(|_| "<unprintable error>")
-                .to_owned()
+        let err_string = if ffi::lua_type(state, -1) == ffi::LUA_TSTRING {
+            // lua_tostring only throws memory errors when the type is not already a string
+            CStr::from_ptr(ffi::lua_tostring(state, -1))
+                .to_string_lossy()
+                .into_owned()
         } else {
-            "<unprintable error>".to_owned()
+            "<non-string error>".to_owned()
         };
-        ffi::lua_pop(state, 1);
 
         match err_code {
             ffi::LUA_ERRRUN => Error::RuntimeError(err_string),
@@ -228,16 +226,10 @@ pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut 
 }
 
 pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
-    match catch_unwind(|| {
+    callback_error(state, || {
         *(ffi::lua_touserdata(state, 1) as *mut Option<T>) = None;
-        0
-    }) {
-        Ok(r) => r,
-        Err(p) => {
-            push_wrapped_panic(state, p);
-            ffi::lua_error(state)
-        }
-    }
+        Ok(0)
+    })
 }
 
 // In the context of a lua callback, this will call the given function and if the given function
@@ -267,7 +259,7 @@ where
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     if let Some(error) = pop_wrapped_error(state) {
         ffi::luaL_traceback(state, state, ptr::null(), 0);
-        let traceback = CStr::from_ptr(ffi::lua_tolstring(state, -1, ptr::null_mut()))
+        let traceback = CStr::from_ptr(ffi::lua_tostring(state, -1))
             .to_string_lossy()
             .into_owned();
         push_wrapped_error(
@@ -279,7 +271,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         );
         ffi::lua_remove(state, -2);
     } else if !is_wrapped_panic(state, 1) {
-        let s = ffi::lua_tolstring(state, 1, ptr::null_mut());
+        let s = ffi::lua_tostring(state, 1);
         let s = if s.is_null() {
             cstr!("<unprintable Rust panic>")
         } else {
@@ -482,6 +474,8 @@ unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool {
 }
 
 unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
+    static ERROR_METATABLE_REGISTRY_KEY: u8 = 0;
+
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
         callback_error(state, || {
             if is_wrapped_error(state, -1) {
@@ -533,6 +527,8 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
 }
 
 unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
+    static PANIC_METATABLE_REGISTRY_KEY: u8 = 0;
+
     ffi::lua_pushlightuserdata(
         state,
         &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
@@ -564,6 +560,3 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
 
     ffi::LUA_TTABLE
 }
-
-static ERROR_METATABLE_REGISTRY_KEY: u8 = 0;
-static PANIC_METATABLE_REGISTRY_KEY: u8 = 0;
