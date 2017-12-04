@@ -77,6 +77,8 @@ impl<'lua> String<'lua> {
                 assert_eq!(ffi::lua_type(lua.state, -1), ffi::LUA_TSTRING);
 
                 let mut size = 0;
+                // This will not trigger a 'm' error, because the reference is guaranteed to be of
+                // string type
                 let data = ffi::lua_tolstring(lua.state, -1, &mut size);
 
                 ffi::lua_pop(lua.state, 1);

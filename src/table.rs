@@ -129,8 +129,9 @@ impl<'lua> Table<'lua> {
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
                 lua.push_value(lua.state, value.to_lua(lua)?);
-                ffi::lua_rawset(lua.state, -3);
-                ffi::lua_pop(lua.state, 1);
+                protect_lua_call(lua.state, 3, 0, |state| {
+                    ffi::lua_rawset(state, -3);
+                })?;
                 Ok(())
             })
         }

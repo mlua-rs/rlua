@@ -151,21 +151,6 @@ where
     }
 }
 
-// Runs the given function with the Lua garbage collector disabled.  `rlua` assumes that all memory
-// errors are aborts, so in this way, 'm' functions that may also cause a `__gc` metamethod error
-// are guaranteed not to cause a Lua error (longjmp).  The given function should never panic or
-// longjmp, because this could inadverntently disable the gc.
-pub unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) -> R {
-    if ffi::lua_gc(state, ffi::LUA_GCISRUNNING, 0) != 0 {
-        ffi::lua_gc(state, ffi::LUA_GCSTOP, 0);
-        let r = f();
-        ffi::lua_gc(state, ffi::LUA_GCRESTART, 0);
-        r
-    } else {
-        f()
-    }
-}
-
 // Pops an error off of the stack and returns it. If the error is actually a WrappedPanic, clears
 // the current lua stack and continues the panic.  If the error on the top of the stack is actually
 // a WrappedError, just returns it.  Otherwise, interprets the error as the appropriate lua error.
@@ -231,13 +216,18 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
     }
 }
 
-pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) {
-    ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
+pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) -> Result<()> {
+    protect_lua_call(state, 0, 1, |state| {
+        ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
+    })
 }
 
-pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) {
-    let ud = ffi::lua_newuserdata(state, mem::size_of::<Option<T>>()) as *mut Option<T>;
-    ptr::write(ud, Some(t));
+pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
+    let mut t = Some(t);
+    protect_lua_call(state, 0, 1, |state| {
+        let ud = ffi::lua_newuserdata(state, mem::size_of::<Option<T>>()) as *mut Option<T>;
+        ptr::write(ud, t.take());
+    })
 }
 
 pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
@@ -549,17 +539,17 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
 
             ffi::lua_pushstring(state, cstr!("__gc"));
             ffi::lua_pushcfunction(state, userdata_destructor::<WrappedError>);
-            ffi::lua_settable(state, -3);
+            ffi::lua_rawset(state, -3);
 
             ffi::lua_pushstring(state, cstr!("__tostring"));
             ffi::lua_pushcfunction(state, error_tostring);
-            ffi::lua_settable(state, -3);
+            ffi::lua_rawset(state, -3);
 
             ffi::lua_pushstring(state, cstr!("__metatable"));
             ffi::lua_pushboolean(state, 0);
-            ffi::lua_settable(state, -3);
+            ffi::lua_rawset(state, -3);
 
-            ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
         })
     }
 
@@ -590,15 +580,32 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
 
             ffi::lua_pushstring(state, cstr!("__gc"));
             ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
-            ffi::lua_settable(state, -3);
+            ffi::lua_rawset(state, -3);
 
             ffi::lua_pushstring(state, cstr!("__metatable"));
             ffi::lua_pushboolean(state, 0);
-            ffi::lua_settable(state, -3);
+            ffi::lua_rawset(state, -3);
 
-            ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
         });
     }
 
     ffi::LUA_TTABLE
+}
+
+// Runs the given function with the Lua garbage collector disabled.  `rlua` assumes that all memory
+// errors are aborts, so in this way, 'm' functions that may also cause a `__gc` metamethod error
+// are guaranteed not to cause a Lua error (longjmp).  The given function should never panic or
+// longjmp, because this could inadverntently disable the gc.  This is useful when error handling
+// must allocate, and `__gc` errors at that time would shadow more important errors, or be extremely
+// difficult to handle safely.
+unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) -> R {
+    if ffi::lua_gc(state, ffi::LUA_GCISRUNNING, 0) != 0 {
+        ffi::lua_gc(state, ffi::LUA_GCSTOP, 0);
+        let r = f();
+        ffi::lua_gc(state, ffi::LUA_GCRESTART, 0);
+        r
+    } else {
+        f()
+    }
 }

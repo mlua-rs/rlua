@@ -292,7 +292,9 @@ impl<'lua> Function<'lua> {
                     lua.push_value(lua.state, arg);
                 }
 
-                ffi::lua_pushcclosure(lua.state, bind_call_impl, nargs + 2);
+                protect_lua_call(lua.state, nargs + 2, 1, |state| {
+                    ffi::lua_pushcclosure(state, bind_call_impl, nargs + 2);
+                })?;
 
                 Ok(Function(lua.pop_ref(lua.state)))
             })
@@ -547,9 +549,9 @@ impl Lua {
     /// Pass a `&str` slice to Lua, creating and returning an interned Lua string.
     pub fn create_string(&self, s: &str) -> Result<String> {
         unsafe {
-            stack_guard(self.state, 0, || {
+            stack_err_guard(self.state, 0, || {
                 check_stack(self.state, 2);
-                ffi::lua_pushlstring(self.state, s.as_ptr() as *const c_char, s.len());
+                push_string(self.state, s)?;
                 Ok(String(self.pop_ref(self.state)))
             })
         }
@@ -558,7 +560,7 @@ impl Lua {
     /// Creates and returns a new table.
     pub fn create_table(&self) -> Result<Table> {
         unsafe {
-            stack_guard(self.state, 0, || {
+            stack_err_guard(self.state, 0, || {
                 check_stack(self.state, 4);
                 protect_lua_call(self.state, 0, 1, |state| {
                     ffi::lua_newtable(state);
@@ -585,7 +587,9 @@ impl Lua {
                 for (k, v) in cont {
                     self.push_value(self.state, k.to_lua(self)?);
                     self.push_value(self.state, v.to_lua(self)?);
-                    ffi::lua_rawset(self.state, -3);
+                    protect_lua_call(self.state, 3, 1, |state| {
+                        ffi::lua_rawset(state, -3);
+                    })?;
                 }
                 Ok(Table(self.pop_ref(self.state)))
             })
@@ -660,10 +664,12 @@ impl Lua {
     /// Equivalent to `coroutine.create`.
     pub fn create_thread<'lua>(&'lua self, func: Function<'lua>) -> Result<Thread<'lua>> {
         unsafe {
-            stack_guard(self.state, 0, move || {
+            stack_err_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
 
-                let thread_state = ffi::lua_newthread(self.state);
+                let thread_state = protect_lua_call(self.state, 0, 1, |state| {
+                    ffi::lua_newthread(state)
+                })?;
                 self.push_ref(thread_state, &func.0);
 
                 Ok(Thread(self.pop_ref(self.state)))
@@ -680,7 +686,7 @@ impl Lua {
             stack_err_guard(self.state, 0, move || {
                 check_stack(self.state, 3);
 
-                push_userdata::<RefCell<T>>(self.state, RefCell::new(data));
+                push_userdata::<RefCell<T>>(self.state, RefCell::new(data))?;
 
                 ffi::lua_rawgeti(
                     self.state,
@@ -713,11 +719,14 @@ impl Lua {
         match v {
             Value::String(s) => Ok(s),
             v => unsafe {
-                stack_guard(self.state, 0, || {
+                stack_err_guard(self.state, 0, || {
                     check_stack(self.state, 2);
                     let ty = v.type_name();
                     self.push_value(self.state, v);
-                    if ffi::lua_tostring(self.state, -1).is_null() {
+                    let s = protect_lua_call(self.state, 1, 1, |state| {
+                        ffi::lua_tostring(state, -1)
+                    })?;
+                    if s.is_null() {
                         ffi::lua_pop(self.state, 1);
                         Err(Error::FromLuaConversionError {
                             from: ty,
@@ -989,37 +998,50 @@ impl Lua {
             };
             T::add_methods(&mut methods);
 
-            ffi::lua_newtable(self.state);
+            protect_lua_call(self.state, 0, 1, |state| {
+                ffi::lua_newtable(state);
+            })?;
 
             let has_methods = !methods.methods.is_empty();
 
             if has_methods {
-                push_string(self.state, "__index");
-                ffi::lua_newtable(self.state);
+                push_string(self.state, "__index")?;
+                protect_lua_call(self.state, 0, 1, |state| {
+                    ffi::lua_newtable(state);
+                })?;
 
                 for (k, m) in methods.methods {
-                    push_string(self.state, &k);
+                    push_string(self.state, &k)?;
                     self.push_value(
                         self.state,
                         Value::Function(self.create_callback_function(m)?),
                     );
-                    ffi::lua_rawset(self.state, -3);
+                    protect_lua_call(self.state, 3, 1, |state| {
+                        ffi::lua_rawset(state, -3);
+                    })?;
                 }
 
-                ffi::lua_rawset(self.state, -3);
+                protect_lua_call(self.state, 3, 1, |state| {
+                    ffi::lua_rawset(state, -3);
+                })?;
             }
 
             for (k, m) in methods.meta_methods {
                 if k == MetaMethod::Index && has_methods {
-                    push_string(self.state, "__index");
+                    push_string(self.state, "__index")?;
                     ffi::lua_pushvalue(self.state, -1);
                     ffi::lua_gettable(self.state, -3);
                     self.push_value(
                         self.state,
                         Value::Function(self.create_callback_function(m)?),
                     );
-                    ffi::lua_pushcclosure(self.state, meta_index_impl, 2);
-                    ffi::lua_rawset(self.state, -3);
+                    protect_lua_call(self.state, 2, 1, |state| {
+                        ffi::lua_pushcclosure(state, meta_index_impl, 2);
+                    })?;
+
+                    protect_lua_call(self.state, 3, 1, |state| {
+                        ffi::lua_rawset(state, -3);
+                    })?;
                 } else {
                     let name = match k {
                         MetaMethod::Add => "__add",
@@ -1046,22 +1068,28 @@ impl Lua {
                         MetaMethod::Call => "__call",
                         MetaMethod::ToString => "__tostring",
                     };
-                    push_string(self.state, name);
+                    push_string(self.state, name)?;
                     self.push_value(
                         self.state,
                         Value::Function(self.create_callback_function(m)?),
                     );
-                    ffi::lua_rawset(self.state, -3);
+                    protect_lua_call(self.state, 3, 1, |state| {
+                        ffi::lua_rawset(state, -3);
+                    })?;
                 }
             }
 
-            push_string(self.state, "__gc");
+            push_string(self.state, "__gc")?;
             ffi::lua_pushcfunction(self.state, userdata_destructor::<RefCell<T>>);
-            ffi::lua_rawset(self.state, -3);
+            protect_lua_call(self.state, 3, 1, |state| {
+                ffi::lua_rawset(state, -3);
+            })?;
 
-            push_string(self.state, "__metatable");
+            push_string(self.state, "__metatable")?;
             ffi::lua_pushboolean(self.state, 0);
-            ffi::lua_rawset(self.state, -3);
+            protect_lua_call(self.state, 3, 1, |state| {
+                ffi::lua_rawset(state, -3);
+            })?;
 
             let id = ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX);
             (*registered_userdata).insert(TypeId::of::<T>(), id);
@@ -1094,6 +1122,8 @@ impl Lua {
 
         let state = ffi::lua_newstate(allocator, ptr::null_mut());
 
+        // Ignores or `unwrap()`s 'm' errors, because this is assuming that nothing in the lua
+        // standard library will have a `__gc` metamethod error.
         stack_guard(state, 0, || {
             // Do not open the debug library, it can be used to cause unsafety.
             ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
@@ -1119,11 +1149,11 @@ impl Lua {
                 &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
             );
 
-            push_userdata::<HashMap<TypeId, c_int>>(state, HashMap::new());
+            push_userdata::<HashMap<TypeId, c_int>>(state, HashMap::new()).unwrap();
 
             ffi::lua_newtable(state);
 
-            push_string(state, "__gc");
+            push_string(state, "__gc").unwrap();
             ffi::lua_pushcfunction(state, userdata_destructor::<HashMap<TypeId, c_int>>);
             ffi::lua_rawset(state, -3);
 
@@ -1140,11 +1170,11 @@ impl Lua {
 
             ffi::lua_newtable(state);
 
-            push_string(state, "__gc");
+            push_string(state, "__gc").unwrap();
             ffi::lua_pushcfunction(state, userdata_destructor::<RefCell<Callback>>);
             ffi::lua_rawset(state, -3);
 
-            push_string(state, "__metatable");
+            push_string(state, "__metatable").unwrap();
             ffi::lua_pushboolean(state, 0);
             ffi::lua_rawset(state, -3);
 
@@ -1155,15 +1185,15 @@ impl Lua {
 
             ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
 
-            push_string(state, "pcall");
+            push_string(state, "pcall").unwrap();
             ffi::lua_pushcfunction(state, safe_pcall);
             ffi::lua_rawset(state, -3);
 
-            push_string(state, "xpcall");
+            push_string(state, "xpcall").unwrap();
             ffi::lua_pushcfunction(state, safe_xpcall);
             ffi::lua_rawset(state, -3);
 
-            push_string(state, "setmetatable");
+            push_string(state, "setmetatable").unwrap();
             ffi::lua_pushcfunction(state, safe_setmetatable);
             ffi::lua_rawset(state, -3);
 
@@ -1217,10 +1247,10 @@ impl Lua {
         }
 
         unsafe {
-            stack_guard(self.state, 0, move || {
+            stack_err_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
 
-                push_userdata::<RefCell<Callback>>(self.state, RefCell::new(func));
+                push_userdata::<RefCell<Callback>>(self.state, RefCell::new(func))?;
 
                 ffi::lua_pushlightuserdata(
                     self.state,
@@ -1229,7 +1259,9 @@ impl Lua {
                 ffi::lua_gettable(self.state, ffi::LUA_REGISTRYINDEX);
                 ffi::lua_setmetatable(self.state, -2);
 
-                ffi::lua_pushcclosure(self.state, callback_call_impl, 1);
+                protect_lua_call(self.state, 1, 1, |state| {
+                    ffi::lua_pushcclosure(state, callback_call_impl, 1);
+                })?;
 
                 Ok(Function(self.pop_ref(self.state)))
             })
