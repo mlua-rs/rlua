@@ -588,11 +588,11 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
             );
             ffi::lua_pushvalue(state, -2);
 
-            push_string(state, "__gc");
+            ffi::lua_pushstring(state, cstr!("__gc"));
             ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
             ffi::lua_settable(state, -3);
 
-            push_string(state, "__metatable");
+            ffi::lua_pushstring(state, cstr!("__metatable"));
             ffi::lua_pushboolean(state, 0);
             ffi::lua_settable(state, -3);
 
