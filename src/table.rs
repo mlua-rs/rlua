@@ -111,7 +111,7 @@ impl<'lua> Table<'lua> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
-                check_stack(lua.state, 5);
+                check_stack(lua.state, 6);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
                 pgettable(lua.state, -2)?;
