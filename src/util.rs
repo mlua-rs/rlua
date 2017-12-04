@@ -1,6 +1,4 @@
-use std::mem;
-use std::ptr;
-use std::process;
+use std::{mem, ptr, process};
 use std::sync::Arc;
 use std::ffi::CStr;
 use std::any::Any;
@@ -93,123 +91,111 @@ where
     res
 }
 
-// Protected version of lua_gettable, uses 3 stack spaces, does not call checkstack.
-pub unsafe fn pgettable(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
-    unsafe extern "C" fn gettable(state: *mut ffi::lua_State) -> c_int {
-        ffi::lua_gettable(state, -2);
-        1
+// Call a function that calls into the Lua API and may trigger a Lua error (longjmp) in a safe way.
+// Wraps the inner function in a call to `lua_pcall`, so the inner function only has access to a
+// limited lua stack.  `nargs` and `nresults` are similar to the parameters of `lua_pcall`, but the
+// given function return type is not the return value count, instead the inner function return
+// values are assumed to match the `nresults` param.  Internally uses 3 extra stack spaces, and does
+// not call checkstack.
+pub unsafe fn protect_lua_call<F, R>(state: *mut ffi::lua_State, nargs: c_int, nresults: c_int, f: F) -> Result<R>
+    where F: FnMut(*mut ffi::lua_State) -> R,
+    R: Copy,
+{
+    struct Params<F, R> {
+        function: F,
+        ret: R,
+        nresults: c_int,
     }
 
-    let table_index = ffi::lua_absindex(state, index);
-
-    ffi::lua_pushcfunction(state, gettable);
-    ffi::lua_pushvalue(state, table_index);
-    ffi::lua_pushvalue(state, -3);
-    ffi::lua_remove(state, -4);
-
-    match pcall_with_traceback(state, 2, 1) {
-        ffi::LUA_OK => Ok(ffi::lua_type(state, -1)),
-        err => Err(pop_error(state, err)),
-    }
-}
-
-// Protected version of lua_settable, uses 4 stack spaces, does not call checkstack.
-pub unsafe fn psettable(state: *mut ffi::lua_State, index: c_int) -> Result<()> {
-    unsafe extern "C" fn settable(state: *mut ffi::lua_State) -> c_int {
-        ffi::lua_settable(state, -3);
-        0
-    }
-
-    let table_index = ffi::lua_absindex(state, index);
-
-    ffi::lua_pushcfunction(state, settable);
-    ffi::lua_pushvalue(state, table_index);
-    ffi::lua_pushvalue(state, -4);
-    ffi::lua_pushvalue(state, -4);
-    ffi::lua_remove(state, -5);
-    ffi::lua_remove(state, -5);
-
-    match pcall_with_traceback(state, 3, 0) {
-        ffi::LUA_OK => Ok(()),
-        err => Err(pop_error(state, err)),
-    }
-}
-
-// Protected version of luaL_len, uses 2 stack spaces, does not call checkstack.
-pub unsafe fn plen(state: *mut ffi::lua_State, index: c_int) -> Result<ffi::lua_Integer> {
-    unsafe extern "C" fn len(state: *mut ffi::lua_State) -> c_int {
-        ffi::lua_pushinteger(state, ffi::luaL_len(state, -1));
-        1
-    }
-
-    let table_index = ffi::lua_absindex(state, index);
-
-    ffi::lua_pushcfunction(state, len);
-    ffi::lua_pushvalue(state, table_index);
-
-    match pcall_with_traceback(state, 1, 1) {
-        ffi::LUA_OK => {
-            let len = ffi::lua_tointeger(state, -1);
-            ffi::lua_pop(state, 1);
-            Ok(len)
+    unsafe extern "C" fn do_call<F, R>(state: *mut ffi::lua_State) -> c_int
+        where F: FnMut(*mut ffi::lua_State) -> R
+    {
+        let params = ffi::lua_touserdata(state, -1) as *mut Params<F, R>;
+        ffi::lua_pop(state, 1);
+        ptr::write(&mut (*params).ret, ((*params).function)(state));
+        if (*params).nresults == ffi::LUA_MULTRET {
+            ffi::lua_gettop(state)
+        } else {
+            (*params).nresults
         }
-        err => Err(pop_error(state, err)),
+    }
+
+    let stack_start = ffi::lua_gettop(state) - nargs;
+
+    ffi::lua_pushcfunction(state, error_traceback);
+    ffi::lua_pushcfunction(state, do_call::<F, R>);
+    ffi::lua_rotate(state, stack_start + 1, 2);
+
+    let mut params = Params {
+        function: f,
+        ret: mem::uninitialized(),
+        nresults,
+    };
+
+    ffi::lua_pushlightuserdata(state, &mut params as *mut Params<F, R> as *mut c_void);
+
+    let ret = ffi::lua_pcall(state, nargs + 1, nresults, stack_start + 1);
+
+    ffi::lua_remove(state, stack_start + 1);
+
+    if ret == ffi::LUA_OK {
+        Ok(params.ret)
+    } else {
+        Err(pop_error(state, ret))
     }
 }
 
-// Protected version of lua_geti, uses 3 stack spaces, does not call checkstack.
+// Protected version of lua_gettable, uses 4 stack spaces, does not call checkstack.
+pub unsafe fn pgettable(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
+    ffi::lua_pushvalue(state, index);
+    ffi::lua_insert(state, -2);
+    protect_lua_call(state, 2, 1, |state| {
+        ffi::lua_gettable(state, -2)
+    })
+}
+
+// Protected version of lua_settable, uses 5 stack spaces, does not call checkstack.
+pub unsafe fn psettable(state: *mut ffi::lua_State, index: c_int) -> Result<()> {
+    ffi::lua_pushvalue(state, index);
+    ffi::lua_insert(state, -3);
+    protect_lua_call(state, 3, 0, |state| {
+        ffi::lua_settable(state, -3);
+    })
+}
+
+// Protected version of luaL_len, uses 4 stack spaces, does not call checkstack.
+pub unsafe fn plen(state: *mut ffi::lua_State, index: c_int) -> Result<ffi::lua_Integer> {
+    ffi::lua_pushvalue(state, index);
+    protect_lua_call(state, 1, 0, |state| {
+        ffi::luaL_len(state, -1)
+    })
+}
+
+// Protected version of lua_geti, uses 4 stack spaces, does not call checkstack.
 pub unsafe fn pgeti(
     state: *mut ffi::lua_State,
     index: c_int,
     i: ffi::lua_Integer,
 ) -> Result<c_int> {
-    unsafe extern "C" fn geti(state: *mut ffi::lua_State) -> c_int {
-        let i = ffi::lua_tointeger(state, -1);
-        ffi::lua_geti(state, -2, i);
-        1
-    }
-
-    let table_index = ffi::lua_absindex(state, index);
-
-    ffi::lua_pushcfunction(state, geti);
-    ffi::lua_pushvalue(state, table_index);
-    ffi::lua_pushinteger(state, i);
-
-    match pcall_with_traceback(state, 2, 1) {
-        ffi::LUA_OK => Ok(ffi::lua_type(state, -1)),
-        err => Err(pop_error(state, err)),
-    }
+    ffi::lua_pushvalue(state, index);
+    protect_lua_call(state, 1, 1, |state| {
+        ffi::lua_geti(state, -1, i)
+    })
 }
 
-// Protected version of lua_next, uses 3 stack spaces, does not call checkstack.
+// Protected version of lua_next, uses 4 stack spaces, does not call checkstack.
 pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
-    unsafe extern "C" fn next(state: *mut ffi::lua_State) -> c_int {
+    ffi::lua_pushvalue(state, index);
+    ffi::lua_insert(state, -2);
+    protect_lua_call(state, 2, ffi::LUA_MULTRET, |state| {
         if ffi::lua_next(state, -2) == 0 {
+            ffi::lua_remove(state, -1);
             0
         } else {
-            2
+            ffi::lua_remove(state, -3);
+            1
         }
-    }
-
-    let table_index = ffi::lua_absindex(state, index);
-
-    ffi::lua_pushcfunction(state, next);
-    ffi::lua_pushvalue(state, table_index);
-    ffi::lua_pushvalue(state, -3);
-    ffi::lua_remove(state, -4);
-
-    let stack_start = ffi::lua_gettop(state) - 3;
-    match pcall_with_traceback(state, 2, ffi::LUA_MULTRET) {
-        ffi::LUA_OK => {
-            let nresults = ffi::lua_gettop(state) - stack_start;
-            if nresults == 0 {
-                Ok(0)
-            } else {
-                Ok(1)
-            }
-        }
-        err => Err(pop_error(state, err)),
-    }
+    })
 }
 
 // Pops an error off of the stack and returns it. If the error is actually a WrappedPanic, clears
@@ -356,18 +342,6 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_remove(state, -2);
     }
     1
-}
-
-// ffi::lua_pcall with a message handler that gives a nice traceback.  If the
-// caught error is actually a Error, will simply pass the error along.  Does
-// not call checkstack, and uses 2 extra stack spaces.
-unsafe fn pcall_with_traceback(state: *mut ffi::lua_State, nargs: c_int, nresults: c_int) -> c_int {
-    let msgh_position = ffi::lua_gettop(state) - nargs;
-    ffi::lua_pushcfunction(state, error_traceback);
-    ffi::lua_insert(state, msgh_position);
-    let ret = ffi::lua_pcall(state, nargs, nresults, msgh_position);
-    ffi::lua_remove(state, msgh_position);
-    ret
 }
 
 // A variant of pcall that does not allow lua to catch panic errors from callback_error
