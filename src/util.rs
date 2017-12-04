@@ -1,4 +1,4 @@
-use std::{mem, ptr, process};
+use std::{mem, process, ptr};
 use std::sync::Arc;
 use std::ffi::CStr;
 use std::any::Any;
@@ -97,8 +97,14 @@ where
 // given function return type is not the return value count, instead the inner function return
 // values are assumed to match the `nresults` param.  Internally uses 3 extra stack spaces, and does
 // not call checkstack.
-pub unsafe fn protect_lua_call<F, R>(state: *mut ffi::lua_State, nargs: c_int, nresults: c_int, f: F) -> Result<R>
-    where F: FnMut(*mut ffi::lua_State) -> R,
+pub unsafe fn protect_lua_call<F, R>(
+    state: *mut ffi::lua_State,
+    nargs: c_int,
+    nresults: c_int,
+    f: F,
+) -> Result<R>
+where
+    F: FnMut(*mut ffi::lua_State) -> R,
 {
     struct Params<F, R> {
         function: F,
@@ -107,7 +113,8 @@ pub unsafe fn protect_lua_call<F, R>(state: *mut ffi::lua_State, nargs: c_int, n
     }
 
     unsafe extern "C" fn do_call<F, R>(state: *mut ffi::lua_State) -> c_int
-        where F: FnMut(*mut ffi::lua_State) -> R
+    where
+        F: FnMut(*mut ffi::lua_State) -> R,
     {
         let params = ffi::lua_touserdata(state, -1) as *mut Params<F, R>;
         ffi::lua_pop(state, 1);
@@ -144,6 +151,21 @@ pub unsafe fn protect_lua_call<F, R>(state: *mut ffi::lua_State, nargs: c_int, n
     }
 }
 
+// Runs the given function with the Lua garbage collector disabled.  `rlua` assumes that all memory
+// errors are aborts, so in this way, 'm' functions that may also cause a `__gc` metamethod error
+// are guaranteed not to cause a Lua error (longjmp).  The given function should never panic or
+// longjmp, because this could inadverntently disable the gc.
+pub unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) -> R {
+    if ffi::lua_gc(state, ffi::LUA_GCISRUNNING, 0) != 0 {
+        ffi::lua_gc(state, ffi::LUA_GCSTOP, 0);
+        let r = f();
+        ffi::lua_gc(state, ffi::LUA_GCRESTART, 0);
+        r
+    } else {
+        f()
+    }
+}
+
 // Pops an error off of the stack and returns it. If the error is actually a WrappedPanic, clears
 // the current lua stack and continues the panic.  If the error on the top of the stack is actually
 // a WrappedError, just returns it.  Otherwise, interprets the error as the appropriate lua error.
@@ -165,14 +187,14 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
             lua_panic!(state, "internal error: panic was resumed twice")
         }
     } else {
-        let err_string = if ffi::lua_type(state, -1) == ffi::LUA_TSTRING {
-            // lua_tostring only throws memory errors when the type is not already a string
-            CStr::from_ptr(ffi::lua_tostring(state, -1))
-                .to_string_lossy()
-                .into_owned()
-        } else {
-            "<non-string error>".to_owned()
-        };
+        let err_string = gc_guard(state, || {
+            if let Some(s) = ffi::lua_tostring(state, -1).as_ref() {
+                CStr::from_ptr(s).to_string_lossy().into_owned()
+            } else {
+                "<unprintable error>".to_owned()
+            }
+        });
+        ffi::lua_pop(state, 1);
 
         match err_code {
             ffi::LUA_ERRRUN => Error::RuntimeError(err_string),
@@ -287,7 +309,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
 pub unsafe extern "C" fn safe_pcall(state: *mut ffi::lua_State) -> c_int {
     let top = ffi::lua_gettop(state);
     if top == 0 {
-        push_string(state, "not enough arguments to pcall");
+        ffi::lua_pushstring(state, cstr!("not enough arguments to pcall"));
         ffi::lua_error(state);
     } else if ffi::lua_pcall(state, top - 1, ffi::LUA_MULTRET, 0) != ffi::LUA_OK {
         if is_wrapped_panic(state, -1) {
@@ -318,7 +340,7 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
 
     let top = ffi::lua_gettop(state);
     if top < 2 {
-        push_string(state, "not enough arguments to xpcall");
+        ffi::lua_pushstring(state, cstr!("not enough arguments to xpcall"));
         ffi::lua_error(state);
     }
 
@@ -345,13 +367,13 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
 // Safely call setmetatable, if a __gc function is given, will wrap it in pcall, and panic on error.
 pub unsafe extern "C" fn safe_setmetatable(state: *mut ffi::lua_State) -> c_int {
     if ffi::lua_gettop(state) < 2 {
-        push_string(state, "not enough arguments to setmetatable");
+        ffi::lua_pushstring(state, cstr!("not enough arguments to setmetatable"));
         ffi::lua_error(state);
     }
 
     // Wrapping the __gc method in setmetatable ONLY works because Lua 5.3 only honors the __gc
     // method when it exists upon calling setmetatable, and ignores it if it is set later.
-    push_string(state, "__gc");
+    ffi::lua_pushstring(state, cstr!("__gc"));
     if ffi::lua_istable(state, -2) == 1 && ffi::lua_rawget(state, -2) == ffi::LUA_TFUNCTION {
         unsafe extern "C" fn safe_gc(state: *mut ffi::lua_State) -> c_int {
             ffi::lua_pushvalue(state, ffi::lua_upvalueindex(1));
@@ -369,7 +391,7 @@ pub unsafe extern "C" fn safe_setmetatable(state: *mut ffi::lua_State) -> c_int 
         }
 
         ffi::lua_pushcclosure(state, safe_gc, 1);
-        push_string(state, "__gc");
+        ffi::lua_pushstring(state, cstr!("__gc"));
         ffi::lua_insert(state, -2);
         ffi::lua_rawset(state, -3);
     } else {
@@ -391,7 +413,12 @@ pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
     ffi::luaL_checkstack(state, 2, ptr::null());
 
-    push_userdata(state, WrappedError(err));
+    gc_guard(state, || {
+        let ud = ffi::lua_newuserdata(state, mem::size_of::<Option<WrappedError>>())
+            as *mut Option<WrappedError>;
+        ptr::write(ud, Some(WrappedError(err)))
+    });
+
 
     get_error_metatable(state);
     ffi::lua_setmetatable(state, -2);
@@ -417,7 +444,11 @@ struct WrappedPanic(pub Option<Box<Any + Send>>);
 unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>) {
     ffi::luaL_checkstack(state, 2, ptr::null());
 
-    push_userdata(state, WrappedPanic(Some(panic)));
+    gc_guard(state, || {
+        let ud = ffi::lua_newuserdata(state, mem::size_of::<Option<WrappedPanic>>())
+            as *mut Option<WrappedPanic>;
+        ptr::write(ud, Some(WrappedPanic(Some(panic))))
+    });
 
     get_panic_metatable(state);
     ffi::lua_setmetatable(state, -2);
@@ -480,7 +511,14 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
         callback_error(state, || {
             if is_wrapped_error(state, -1) {
                 let error = get_userdata::<WrappedError>(state, -1);
-                push_string(state, &(*error).0.to_string());
+                let error_str = (*error).0.to_string();
+                gc_guard(state, || {
+                    ffi::lua_pushlstring(
+                        state,
+                        error_str.as_ptr() as *const c_char,
+                        error_str.len(),
+                    )
+                });
                 ffi::lua_remove(state, -2);
 
                 Ok(1)
@@ -501,26 +539,28 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
 
         ffi::luaL_checkstack(state, 8, ptr::null());
 
-        ffi::lua_newtable(state);
-        ffi::lua_pushlightuserdata(
-            state,
-            &ERROR_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-        );
-        ffi::lua_pushvalue(state, -2);
+        gc_guard(state, || {
+            ffi::lua_newtable(state);
+            ffi::lua_pushlightuserdata(
+                state,
+                &ERROR_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+            );
+            ffi::lua_pushvalue(state, -2);
 
-        push_string(state, "__gc");
-        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedError>);
-        ffi::lua_settable(state, -3);
+            ffi::lua_pushstring(state, cstr!("__gc"));
+            ffi::lua_pushcfunction(state, userdata_destructor::<WrappedError>);
+            ffi::lua_settable(state, -3);
 
-        push_string(state, "__tostring");
-        ffi::lua_pushcfunction(state, error_tostring);
-        ffi::lua_settable(state, -3);
+            ffi::lua_pushstring(state, cstr!("__tostring"));
+            ffi::lua_pushcfunction(state, error_tostring);
+            ffi::lua_settable(state, -3);
 
-        push_string(state, "__metatable");
-        ffi::lua_pushboolean(state, 0);
-        ffi::lua_settable(state, -3);
+            ffi::lua_pushstring(state, cstr!("__metatable"));
+            ffi::lua_pushboolean(state, 0);
+            ffi::lua_settable(state, -3);
 
-        ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+            ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+        })
     }
 
     ffi::LUA_TTABLE
@@ -540,22 +580,24 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
 
         ffi::luaL_checkstack(state, 8, ptr::null());
 
-        ffi::lua_newtable(state);
-        ffi::lua_pushlightuserdata(
-            state,
-            &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-        );
-        ffi::lua_pushvalue(state, -2);
+        gc_guard(state, || {
+            ffi::lua_newtable(state);
+            ffi::lua_pushlightuserdata(
+                state,
+                &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+            );
+            ffi::lua_pushvalue(state, -2);
 
-        push_string(state, "__gc");
-        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
-        ffi::lua_settable(state, -3);
+            push_string(state, "__gc");
+            ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
+            ffi::lua_settable(state, -3);
 
-        push_string(state, "__metatable");
-        ffi::lua_pushboolean(state, 0);
-        ffi::lua_settable(state, -3);
+            push_string(state, "__metatable");
+            ffi::lua_pushboolean(state, 0);
+            ffi::lua_settable(state, -3);
 
-        ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+            ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+        });
     }
 
     ffi::LUA_TTABLE

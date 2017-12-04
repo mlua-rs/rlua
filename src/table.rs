@@ -98,9 +98,7 @@ impl<'lua> Table<'lua> {
                 check_stack(lua.state, 5);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
-                protect_lua_call(lua.state, 2, 1, |state| {
-                    ffi::lua_gettable(state, -2)
-                })?;
+                protect_lua_call(lua.state, 2, 1, |state| ffi::lua_gettable(state, -2))?;
                 V::from_lua(lua.pop_value(lua.state), lua)
             })
         }
@@ -114,9 +112,7 @@ impl<'lua> Table<'lua> {
                 check_stack(lua.state, 5);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
-                protect_lua_call(lua.state, 2, 1, |state| {
-                    ffi::lua_gettable(state, -2)
-                })?;
+                protect_lua_call(lua.state, 2, 1, |state| ffi::lua_gettable(state, -2))?;
                 let has = ffi::lua_isnil(lua.state, -1) == 0;
                 ffi::lua_pop(lua.state, 1);
                 Ok(has)
@@ -167,9 +163,7 @@ impl<'lua> Table<'lua> {
             stack_err_guard(lua.state, 0, || {
                 check_stack(lua.state, 4);
                 lua.push_ref(lua.state, &self.0);
-                protect_lua_call(lua.state, 1, 0, |state| {
-                    ffi::luaL_len(state, -1)
-                })
+                protect_lua_call(lua.state, 1, 0, |state| ffi::luaL_len(state, -1))
             })
         }
     }
@@ -416,9 +410,8 @@ where
                     check_stack(lua.state, 4);
 
                     lua.push_ref(lua.state, &self.table);
-                    match protect_lua_call(lua.state, 1, 1, |state| {
-                        ffi::lua_geti(state, -1, index)
-                    }) {
+                    match protect_lua_call(lua.state, 1, 1, |state| ffi::lua_geti(state, -1, index))
+                    {
                         Ok(ffi::LUA_TNIL) => {
                             ffi::lua_pop(lua.state, 1);
                             None

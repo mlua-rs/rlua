@@ -15,12 +15,8 @@ fn test_load() {
 }
 
 #[test]
-fn test_load_debug() {
-    let lua = Lua::new();
-    lua.exec::<()>("assert(debug == nil)", None).unwrap();
-    unsafe {
-        lua.load_debug();
-    }
+fn test_debug() {
+    let lua = unsafe { Lua::new_with_debug() };
     match lua.eval("debug", None).unwrap() {
         Value::Table(_) => {}
         val => panic!("Expected table for debug library, got {:#?}", val),

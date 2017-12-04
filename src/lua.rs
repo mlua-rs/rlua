@@ -449,7 +449,7 @@ impl Drop for Lua {
                     let top = ffi::lua_gettop(self.state);
                     if top != 0 {
                         eprintln!("Lua stack leak detected, stack top is {}", top);
-                        ::std::process::abort()
+                        process::abort()
                     }
                 }
 
@@ -460,122 +460,17 @@ impl Drop for Lua {
 }
 
 impl Lua {
-    /// Creates a new Lua state.
-    ///
-    /// Also loads the standard library.
+    /// Creates a new Lua state and loads standard library without the `debug` library.
     pub fn new() -> Lua {
-        unsafe extern "C" fn allocator(
-            _: *mut c_void,
-            ptr: *mut c_void,
-            _: usize,
-            nsize: usize,
-        ) -> *mut c_void {
-            if nsize == 0 {
-                libc::free(ptr as *mut libc::c_void);
-                ptr::null_mut()
-            } else {
-                let p = libc::realloc(ptr as *mut libc::c_void, nsize);
-                if p.is_null() {
-                    // We must abort on OOM, because otherwise this will result in an unsafe
-                    // longjmp.
-                    eprintln!("Out of memory in Lua allocation, aborting!");
-                    process::abort()
-                } else {
-                    p as *mut c_void
-                }
-            }
-        }
-
-        unsafe {
-            let state = ffi::lua_newstate(allocator, ptr::null_mut());
-
-            stack_guard(state, 0, || {
-                // Do not open the debug library, currently it can be used to cause unsafety.
-                ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
-                ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
-                ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
-                ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
-                ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
-                ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
-                ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
-                ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
-                ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
-                ffi::lua_pop(state, 9);
-
-                // Create the userdata registry table
-
-                ffi::lua_pushlightuserdata(
-                    state,
-                    &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
-                );
-
-                push_userdata::<HashMap<TypeId, c_int>>(state, HashMap::new());
-
-                ffi::lua_newtable(state);
-
-                push_string(state, "__gc");
-                ffi::lua_pushcfunction(state, userdata_destructor::<HashMap<TypeId, c_int>>);
-                ffi::lua_rawset(state, -3);
-
-                ffi::lua_setmetatable(state, -2);
-
-                ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
-
-                // Create the function metatable
-
-                ffi::lua_pushlightuserdata(
-                    state,
-                    &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-                );
-
-                ffi::lua_newtable(state);
-
-                push_string(state, "__gc");
-                ffi::lua_pushcfunction(state, userdata_destructor::<RefCell<Callback>>);
-                ffi::lua_rawset(state, -3);
-
-                push_string(state, "__metatable");
-                ffi::lua_pushboolean(state, 0);
-                ffi::lua_rawset(state, -3);
-
-                ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
-
-                // Override pcall, xpcall, and setmetatable with versions that cannot be used to
-                // cause unsafety.
-
-                ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
-
-                push_string(state, "pcall");
-                ffi::lua_pushcfunction(state, safe_pcall);
-                ffi::lua_rawset(state, -3);
-
-                push_string(state, "xpcall");
-                ffi::lua_pushcfunction(state, safe_xpcall);
-                ffi::lua_rawset(state, -3);
-
-                push_string(state, "setmetatable");
-                ffi::lua_pushcfunction(state, safe_setmetatable);
-                ffi::lua_rawset(state, -3);
-
-                ffi::lua_pop(state, 1);
-            });
-
-            Lua {
-                state,
-                main_state: state,
-                ephemeral: false,
-            }
-        }
+        unsafe { Lua::create_lua(false) }
     }
 
-    /// Loads the Lua debug library.
+    /// Creates a new Lua state and loads the standard library including the `debug` library.
     ///
-    /// The debug library is very unsound, loading it and using it breaks all
-    /// the guarantees of rlua.
-    pub unsafe fn load_debug(&self) {
-        check_stack(self.state, 1);
-        ffi::luaL_requiref(self.state, cstr!("debug"), ffi::luaopen_debug, 1);
-        ffi::lua_pop(self.state, 1);
+    /// The debug library is very unsound, loading it and using it breaks all the guarantees of
+    /// rlua.
+    pub unsafe fn new_with_debug() -> Lua {
+        Lua::create_lua(true)
     }
 
     /// Loads a chunk of Lua code and returns it as a function.
@@ -914,65 +809,6 @@ impl Lua {
         T::from_lua_multi(value, self)
     }
 
-    fn create_callback_function<'lua>(&'lua self, func: Callback<'lua>) -> Function<'lua> {
-        unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
-            callback_error(state, || {
-                let lua = Lua {
-                    state: state,
-                    main_state: main_state(state),
-                    ephemeral: true,
-                };
-
-                let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1));
-                let mut func = if let Ok(func) = (*func).try_borrow_mut() {
-                    func
-                } else {
-                    lua_panic!(
-                        state,
-                        "recursive callback function call would mutably borrow function twice"
-                    );
-                };
-
-                let nargs = ffi::lua_gettop(state);
-                let mut args = MultiValue::new();
-                check_stack(state, 1);
-                for _ in 0..nargs {
-                    args.push_front(lua.pop_value(state));
-                }
-
-                let results = func.deref_mut()(&lua, args)?;
-                let nresults = results.len() as c_int;
-
-                check_stack(state, nresults);
-
-                for r in results {
-                    lua.push_value(state, r);
-                }
-
-                Ok(nresults)
-            })
-        }
-
-        unsafe {
-            stack_guard(self.state, 0, move || {
-                check_stack(self.state, 2);
-
-                push_userdata::<RefCell<Callback>>(self.state, RefCell::new(func));
-
-                ffi::lua_pushlightuserdata(
-                    self.state,
-                    &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-                );
-                ffi::lua_gettable(self.state, ffi::LUA_REGISTRYINDEX);
-                ffi::lua_setmetatable(self.state, -2);
-
-                ffi::lua_pushcclosure(self.state, callback_call_impl, 1);
-
-                Function(self.pop_ref(self.state))
-            })
-        }
-    }
-
     // Used 1 stack space, does not call checkstack
     pub(crate) unsafe fn push_value(&self, state: *mut ffi::lua_State, value: Value) {
         match value {
@@ -1227,6 +1063,173 @@ impl Lua {
             (*registered_userdata).insert(TypeId::of::<T>(), id);
             id
         })
+    }
+
+    unsafe fn create_lua(load_debug: bool) -> Lua {
+        unsafe extern "C" fn allocator(
+            _: *mut c_void,
+            ptr: *mut c_void,
+            _: usize,
+            nsize: usize,
+        ) -> *mut c_void {
+            if nsize == 0 {
+                libc::free(ptr as *mut libc::c_void);
+                ptr::null_mut()
+            } else {
+                let p = libc::realloc(ptr as *mut libc::c_void, nsize);
+                if p.is_null() {
+                    // We must abort on OOM, because otherwise this will result in an unsafe
+                    // longjmp.
+                    eprintln!("Out of memory in Lua allocation, aborting!");
+                    process::abort()
+                } else {
+                    p as *mut c_void
+                }
+            }
+        }
+
+        let state = ffi::lua_newstate(allocator, ptr::null_mut());
+
+        stack_guard(state, 0, || {
+            // Do not open the debug library, it can be used to cause unsafety.
+            ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
+            ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
+            ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
+            ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
+            ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
+            ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
+            ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
+            ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
+            ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
+            ffi::lua_pop(state, 9);
+
+            if load_debug {
+                ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
+                ffi::lua_pop(state, 1);
+            }
+
+            // Create the userdata registry table
+
+            ffi::lua_pushlightuserdata(
+                state,
+                &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
+            );
+
+            push_userdata::<HashMap<TypeId, c_int>>(state, HashMap::new());
+
+            ffi::lua_newtable(state);
+
+            push_string(state, "__gc");
+            ffi::lua_pushcfunction(state, userdata_destructor::<HashMap<TypeId, c_int>>);
+            ffi::lua_rawset(state, -3);
+
+            ffi::lua_setmetatable(state, -2);
+
+            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+
+            // Create the function metatable
+
+            ffi::lua_pushlightuserdata(
+                state,
+                &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+            );
+
+            ffi::lua_newtable(state);
+
+            push_string(state, "__gc");
+            ffi::lua_pushcfunction(state, userdata_destructor::<RefCell<Callback>>);
+            ffi::lua_rawset(state, -3);
+
+            push_string(state, "__metatable");
+            ffi::lua_pushboolean(state, 0);
+            ffi::lua_rawset(state, -3);
+
+            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+
+            // Override pcall, xpcall, and setmetatable with versions that cannot be used to
+            // cause unsafety.
+
+            ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
+
+            push_string(state, "pcall");
+            ffi::lua_pushcfunction(state, safe_pcall);
+            ffi::lua_rawset(state, -3);
+
+            push_string(state, "xpcall");
+            ffi::lua_pushcfunction(state, safe_xpcall);
+            ffi::lua_rawset(state, -3);
+
+            push_string(state, "setmetatable");
+            ffi::lua_pushcfunction(state, safe_setmetatable);
+            ffi::lua_rawset(state, -3);
+
+            ffi::lua_pop(state, 1);
+        });
+
+        Lua {
+            state,
+            main_state: state,
+            ephemeral: false,
+        }
+    }
+
+    fn create_callback_function<'lua>(&'lua self, func: Callback<'lua>) -> Function<'lua> {
+        unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
+            callback_error(state, || {
+                let lua = Lua {
+                    state: state,
+                    main_state: main_state(state),
+                    ephemeral: true,
+                };
+
+                let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1));
+                let mut func = if let Ok(func) = (*func).try_borrow_mut() {
+                    func
+                } else {
+                    lua_panic!(
+                        state,
+                        "recursive callback function call would mutably borrow function twice"
+                    );
+                };
+
+                let nargs = ffi::lua_gettop(state);
+                let mut args = MultiValue::new();
+                check_stack(state, 1);
+                for _ in 0..nargs {
+                    args.push_front(lua.pop_value(state));
+                }
+
+                let results = func.deref_mut()(&lua, args)?;
+                let nresults = results.len() as c_int;
+
+                check_stack(state, nresults);
+
+                for r in results {
+                    lua.push_value(state, r);
+                }
+
+                Ok(nresults)
+            })
+        }
+
+        unsafe {
+            stack_guard(self.state, 0, move || {
+                check_stack(self.state, 2);
+
+                push_userdata::<RefCell<Callback>>(self.state, RefCell::new(func));
+
+                ffi::lua_pushlightuserdata(
+                    self.state,
+                    &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+                );
+                ffi::lua_gettable(self.state, ffi::LUA_REGISTRYINDEX);
+                ffi::lua_setmetatable(self.state, -2);
+
+                ffi::lua_pushcclosure(self.state, callback_call_impl, 1);
+
+                Function(self.pop_ref(self.state))
+            })
+        }
     }
 }
 

@@ -51,6 +51,16 @@ pub const LUA_TFUNCTION: c_int = 6;
 pub const LUA_TUSERDATA: c_int = 7;
 pub const LUA_TTHREAD: c_int = 8;
 
+pub const LUA_GCSTOP: c_int = 0;
+pub const LUA_GCRESTART: c_int = 1;
+pub const LUA_GCCOLLECT: c_int = 2;
+pub const LUA_GCCOUNT: c_int = 3;
+pub const LUA_GCCOUNTB: c_int = 4;
+pub const LUA_GCSTEP: c_int = 5;
+pub const LUA_GCSETPAUSE: c_int = 6;
+pub const LUA_GCSETSTEPMUL: c_int = 7;
+pub const LUA_GCISRUNNING: c_int = 9;
+
 #[link(name = "lua5.3")]
 extern "C" {
     pub fn lua_newstate(alloc: lua_Alloc, ud: *mut c_void) -> *mut lua_State;
@@ -80,6 +90,7 @@ extern "C" {
     pub fn lua_pushinteger(state: *mut lua_State, n: lua_Integer);
     pub fn lua_pushnumber(state: *mut lua_State, n: lua_Number);
     pub fn lua_pushlstring(state: *mut lua_State, s: *const c_char, len: usize) -> *const c_char;
+    pub fn lua_pushstring(state: *mut lua_State, s: *const c_char) -> *const c_char;
     pub fn lua_pushlightuserdata(state: *mut lua_State, data: *mut c_void);
     pub fn lua_pushcclosure(state: *mut lua_State, function: lua_CFunction, n: c_int);
 
@@ -125,6 +136,7 @@ extern "C" {
 
     pub fn lua_error(state: *mut lua_State) -> !;
     pub fn lua_atpanic(state: *mut lua_State, panic: lua_CFunction) -> lua_CFunction;
+    pub fn lua_gc(state: *mut lua_State, what: c_int, data: c_int) -> c_int;
 
     pub fn luaopen_base(state: *mut lua_State) -> c_int;
     pub fn luaopen_coroutine(state: *mut lua_State) -> c_int;
