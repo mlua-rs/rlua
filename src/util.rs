@@ -145,59 +145,6 @@ pub unsafe fn protect_lua_call<F, R>(state: *mut ffi::lua_State, nargs: c_int, n
     }
 }
 
-// Protected version of lua_gettable, uses 4 stack spaces, does not call checkstack.
-pub unsafe fn pgettable(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
-    ffi::lua_pushvalue(state, index);
-    ffi::lua_insert(state, -2);
-    protect_lua_call(state, 2, 1, |state| {
-        ffi::lua_gettable(state, -2)
-    })
-}
-
-// Protected version of lua_settable, uses 5 stack spaces, does not call checkstack.
-pub unsafe fn psettable(state: *mut ffi::lua_State, index: c_int) -> Result<()> {
-    ffi::lua_pushvalue(state, index);
-    ffi::lua_insert(state, -3);
-    protect_lua_call(state, 3, 0, |state| {
-        ffi::lua_settable(state, -3);
-    })
-}
-
-// Protected version of luaL_len, uses 4 stack spaces, does not call checkstack.
-pub unsafe fn plen(state: *mut ffi::lua_State, index: c_int) -> Result<ffi::lua_Integer> {
-    ffi::lua_pushvalue(state, index);
-    protect_lua_call(state, 1, 0, |state| {
-        ffi::luaL_len(state, -1)
-    })
-}
-
-// Protected version of lua_geti, uses 4 stack spaces, does not call checkstack.
-pub unsafe fn pgeti(
-    state: *mut ffi::lua_State,
-    index: c_int,
-    i: ffi::lua_Integer,
-) -> Result<c_int> {
-    ffi::lua_pushvalue(state, index);
-    protect_lua_call(state, 1, 1, |state| {
-        ffi::lua_geti(state, -1, i)
-    })
-}
-
-// Protected version of lua_next, uses 4 stack spaces, does not call checkstack.
-pub unsafe fn pnext(state: *mut ffi::lua_State, index: c_int) -> Result<c_int> {
-    ffi::lua_pushvalue(state, index);
-    ffi::lua_insert(state, -2);
-    protect_lua_call(state, 2, ffi::LUA_MULTRET, |state| {
-        if ffi::lua_next(state, -2) == 0 {
-            ffi::lua_remove(state, -1);
-            0
-        } else {
-            ffi::lua_remove(state, -3);
-            1
-        }
-    })
-}
-
 // Pops an error off of the stack and returns it. If the error is actually a WrappedPanic, clears
 // the current lua stack and continues the panic.  If the error on the top of the stack is actually
 // a WrappedError, just returns it.  Otherwise, interprets the error as the appropriate lua error.
