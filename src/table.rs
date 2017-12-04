@@ -435,7 +435,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::Table;
-    use error::{Result};
+    use error::Result;
     use lua::{Lua, Nil, Value};
 
     #[test]
@@ -565,7 +565,10 @@ mod tests {
         let table = lua.create_table().unwrap();
         let metatable = lua.create_table().unwrap();
         metatable
-            .set("__index", lua.create_function(|_, ()| Ok("index_value")).unwrap())
+            .set(
+                "__index",
+                lua.create_function(|_, ()| Ok("index_value")).unwrap(),
+            )
             .unwrap();
         table.set_metatable(Some(metatable));
         assert_eq!(table.get::<_, String>("any_key").unwrap(), "index_value");

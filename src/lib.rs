@@ -53,6 +53,8 @@ mod conversion;
 mod multi;
 mod string;
 mod table;
+mod function;
+mod thread;
 mod userdata;
 
 #[cfg(test)]
@@ -63,8 +65,9 @@ pub use types::{Integer, LightUserData, Number};
 pub use multi::Variadic;
 pub use string::String;
 pub use table::{Table, TablePairs, TableSequence};
+pub use function::Function;
+pub use thread::{Thread, ThreadStatus};
 pub use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
-pub use lua::{FromLua, FromLuaMulti, Function, Lua, MultiValue, Nil, Thread, ThreadStatus, ToLua,
-              ToLuaMulti, Value};
+pub use lua::{FromLua, FromLuaMulti, Lua, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
 pub mod prelude;

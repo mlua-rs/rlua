@@ -2,7 +2,7 @@ use std::fmt;
 use std::error;
 use std::panic::catch_unwind;
 
-use {Error, ExternalError, Function, Lua, Result, Table, Thread, ThreadStatus, Value, Variadic};
+use {Error, ExternalError, Function, Lua, Result, Table, Value, Variadic};
 
 #[test]
 fn test_load() {
@@ -79,73 +79,6 @@ fn test_eval() {
             r
         ),
     }
-}
-
-#[test]
-fn test_function() {
-    let lua = Lua::new();
-    let globals = lua.globals();
-    lua.exec::<()>(
-        r#"
-            function concat(arg1, arg2)
-                return arg1 .. arg2
-            end
-        "#,
-        None,
-    ).unwrap();
-
-    let concat = globals.get::<_, Function>("concat").unwrap();
-    assert_eq!(concat.call::<_, String>(("foo", "bar")).unwrap(), "foobar");
-}
-
-#[test]
-fn test_bind() {
-    let lua = Lua::new();
-    let globals = lua.globals();
-    lua.exec::<()>(
-        r#"
-            function concat(...)
-                local res = ""
-                for _, s in pairs({...}) do
-                    res = res..s
-                end
-                return res
-            end
-        "#,
-        None,
-    ).unwrap();
-
-    let mut concat = globals.get::<_, Function>("concat").unwrap();
-    concat = concat.bind("foo").unwrap();
-    concat = concat.bind("bar").unwrap();
-    concat = concat.bind(("baz", "baf")).unwrap();
-    assert_eq!(
-        concat.call::<_, String>(("hi", "wut")).unwrap(),
-        "foobarbazbafhiwut"
-    );
-}
-
-#[test]
-fn test_rust_function() {
-    let lua = Lua::new();
-    let globals = lua.globals();
-    lua.exec::<()>(
-        r#"
-            function lua_function()
-                return rust_function()
-            end
-
-            -- Test to make sure chunk return is ignored
-            return 1
-        "#,
-        None,
-    ).unwrap();
-
-    let lua_function = globals.get::<_, Function>("lua_function").unwrap();
-    let rust_function = lua.create_function(|_, ()| Ok("hello")).unwrap();
-
-    globals.set("rust_function", rust_function).unwrap();
-    assert_eq!(lua_function.call::<_, String>(()).unwrap(), "hello");
 }
 
 #[test]
@@ -270,8 +203,9 @@ fn test_error() {
         None,
     ).unwrap();
 
-    let rust_error_function =
-        lua.create_function(|_, ()| -> Result<()> { Err(TestError.to_lua_err()) }).unwrap();
+    let rust_error_function = lua.create_function(|_, ()| -> Result<()> {
+        Err(TestError.to_lua_err())
+    }).unwrap();
     globals
         .set("rust_error_function", rust_error_function)
         .unwrap();
@@ -378,92 +312,6 @@ fn test_error() {
 }
 
 #[test]
-fn test_thread() {
-    let lua = Lua::new();
-    let thread = lua.create_thread(
-        lua.eval::<Function>(
-            r#"
-                function (s)
-                    local sum = s
-                    for i = 1,4 do
-                        sum = sum + coroutine.yield(sum)
-                    end
-                    return sum
-                end
-            "#,
-            None,
-        ).unwrap(),
-    ).unwrap();
-
-    assert_eq!(thread.status(), ThreadStatus::Resumable);
-    assert_eq!(thread.resume::<_, i64>(0).unwrap(), 0);
-    assert_eq!(thread.status(), ThreadStatus::Resumable);
-    assert_eq!(thread.resume::<_, i64>(1).unwrap(), 1);
-    assert_eq!(thread.status(), ThreadStatus::Resumable);
-    assert_eq!(thread.resume::<_, i64>(2).unwrap(), 3);
-    assert_eq!(thread.status(), ThreadStatus::Resumable);
-    assert_eq!(thread.resume::<_, i64>(3).unwrap(), 6);
-    assert_eq!(thread.status(), ThreadStatus::Resumable);
-    assert_eq!(thread.resume::<_, i64>(4).unwrap(), 10);
-    assert_eq!(thread.status(), ThreadStatus::Unresumable);
-
-    let accumulate = lua.create_thread(
-        lua.eval::<Function>(
-            r#"
-                function (sum)
-                    while true do
-                        sum = sum + coroutine.yield(sum)
-                    end
-                end
-            "#,
-            None,
-        ).unwrap(),
-    ).unwrap();
-
-    for i in 0..4 {
-        accumulate.resume::<_, ()>(i).unwrap();
-    }
-    assert_eq!(accumulate.resume::<_, i64>(4).unwrap(), 10);
-    assert_eq!(accumulate.status(), ThreadStatus::Resumable);
-    assert!(accumulate.resume::<_, ()>("error").is_err());
-    assert_eq!(accumulate.status(), ThreadStatus::Error);
-
-    let thread = lua.eval::<Thread>(
-        r#"
-            coroutine.create(function ()
-                while true do
-                    coroutine.yield(42)
-                end
-            end)
-        "#,
-        None,
-    ).unwrap();
-    assert_eq!(thread.status(), ThreadStatus::Resumable);
-    assert_eq!(thread.resume::<_, i64>(()).unwrap(), 42);
-
-    let thread: Thread = lua.eval(
-        r#"
-            coroutine.create(function(arg)
-                assert(arg == 42)
-                local yieldarg = coroutine.yield(123)
-                assert(yieldarg == 43)
-                return 987
-            end)
-        "#,
-        None,
-    ).unwrap();
-
-    assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);
-    assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);
-
-    match thread.resume::<_, u32>(()) {
-        Err(Error::CoroutineInactive) => {}
-        Err(_) => panic!("resuming dead coroutine error is not CoroutineInactive kind"),
-        _ => panic!("resuming dead coroutine did not return error"),
-    }
-}
-
-#[test]
 fn test_result_conversions() {
     let lua = Lua::new();
     let globals = lua.globals();
@@ -473,7 +321,8 @@ fn test_result_conversions() {
             "only through failure can we succeed".to_lua_err(),
         ))
     }).unwrap();
-    let ok = lua.create_function(|_, ()| Ok(Ok::<_, Error>("!".to_owned()))).unwrap();
+    let ok = lua.create_function(|_, ()| Ok(Ok::<_, Error>("!".to_owned())))
+        .unwrap();
 
     globals.set("err", err).unwrap();
     globals.set("ok", ok).unwrap();
@@ -514,29 +363,6 @@ fn test_num_conversion() {
 
     lua.exec::<()>("a = math.huge", None).unwrap();
     assert!(globals.get::<_, i64>("n").is_err());
-}
-
-#[test]
-fn coroutine_from_closure() {
-    let lua = Lua::new();
-    let thrd_main = lua.create_function(|_, ()| Ok(())).unwrap();
-    lua.globals().set("main", thrd_main).unwrap();
-    let thrd: Thread = lua.eval("coroutine.create(main)", None).unwrap();
-    thrd.resume::<_, ()>(()).unwrap();
-}
-
-#[test]
-#[should_panic]
-fn coroutine_panic() {
-    let lua = Lua::new();
-    let thrd_main = lua.create_function(|lua, ()| {
-        // whoops, 'main' has a wrong type
-        let _coro: u32 = lua.globals().get("main").unwrap();
-        Ok(())
-    }).unwrap();
-    lua.globals().set("main", thrd_main.clone()).unwrap();
-    let thrd: Thread = lua.create_thread(thrd_main).unwrap();
-    thrd.resume::<_, ()>(()).unwrap();
 }
 
 #[test]

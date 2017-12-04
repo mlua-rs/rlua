@@ -4,10 +4,12 @@ use std::string::String as StdString;
 
 use error::*;
 use types::{Integer, LightUserData, Number};
-use lua::*;
 use string::String;
 use table::Table;
 use userdata::{AnyUserData, UserData};
+use function::Function;
+use thread::Thread;
+use lua::{FromLua, Lua, Nil, ToLua, Value};
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {

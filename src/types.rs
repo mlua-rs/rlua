@@ -49,7 +49,8 @@ impl<'lua> Drop for LuaRef<'lua> {
 #[cfg(test)]
 mod tests {
     use super::LightUserData;
-    use lua::{Function, Lua};
+    use function::Function;
+    use lua::Lua;
 
     use std::os::raw::c_void;
 

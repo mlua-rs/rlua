@@ -107,7 +107,9 @@ impl fmt::Display for Error {
         match *self {
             Error::SyntaxError { ref message, .. } => write!(fmt, "syntax error: {}", message),
             Error::RuntimeError(ref msg) => write!(fmt, "runtime error: {}", msg),
-            Error::GarbageCollectorError(ref msg) => write!(fmt, "garbage collector error: {}", msg),
+            Error::GarbageCollectorError(ref msg) => {
+                write!(fmt, "garbage collector error: {}", msg)
+            }
             Error::ToLuaConversionError {
                 from,
                 to,

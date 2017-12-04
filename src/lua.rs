@@ -17,6 +17,8 @@ use util::*;
 use types::{Callback, Integer, LightUserData, LuaRef, Number};
 use string::String;
 use table::Table;
+use function::Function;
+use thread::Thread;
 use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 
 /// A dynamically typed Lua value.
@@ -142,298 +144,6 @@ pub trait FromLuaMulti<'lua>: Sized {
     /// assigning values. Similarly, if not enough values are given, conversions should assume that
     /// any missing values are nil.
     fn from_lua_multi(values: MultiValue<'lua>, lua: &'lua Lua) -> Result<Self>;
-}
-
-/// Handle to an internal Lua function.
-#[derive(Clone, Debug)]
-pub struct Function<'lua>(LuaRef<'lua>);
-
-impl<'lua> Function<'lua> {
-    /// Calls the function, passing `args` as function arguments.
-    ///
-    /// The function's return values are converted to the generic type `R`.
-    ///
-    /// # Examples
-    ///
-    /// Call Lua's built-in `tostring` function:
-    ///
-    /// ```
-    /// # extern crate rlua;
-    /// # use rlua::{Lua, Function, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    /// let globals = lua.globals();
-    ///
-    /// let tostring: Function = globals.get("tostring")?;
-    ///
-    /// assert_eq!(tostring.call::<_, String>(123)?, "123");
-    ///
-    /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
-    ///
-    /// Call a function with multiple arguments:
-    ///
-    /// ```
-    /// # extern crate rlua;
-    /// # use rlua::{Lua, Function, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    ///
-    /// let sum: Function = lua.eval(r#"
-    ///     function(a, b)
-    ///         return a + b
-    ///     end
-    /// "#, None)?;
-    ///
-    /// assert_eq!(sum.call::<_, u32>((3, 4))?, 3 + 4);
-    ///
-    /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
-    pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
-        let lua = self.0.lua;
-        unsafe {
-            stack_err_guard(lua.state, 0, || {
-                let args = args.to_lua_multi(lua)?;
-                let nargs = args.len() as c_int;
-                check_stack(lua.state, nargs + 3);
-
-                ffi::lua_pushcfunction(lua.state, error_traceback);
-                let stack_start = ffi::lua_gettop(lua.state);
-                lua.push_ref(lua.state, &self.0);
-                for arg in args {
-                    lua.push_value(lua.state, arg);
-                }
-                let ret = ffi::lua_pcall(lua.state, nargs, ffi::LUA_MULTRET, stack_start);
-                if ret != ffi::LUA_OK {
-                    return Err(pop_error(lua.state, ret));
-                }
-                let nresults = ffi::lua_gettop(lua.state) - stack_start;
-                let mut results = MultiValue::new();
-                check_stack(lua.state, 1);
-                for _ in 0..nresults {
-                    results.push_front(lua.pop_value(lua.state));
-                }
-                ffi::lua_pop(lua.state, 1);
-                R::from_lua_multi(results, lua)
-            })
-        }
-    }
-
-    /// Returns a function that, when called, calls `self`, passing `args` as the first set of
-    /// arguments.
-    ///
-    /// If any arguments are passed to the returned function, they will be passed after `args`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate rlua;
-    /// # use rlua::{Lua, Function, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    ///
-    /// let sum: Function = lua.eval(r#"
-    ///     function(a, b)
-    ///         return a + b
-    ///     end
-    /// "#, None)?;
-    ///
-    /// let bound_a = sum.bind(1)?;
-    /// assert_eq!(bound_a.call::<_, u32>(2)?, 1 + 2);
-    ///
-    /// let bound_a_and_b = sum.bind(13)?.bind(57)?;
-    /// assert_eq!(bound_a_and_b.call::<_, u32>(())?, 13 + 57);
-    ///
-    /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
-    pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> Result<Function<'lua>> {
-        unsafe extern "C" fn bind_call_impl(state: *mut ffi::lua_State) -> c_int {
-            let nargs = ffi::lua_gettop(state);
-            let nbinds = ffi::lua_tointeger(state, ffi::lua_upvalueindex(2)) as c_int;
-            check_stack(state, nbinds + 2);
-
-            ffi::lua_settop(state, nargs + nbinds + 1);
-            ffi::lua_rotate(state, -(nargs + nbinds + 1), nbinds + 1);
-
-            ffi::lua_pushvalue(state, ffi::lua_upvalueindex(1));
-            ffi::lua_replace(state, 1);
-
-            for i in 0..nbinds {
-                ffi::lua_pushvalue(state, ffi::lua_upvalueindex(i + 3));
-                ffi::lua_replace(state, i + 2);
-            }
-
-            ffi::lua_call(state, nargs + nbinds, ffi::LUA_MULTRET);
-            ffi::lua_gettop(state)
-        }
-
-        let lua = self.0.lua;
-        unsafe {
-            stack_err_guard(lua.state, 0, || {
-                let args = args.to_lua_multi(lua)?;
-                let nargs = args.len() as c_int;
-
-                check_stack(lua.state, nargs + 3);
-                lua.push_ref(lua.state, &self.0);
-                ffi::lua_pushinteger(lua.state, nargs as ffi::lua_Integer);
-                for arg in args {
-                    lua.push_value(lua.state, arg);
-                }
-
-                protect_lua_call(lua.state, nargs + 2, 1, |state| {
-                    ffi::lua_pushcclosure(state, bind_call_impl, nargs + 2);
-                })?;
-
-                Ok(Function(lua.pop_ref(lua.state)))
-            })
-        }
-    }
-}
-
-/// Status of a Lua thread (or coroutine).
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum ThreadStatus {
-    /// The thread was just created, or is suspended because it has called `coroutine.yield`.
-    ///
-    /// If a thread is in this state, it can be resumed by calling [`Thread::resume`].
-    ///
-    /// [`Thread::resume`]: struct.Thread.html#method.resume
-    Resumable,
-    /// Either the thread has finished executing, or the thread is currently running.
-    Unresumable,
-    /// The thread has raised a Lua error during execution.
-    Error,
-}
-
-/// Handle to an internal Lua thread (or coroutine).
-#[derive(Clone, Debug)]
-pub struct Thread<'lua>(LuaRef<'lua>);
-
-impl<'lua> Thread<'lua> {
-    /// Resumes execution of this thread.
-    ///
-    /// Equivalent to `coroutine.resume`.
-    ///
-    /// Passes `args` as arguments to the thread. If the coroutine has called `coroutine.yield`, it
-    /// will return these arguments. Otherwise, the coroutine wasn't yet started, so the arguments
-    /// are passed to its main function.
-    ///
-    /// If the thread is no longer in `Active` state (meaning it has finished execution or
-    /// encountered an error), this will return `Err(CoroutineInactive)`, otherwise will return `Ok`
-    /// as follows:
-    ///
-    /// If the thread calls `coroutine.yield`, returns the values passed to `yield`. If the thread
-    /// `return`s values from its main function, returns those.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate rlua;
-    /// # use rlua::{Lua, Thread, Error, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    /// let thread: Thread = lua.eval(r#"
-    ///     coroutine.create(function(arg)
-    ///         assert(arg == 42)
-    ///         local yieldarg = coroutine.yield(123)
-    ///         assert(yieldarg == 43)
-    ///         return 987
-    ///     end)
-    /// "#, None).unwrap();
-    ///
-    /// assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);
-    /// assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);
-    ///
-    /// // The coroutine has now returned, so `resume` will fail
-    /// match thread.resume::<_, u32>(()) {
-    ///     Err(Error::CoroutineInactive) => {},
-    ///     unexpected => panic!("unexpected result {:?}", unexpected),
-    /// }
-    /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
-    /// # }
-    /// ```
-    pub fn resume<A, R>(&self, args: A) -> Result<R>
-    where
-        A: ToLuaMulti<'lua>,
-        R: FromLuaMulti<'lua>,
-    {
-        let lua = self.0.lua;
-        unsafe {
-            stack_err_guard(lua.state, 0, || {
-                check_stack(lua.state, 1);
-
-                lua.push_ref(lua.state, &self.0);
-                let thread_state = ffi::lua_tothread(lua.state, -1);
-
-                let status = ffi::lua_status(thread_state);
-                if status != ffi::LUA_YIELD && ffi::lua_gettop(thread_state) == 0 {
-                    return Err(Error::CoroutineInactive);
-                }
-
-                ffi::lua_pop(lua.state, 1);
-
-                let args = args.to_lua_multi(lua)?;
-                let nargs = args.len() as c_int;
-                check_stack(thread_state, nargs);
-
-                for arg in args {
-                    lua.push_value(thread_state, arg);
-                }
-
-                let ret = ffi::lua_resume(thread_state, lua.state, nargs);
-                if ret != ffi::LUA_OK && ret != ffi::LUA_YIELD {
-                    error_traceback(thread_state);
-                    return Err(pop_error(thread_state, ret));
-                }
-
-                let nresults = ffi::lua_gettop(thread_state);
-                let mut results = MultiValue::new();
-                check_stack(thread_state, 1);
-                for _ in 0..nresults {
-                    results.push_front(lua.pop_value(thread_state));
-                }
-                R::from_lua_multi(results, lua)
-            })
-        }
-    }
-
-    /// Gets the status of the thread.
-    pub fn status(&self) -> ThreadStatus {
-        let lua = self.0.lua;
-        unsafe {
-            stack_guard(lua.state, 0, || {
-                check_stack(lua.state, 1);
-
-                lua.push_ref(lua.state, &self.0);
-                let thread_state = ffi::lua_tothread(lua.state, -1);
-                ffi::lua_pop(lua.state, 1);
-
-                let status = ffi::lua_status(thread_state);
-                if status != ffi::LUA_OK && status != ffi::LUA_YIELD {
-                    ThreadStatus::Error
-                } else if status == ffi::LUA_YIELD || ffi::lua_gettop(thread_state) > 0 {
-                    ThreadStatus::Resumable
-                } else {
-                    ThreadStatus::Unresumable
-                }
-            })
-        }
-    }
 }
 
 /// Top level Lua struct which holds the Lua state itself.
@@ -667,9 +377,8 @@ impl Lua {
             stack_err_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
 
-                let thread_state = protect_lua_call(self.state, 0, 1, |state| {
-                    ffi::lua_newthread(state)
-                })?;
+                let thread_state =
+                    protect_lua_call(self.state, 0, 1, |state| ffi::lua_newthread(state))?;
                 self.push_ref(thread_state, &func.0);
 
                 Ok(Thread(self.pop_ref(self.state)))
@@ -723,9 +432,8 @@ impl Lua {
                     check_stack(self.state, 2);
                     let ty = v.type_name();
                     self.push_value(self.state, v);
-                    let s = protect_lua_call(self.state, 1, 1, |state| {
-                        ffi::lua_tostring(state, -1)
-                    })?;
+                    let s =
+                        protect_lua_call(self.state, 1, 1, |state| ffi::lua_tostring(state, -1))?;
                     if s.is_null() {
                         ffi::lua_pop(self.state, 1);
                         Err(Error::FromLuaConversionError {

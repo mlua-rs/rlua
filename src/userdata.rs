@@ -392,7 +392,8 @@ mod tests {
     use super::{MetaMethod, UserData, UserDataMethods};
     use error::ExternalError;
     use string::String;
-    use lua::{Function, Lua};
+    use function::Function;
+    use lua::Lua;
 
     #[test]
     fn test_user_data() {
