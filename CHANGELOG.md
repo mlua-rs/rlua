@@ -1,3 +1,6 @@
+## [0.10.1]
+- Documentation spelling fix
+
 ## [0.10.0]
 - Handle all 'm' functions in the Lua C API correctly, remove LUA_ERRGCMM hacks.
 - Lots and lots of internal changes to support handling all 'm' errors
