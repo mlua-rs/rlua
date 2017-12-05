@@ -28,7 +28,7 @@ pub enum Error {
     GarbageCollectorError(String),
     /// A callback has triggered Lua code that has called the same callback again.
     ///
-    /// This is an error, since `rlua` callbacks are FnMut an the functions can only be mutably
+    /// This is an error because `rlua` callbacks are FnMut and the thus can only be mutably
     /// borrowed once.
     RecursiveCallbackError,
     /// Lua code has accessed a [`UserData`] value that was already garbage collected
