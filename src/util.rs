@@ -370,7 +370,6 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
         ptr::write(ud, Some(WrappedError(err)))
     });
 
-
     get_error_metatable(state);
     ffi::lua_setmetatable(state, -2);
 }
