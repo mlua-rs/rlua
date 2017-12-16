@@ -72,13 +72,12 @@ impl Lua {
                 check_stack(self.state, 1);
 
                 match if let Some(name) = name {
-                    let name = CString::new(name.to_owned()).map_err(|e| {
-                        Error::ToLuaConversionError {
+                    let name =
+                        CString::new(name.to_owned()).map_err(|e| Error::ToLuaConversionError {
                             from: "&str",
                             to: "string",
                             message: Some(e.to_string()),
-                        }
-                    })?;
+                        })?;
                     ffi::luaL_loadbuffer(
                         self.state,
                         source.as_ptr() as *const c_char,

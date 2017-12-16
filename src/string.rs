@@ -35,12 +35,10 @@ impl<'lua> String<'lua> {
     /// # }
     /// ```
     pub fn to_str(&self) -> Result<&str> {
-        str::from_utf8(self.as_bytes()).map_err(|e| {
-            Error::FromLuaConversionError {
-                from: "string",
-                to: "&str",
-                message: Some(e.to_string()),
-            }
+        str::from_utf8(self.as_bytes()).map_err(|e| Error::FromLuaConversionError {
+            from: "string",
+            to: "&str",
+            message: Some(e.to_string()),
         })
     }
 

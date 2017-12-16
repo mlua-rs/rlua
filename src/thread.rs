@@ -152,20 +152,19 @@ mod tests {
     #[test]
     fn test_thread() {
         let lua = Lua::new();
-        let thread = lua.create_thread(
-            lua.eval::<Function>(
-                r#"
-                    function (s)
-                        local sum = s
-                        for i = 1,4 do
-                            sum = sum + coroutine.yield(sum)
-                        end
-                        return sum
+        let thread = lua.create_thread(lua.eval::<Function>(
+            r#"
+                function (s)
+                    local sum = s
+                    for i = 1,4 do
+                        sum = sum + coroutine.yield(sum)
                     end
-                "#,
-                None,
-            ).unwrap(),
-        ).unwrap();
+                    return sum
+                end
+            "#,
+            None,
+        ).unwrap())
+            .unwrap();
 
         assert_eq!(thread.status(), ThreadStatus::Resumable);
         assert_eq!(thread.resume::<_, i64>(0).unwrap(), 0);
@@ -179,18 +178,17 @@ mod tests {
         assert_eq!(thread.resume::<_, i64>(4).unwrap(), 10);
         assert_eq!(thread.status(), ThreadStatus::Unresumable);
 
-        let accumulate = lua.create_thread(
-            lua.eval::<Function>(
-                r#"
-                    function (sum)
-                        while true do
-                            sum = sum + coroutine.yield(sum)
-                        end
+        let accumulate = lua.create_thread(lua.eval::<Function>(
+            r#"
+                function (sum)
+                    while true do
+                        sum = sum + coroutine.yield(sum)
                     end
-                "#,
-                None,
-            ).unwrap(),
-        ).unwrap();
+                end
+            "#,
+            None,
+        ).unwrap())
+            .unwrap();
 
         for i in 0..4 {
             accumulate.resume::<_, ()>(i).unwrap();
