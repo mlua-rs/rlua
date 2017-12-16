@@ -499,6 +499,19 @@ fn test_gc_error() {
     }
 }
 
+#[test]
+fn test_registry() {
+    let lua = Lua::new();
+
+    lua.set_registry::<i32>("test", 42).unwrap();
+    let f = lua.create_function(move |lua, ()| {
+        assert_eq!(lua.get_registry::<i32>("test")?, 42);
+        Ok(())
+    }).unwrap();
+
+    f.call::<_, ()>(()).unwrap();
+}
+
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.
 /*
 #[test]

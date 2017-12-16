@@ -135,7 +135,7 @@ impl Lua {
     pub fn create_string(&self, s: &str) -> Result<String> {
         unsafe {
             stack_err_guard(self.state, 0, || {
-                check_stack(self.state, 2);
+                check_stack(self.state, 4);
                 push_string(self.state, s)?;
                 Ok(String(self.pop_ref(self.state)))
             })
@@ -405,7 +405,41 @@ impl Lua {
         T::from_lua_multi(value, self)
     }
 
-    // Used 1 stack space, does not call checkstack
+    /// Set a value in the Lua registry based on a string key.
+    ///
+    /// This value will be available to rust from all `Lua` instances which share the same main
+    /// state.
+    pub fn set_registry<'lua, T: ToLua<'lua>>(&'lua self, registry_key: &str, t: T) -> Result<()> {
+        unsafe {
+            stack_err_guard(self.state, 0, || {
+                check_stack(self.state, 5);
+                push_string(self.state, registry_key)?;
+                self.push_value(self.state, t.to_lua(self)?);
+                protect_lua_call(self.state, 2, 0, |state| {
+                    ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+                })
+            })
+        }
+    }
+
+    /// Get a value from the Lua registry based on a string key.
+    ///
+    /// Any Lua instance which shares the underlying main state may call `get_registry` to get a
+    /// value previously set by `set_registry`.
+    pub fn get_registry<'lua, T: FromLua<'lua>>(&'lua self, registry_key: &str) -> Result<T> {
+        unsafe {
+            stack_err_guard(self.state, 0, || {
+                check_stack(self.state, 4);
+                push_string(self.state, registry_key)?;
+                protect_lua_call(self.state, 1, 1, |state| {
+                    ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX)
+                })?;
+                T::from_lua(self.pop_value(self.state), self)
+            })
+        }
+    }
+
+    // Uses 1 stack space, does not call checkstack
     pub(crate) unsafe fn push_value(&self, state: *mut ffi::lua_State, value: Value) {
         match value {
             Value::Nil => {
@@ -454,7 +488,7 @@ impl Lua {
         }
     }
 
-    // Used 1 stack space, does not call checkstack
+    // Uses 1 stack space, does not call checkstack
     pub(crate) unsafe fn pop_value(&self, state: *mut ffi::lua_State) -> Value {
         match ffi::lua_type(state, -1) {
             ffi::LUA_TNIL => {
@@ -510,9 +544,9 @@ impl Lua {
 
     // Used 1 stack space, does not call checkstack
     pub(crate) unsafe fn push_ref(&self, state: *mut ffi::lua_State, lref: &LuaRef) {
-        assert_eq!(
-            lref.lua.main_state,
-            self.main_state,
+        lua_assert!(
+            state,
+            lref.lua.main_state == self.main_state,
             "Lua instance passed Value created from a different Lua"
         );
 

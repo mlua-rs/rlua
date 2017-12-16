@@ -211,12 +211,14 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
     }
 }
 
+// Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) -> Result<()> {
     protect_lua_call(state, 0, 1, |state| {
         ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
     })
 }
 
+// Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
     let mut t = Some(t);
     protect_lua_call(state, 0, 1, |state| {
