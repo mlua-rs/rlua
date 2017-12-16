@@ -45,8 +45,6 @@ There are currently a few notable missing pieces of this API:
   * "Context" or "Sandboxing" support.  There should be the ability to set the
     `_ENV` upvalue of a loaded chunk to a table other than `_G`, so that you can
     have different environments for different loaded chunks.
-  * More fleshed out Lua API, there is some missing nice to have functionality
-    not exposed like storing values in the registry.
   * Benchmarks, and quantifying performance differences with what you would
     might write in C.
 

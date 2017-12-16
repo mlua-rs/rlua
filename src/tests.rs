@@ -2,7 +2,7 @@ use std::fmt;
 use std::error;
 use std::panic::catch_unwind;
 
-use {Error, ExternalError, Function, Lua, Result, Table, Value, Variadic};
+use {Error, ExternalError, Function, Lua, Nil, Result, Table, Value, Variadic};
 
 #[test]
 fn test_load() {
@@ -500,16 +500,22 @@ fn test_gc_error() {
 }
 
 #[test]
-fn test_registry() {
+fn test_named_registry_value() {
     let lua = Lua::new();
 
-    lua.set_registry::<i32>("test", 42).unwrap();
+    lua.set_named_registry_value::<i32>("test", 42).unwrap();
     let f = lua.create_function(move |lua, ()| {
-        assert_eq!(lua.get_registry::<i32>("test")?, 42);
+        assert_eq!(lua.named_registry_value::<i32>("test")?, 42);
         Ok(())
     }).unwrap();
 
     f.call::<_, ()>(()).unwrap();
+
+    lua.unset_named_registry_value("test").unwrap();
+    match lua.named_registry_value("test").unwrap() {
+        Nil => {}
+        val => panic!("registry value was not Nil, was {:?}", val),
+    };
 }
 
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.

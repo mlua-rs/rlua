@@ -404,15 +404,19 @@ impl Lua {
         T::from_lua_multi(value, self)
     }
 
-    /// Set a value in the Lua registry based on a string key.
+    /// Set a value in the Lua registry based on a string name.
     ///
     /// This value will be available to rust from all `Lua` instances which share the same main
     /// state.
-    pub fn set_registry<'lua, T: ToLua<'lua>>(&'lua self, registry_key: &str, t: T) -> Result<()> {
+    pub fn set_named_registry_value<'lua, T: ToLua<'lua>>(
+        &'lua self,
+        name: &str,
+        t: T,
+    ) -> Result<()> {
         unsafe {
             stack_err_guard(self.state, 0, || {
                 check_stack(self.state, 5);
-                push_string(self.state, registry_key)?;
+                push_string(self.state, name)?;
                 self.push_value(self.state, t.to_lua(self)?);
                 protect_lua_call(self.state, 2, 0, |state| {
                     ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
@@ -421,21 +425,28 @@ impl Lua {
         }
     }
 
-    /// Get a value from the Lua registry based on a string key.
+    /// Get a value from the Lua registry based on a string name.
     ///
     /// Any Lua instance which shares the underlying main state may call `get_registry` to get a
     /// value previously set by `set_registry`.
-    pub fn get_registry<'lua, T: FromLua<'lua>>(&'lua self, registry_key: &str) -> Result<T> {
+    pub fn named_registry_value<'lua, T: FromLua<'lua>>(&'lua self, name: &str) -> Result<T> {
         unsafe {
             stack_err_guard(self.state, 0, || {
                 check_stack(self.state, 4);
-                push_string(self.state, registry_key)?;
+                push_string(self.state, name)?;
                 protect_lua_call(self.state, 1, 1, |state| {
                     ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX)
                 })?;
                 T::from_lua(self.pop_value(self.state), self)
             })
         }
+    }
+
+    /// Clears a named value in the Lua registry.
+    ///
+    /// Equivalent to calling `Lua::set_named_registry_value` with a value of Nil.
+    pub fn unset_named_registry_value<'lua>(&'lua self, name: &str) -> Result<()> {
+        self.set_named_registry_value(name, Nil)
     }
 
     // Uses 1 stack space, does not call checkstack
