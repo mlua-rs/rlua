@@ -112,10 +112,8 @@ Panic / abort considerations when using this API:
   * The internal Lua allocator is set to use `realloc` from `libc`, but it is
     wrapped in such a way that OOM errors are guaranteed to abort.  This is not
     such a big deal, as this matches the behavior of rust itself.  This allows
-    the internals of `rlua` to, in certain rare cases, call 'm' Lua C API
-    functions with the garbage collector disabled and know that these cannot
-    error.  Though this is not a problem now, this will need to be changed in
-    order to add allocation limits to Lua instances.
+    the internals of `rlua` to, in certain cases, call 'm' Lua C API functions
+    with the garbage collector disabled and know that these cannot error.
   * There are currently no recursion limits on callbacks.  This could cause one
     of two problems, either the API will run out of stack space and cause a
     panic in Rust, or more likely it will cause an internal `LUA_USE_APICHECK`

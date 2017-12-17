@@ -1,3 +1,8 @@
+## [0.10.2]
+- Registry API for storing values inside the `Lua` instance, either by string or
+  by automatically generated keys.
+- Important memory safety fix for `luaL_ref`.
+
 ## [0.10.1]
 - Documentation spelling fix
 
