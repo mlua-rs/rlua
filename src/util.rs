@@ -390,6 +390,23 @@ pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<Error> {
     }
 }
 
+// Runs the given function with the Lua garbage collector disabled.  `rlua` assumes that all
+// allocation failures are aborts, so when the garbage collector is disabled, 'm' functions that can
+// cause either an allocation error or a a `__gc` metamethod error are prevented from causing errors
+// at all.  The given function should never panic or longjmp, because this could inadverntently
+// disable the gc.  This is useful when error handling must allocate, and `__gc` errors at that time
+// would shadow more important errors, or be extremely difficult to handle safely.
+pub unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) -> R {
+    if ffi::lua_gc(state, ffi::LUA_GCISRUNNING, 0) != 0 {
+        ffi::lua_gc(state, ffi::LUA_GCSTOP, 0);
+        let r = f();
+        ffi::lua_gc(state, ffi::LUA_GCRESTART, 0);
+        r
+    } else {
+        f()
+    }
+}
+
 struct WrappedError(pub Error);
 struct WrappedPanic(pub Option<Box<Any + Send>>);
 
@@ -555,21 +572,4 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
     }
 
     ffi::LUA_TTABLE
-}
-
-// Runs the given function with the Lua garbage collector disabled.  `rlua` assumes that all
-// allocation failures are aborts, so when the garbage collector is disabled, 'm' functions that can
-// cause either an allocation error or a a `__gc` metamethod error are prevented from causing errors
-// at all.  The given function should never panic or longjmp, because this could inadverntently
-// disable the gc.  This is useful when error handling must allocate, and `__gc` errors at that time
-// would shadow more important errors, or be extremely difficult to handle safely.
-unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) -> R {
-    if ffi::lua_gc(state, ffi::LUA_GCISRUNNING, 0) != 0 {
-        ffi::lua_gc(state, ffi::LUA_GCSTOP, 0);
-        let r = f();
-        ffi::lua_gc(state, ffi::LUA_GCRESTART, 0);
-        r
-    } else {
-        f()
-    }
 }

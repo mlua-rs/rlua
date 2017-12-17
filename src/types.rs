@@ -15,6 +15,9 @@ pub type Number = ffi::lua_Number;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LightUserData(pub *mut c_void);
 
+/// An auto generated key into the Lua registry.
+pub struct RegistryKey(pub(crate) c_int);
+
 pub(crate) type Callback<'lua> = Box<
     FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'lua,
 >;

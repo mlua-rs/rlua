@@ -119,6 +119,7 @@ extern "C" {
     pub fn lua_geti(state: *mut lua_State, index: c_int, i: lua_Integer) -> c_int;
     pub fn lua_rawget(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_rawgeti(state: *mut lua_State, index: c_int, n: lua_Integer) -> c_int;
+    pub fn lua_rawseti(state: *mut lua_State, index: c_int, n: lua_Integer);
     pub fn lua_getmetatable(state: *mut lua_State, index: c_int) -> c_int;
 
     pub fn lua_createtable(state: *mut lua_State, narr: c_int, nrec: c_int);

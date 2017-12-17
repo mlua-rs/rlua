@@ -518,6 +518,24 @@ fn test_named_registry_value() {
     };
 }
 
+#[test]
+fn test_registry_value() {
+    let lua = Lua::new();
+
+    let mut r = Some(lua.create_registry_value::<i32>(42).unwrap());
+    let f = lua.create_function(move |lua, ()| {
+        if let Some(r) = r.take() {
+            assert_eq!(lua.registry_value::<i32>(&r)?, 42);
+            lua.remove_registry_value(r);
+        } else {
+            panic!();
+        }
+        Ok(())
+    }).unwrap();
+
+    f.call::<_, ()>(()).unwrap();
+}
+
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.
 /*
 #[test]

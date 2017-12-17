@@ -14,7 +14,7 @@ use ffi;
 use error::*;
 use util::*;
 use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-use types::{Callback, Integer, LightUserData, LuaRef, Number};
+use types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
 use string::String;
 use table::Table;
 use function::Function;
@@ -415,11 +415,19 @@ impl Lua {
     ) -> Result<()> {
         unsafe {
             stack_err_guard(self.state, 0, || {
-                check_stack(self.state, 5);
+                check_stack(self.state, 6);
+
+                ffi::lua_pushlightuserdata(
+                    self.state,
+                    &USER_REGISTRY_KEY as *const u8 as *mut c_void,
+                );
+                ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
+
                 push_string(self.state, name)?;
                 self.push_value(self.state, t.to_lua(self)?);
-                protect_lua_call(self.state, 2, 0, |state| {
-                    ffi::lua_settable(state, ffi::LUA_REGISTRYINDEX);
+
+                protect_lua_call(self.state, 3, 0, |state| {
+                    ffi::lua_settable(state, -3);
                 })
             })
         }
@@ -427,26 +435,107 @@ impl Lua {
 
     /// Get a value from the Lua registry based on a string name.
     ///
-    /// Any Lua instance which shares the underlying main state may call `get_registry` to get a
-    /// value previously set by `set_registry`.
+    /// Any Lua instance which shares the underlying main state may call `named_registry_value` to
+    /// get a value previously set by `set_named_registry_value`.
     pub fn named_registry_value<'lua, T: FromLua<'lua>>(&'lua self, name: &str) -> Result<T> {
         unsafe {
             stack_err_guard(self.state, 0, || {
-                check_stack(self.state, 4);
+                check_stack(self.state, 5);
+
+                ffi::lua_pushlightuserdata(
+                    self.state,
+                    &USER_REGISTRY_KEY as *const u8 as *mut c_void,
+                );
+                ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
+
                 push_string(self.state, name)?;
-                protect_lua_call(self.state, 1, 1, |state| {
-                    ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX)
-                })?;
+                protect_lua_call(self.state, 2, 1, |state| ffi::lua_gettable(state, -2))?;
+
                 T::from_lua(self.pop_value(self.state), self)
             })
         }
     }
 
-    /// Clears a named value in the Lua registry.
+    /// Removes a named value in the Lua registry.
     ///
     /// Equivalent to calling `Lua::set_named_registry_value` with a value of Nil.
     pub fn unset_named_registry_value<'lua>(&'lua self, name: &str) -> Result<()> {
         self.set_named_registry_value(name, Nil)
+    }
+
+    /// Place a value in the Lua registry with an auto-generated key.
+    ///
+    /// This value will be available to rust from all `Lua` instances which share the same main
+    /// state.  The value will NOT be automatically removed when the `RegistryKey` is dropped, you
+    /// MUST call `remove_registry_value` to remove it.
+    pub fn create_registry_value<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> Result<RegistryKey> {
+        unsafe {
+            stack_guard(self.state, 0, || {
+                check_stack(self.state, 3);
+
+                ffi::lua_pushlightuserdata(
+                    self.state,
+                    &USER_REGISTRY_KEY as *const u8 as *mut c_void,
+                );
+                ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
+
+                self.push_value(self.state, t.to_lua(self)?);
+                let id = gc_guard(self.state, || ffi::luaL_ref(self.state, -2));
+
+                ffi::lua_pop(self.state, 1);
+
+                Ok(RegistryKey(id))
+            })
+        }
+    }
+
+    /// Get a value from the Lua registry by its `RegistryKey`
+    ///
+    /// Any Lua instance which shares the underlying main state may call `registry_value` to get a
+    /// value previously placed by `create_registry_value`.
+    pub fn registry_value<'lua, T: FromLua<'lua>>(&'lua self, key: &RegistryKey) -> Result<T> {
+        unsafe {
+            stack_err_guard(self.state, 0, || {
+                check_stack(self.state, 2);
+
+                ffi::lua_pushlightuserdata(
+                    self.state,
+                    &USER_REGISTRY_KEY as *const u8 as *mut c_void,
+                );
+                ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
+
+                ffi::lua_rawgeti(self.state, -1, key.0 as ffi::lua_Integer);
+
+                let t = T::from_lua(self.pop_value(self.state), self)?;
+
+                ffi::lua_pop(self.state, 1);
+
+                Ok(t)
+            })
+        }
+    }
+
+    /// Removes a value from the Lua registry.
+    ///
+    /// You MUST call this function to remove a value placed in the registry with
+    /// `create_registry_value`
+    pub fn remove_registry_value<'lua>(&'lua self, key: RegistryKey) {
+        unsafe {
+            stack_guard(self.state, 0, || {
+                check_stack(self.state, 2);
+
+                ffi::lua_pushlightuserdata(
+                    self.state,
+                    &USER_REGISTRY_KEY as *const u8 as *mut c_void,
+                );
+                ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
+
+                ffi::lua_pushnil(self.state);
+                ffi::lua_rawseti(self.state, -2, key.0 as ffi::lua_Integer);
+
+                ffi::lua_pop(self.state, 1);
+            })
+        }
     }
 
     // Uses 1 stack space, does not call checkstack
@@ -575,7 +664,7 @@ impl Lua {
     //
     // pop_ref uses 1 extra stack space and does not call checkstack
     pub(crate) unsafe fn pop_ref(&self, state: *mut ffi::lua_State) -> LuaRef {
-        let registry_id = ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX);
+        let registry_id = gc_guard(state, || ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX));
         LuaRef {
             lua: self,
             registry_id: registry_id,
@@ -810,8 +899,13 @@ impl Lua {
 
             ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
 
-            // Override pcall, xpcall, and setmetatable with versions that cannot be used to
-            // cause unsafety.
+            // Create "user registry" table
+
+            ffi::lua_pushlightuserdata(state, &USER_REGISTRY_KEY as *const u8 as *mut c_void);
+            ffi::lua_newtable(state);
+            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+
+            // Override pcall and xpcall with versions that cannot be used to catch rust panics.
 
             ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
 
@@ -892,3 +986,4 @@ impl Lua {
 
 static LUA_USERDATA_REGISTRY_KEY: u8 = 0;
 static FUNCTION_METATABLE_REGISTRY_KEY: u8 = 0;
+static USER_REGISTRY_KEY: u8 = 0;
