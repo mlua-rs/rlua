@@ -807,7 +807,9 @@ impl Lua {
                 ffi::lua_rawset(state, -3);
             })?;
 
-            let id = ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX);
+            let id = gc_guard(self.state, || {
+                ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX)
+            });
             (*registered_userdata).insert(TypeId::of::<T>(), id);
             Ok(id)
         })
