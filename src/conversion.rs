@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, BTreeSet, HashSet};
 use std::hash::{BuildHasher, Hash};
 use std::string::String as StdString;
 
@@ -305,6 +305,48 @@ impl<'lua, K: Ord + FromLua<'lua>, V: FromLua<'lua>> FromLua<'lua> for BTreeMap<
             Err(Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "BTreeMap",
+                message: Some("expected table".to_string()),
+            })
+        }
+    }
+}
+
+impl<'lua, K: Eq + Hash + ToLua<'lua>, S: BuildHasher> ToLua<'lua>
+    for HashSet<K, S> {
+    fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>> {
+        Ok(Value::Table(lua.create_table_from(self.into_iter().map(|k| (k,true)))?))
+    }
+}
+
+impl<'lua, K: Eq + Hash + FromLua<'lua>, S: BuildHasher + Default> FromLua<'lua>
+    for HashSet<K, S> {
+    fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<Self> {
+        if let Value::Table(table) = value {
+            table.pairs::<K, Value<'lua>>().map(|r| r.map(|(k,_)| k)).collect()
+        } else {
+            Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "HashSet",
+                message: Some("expected table".to_string()),
+            })
+        }
+    }
+}
+
+impl<'lua, K: Ord + ToLua<'lua>> ToLua<'lua> for BTreeSet<K> {
+    fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>> {
+        Ok(Value::Table(lua.create_table_from(self.into_iter().map(|k| (k,true)))?))
+    }
+}
+
+impl<'lua, K: Ord + FromLua<'lua>> FromLua<'lua> for BTreeSet<K> {
+    fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<Self> {
+        if let Value::Table(table) = value {
+            table.pairs::<K, Value<'lua>>().map(|r| r.map(|(k,_)| k)).collect()
+        } else {
+            Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "BTreeSet",
                 message: Some("expected table".to_string()),
             })
         }
