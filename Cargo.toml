@@ -23,6 +23,7 @@ builtin-lua = ["gcc"]
 
 [dependencies]
 libc = { version = "0.2" }
+failure = { version = "0.1.1" }
 
 [build-dependencies]
 gcc = { version = "0.3.52", optional = true }

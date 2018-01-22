@@ -318,7 +318,7 @@ fn test_result_conversions() {
 
     let err = lua.create_function(|_, ()| {
         Ok(Err::<String, _>(
-            "only through failure can we succeed".to_lua_err(),
+            format_err!("only through failure can we succeed").to_lua_err(),
         ))
     }).unwrap();
     let ok = lua.create_function(|_, ()| Ok(Ok::<_, Error>("!".to_owned())))
