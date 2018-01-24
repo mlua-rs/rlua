@@ -477,7 +477,7 @@ mod tests {
                     if index.to_str()? == "inner" {
                         Ok(data.0)
                     } else {
-                        Err("no such custom index".to_lua_err())
+                        Err(format_err!("no such custom index").to_lua_err())
                     }
                 });
             }

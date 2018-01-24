@@ -1,7 +1,8 @@
 use std::fmt;
 use std::sync::Arc;
-use std::error::Error as StdError;
 use std::result::Result as StdResult;
+
+use failure;
 
 /// Error type returned by `rlua` methods.
 #[derive(Debug, Clone)]
@@ -107,7 +108,7 @@ pub enum Error {
     /// Returning `Err(ExternalError(...))` from a Rust callback will raise the error as a Lua
     /// error. The Rust code that originally invoked the Lua code then receives a `CallbackError`,
     /// from which the original error (and a stack traceback) can be recovered.
-    ExternalError(Arc<StdError + Send + Sync>),
+    ExternalError(Arc<failure::Error>),
 }
 
 /// A specialized `Result` type used by `rlua`'s API.
@@ -160,37 +161,28 @@ impl fmt::Display for Error {
     }
 }
 
-impl StdError for Error {
-    fn description(&self) -> &str {
+impl failure::Fail for Error {
+    fn cause(&self) -> Option<&failure::Fail> {
         match *self {
-            Error::SyntaxError { .. } => "syntax error",
-            Error::RuntimeError(_) => "runtime error",
-            Error::GarbageCollectorError(_) => "garbage collector error",
-            Error::RecursiveCallbackError => "callback called recursively",
-            Error::ExpiredUserData => "access of userdata which has already been garbage collected",
-            Error::ToLuaConversionError { .. } => "conversion error to lua",
-            Error::FromLuaConversionError { .. } => "conversion error from lua",
-            Error::CoroutineInactive => "attempt to resume inactive coroutine",
-            Error::UserDataTypeMismatch => "userdata type mismatch",
-            Error::UserDataBorrowError => "userdata already mutably borrowed",
-            Error::UserDataBorrowMutError => "userdata already borrowed",
-            Error::CallbackError { .. } => "callback error",
-            Error::ExternalError(ref err) => err.description(),
+            Error::CallbackError { ref cause, .. } => Some(cause.as_ref()),
+            // Error::cause simply returns the contained Fail type, which we are already displaying
+            // and returning the backtrace for, no need to repeat it as the cause.
+            Error::ExternalError(ref err) => err.cause().cause(),
+            _ => None,
         }
     }
 
-    fn cause(&self) -> Option<&StdError> {
+    fn backtrace(&self) -> Option<&failure::Backtrace> {
         match *self {
-            Error::CallbackError { ref cause, .. } => Some(cause.as_ref()),
-            Error::ExternalError(ref err) => err.cause(),
+            Error::ExternalError(ref err) => Some(err.backtrace()),
             _ => None,
         }
     }
 }
 
 impl Error {
-    pub fn external<T: 'static + StdError + Send + Sync>(err: T) -> Error {
-        Error::ExternalError(Arc::new(err))
+    pub fn external<T: Into<failure::Error>>(err: T) -> Error {
+        Error::ExternalError(Arc::new(err.into()))
     }
 }
 
@@ -200,34 +192,10 @@ pub trait ExternalError {
 
 impl<E> ExternalError for E
 where
-    E: Into<Box<StdError + Send + Sync>>,
+    E: Into<failure::Error>,
 {
     fn to_lua_err(self) -> Error {
-        struct WrapError(Box<StdError + Send + Sync>);
-
-        impl fmt::Debug for WrapError {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                fmt::Debug::fmt(&self.0, f)
-            }
-        }
-
-        impl fmt::Display for WrapError {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                fmt::Display::fmt(&self.0, f)
-            }
-        }
-
-        impl StdError for WrapError {
-            fn description(&self) -> &str {
-                self.0.description()
-            }
-
-            fn cause(&self) -> Option<&StdError> {
-                self.0.cause()
-            }
-        }
-
-        Error::external(WrapError(self.into()))
+        Error::external(self)
     }
 }
 
