@@ -31,10 +31,11 @@ pub enum Error {
     /// This is an error because `rlua` callbacks are FnMut and thus can only be mutably borrowed
     /// once.
     RecursiveCallbackError,
-    /// Lua code has accessed a [`UserData`] value that was already garbage collected
+    /// Lua code has accessed a [`UserData`] value that was already garbage collected.
     ///
     /// This can happen when a [`UserData`] has a custom `__gc` metamethod, this method resurrects
     /// the [`UserData`], and then the [`UserData`] is subsequently accessed.
+    ///
     /// [`UserData`]: trait.UserData.html
     ExpiredUserData,
     /// A Rust value could not be converted to a Lua value.
