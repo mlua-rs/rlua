@@ -1,6 +1,5 @@
 use std::fmt;
 use std::sync::Arc;
-use std::result::Result as StdResult;
 
 use failure;
 
@@ -32,10 +31,11 @@ pub enum Error {
     /// This is an error because `rlua` callbacks are FnMut and thus can only be mutably borrowed
     /// once.
     RecursiveCallbackError,
-    /// Lua code has accessed a [`UserData`] value that was already garbage collected
+    /// Lua code has accessed a [`UserData`] value that was already garbage collected.
     ///
     /// This can happen when a [`UserData`] has a custom `__gc` metamethod, this method resurrects
     /// the [`UserData`], and then the [`UserData`] is subsequently accessed.
+    ///
     /// [`UserData`]: trait.UserData.html
     ExpiredUserData,
     /// A Rust value could not be converted to a Lua value.
@@ -112,7 +112,7 @@ pub enum Error {
 }
 
 /// A specialized `Result` type used by `rlua`'s API.
-pub type Result<T> = StdResult<T, Error>;
+pub type Result<T> = ::std::result::Result<T, Error>;
 
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
@@ -203,7 +203,7 @@ pub trait ExternalResult<T> {
     fn to_lua_err(self) -> Result<T>;
 }
 
-impl<T, E> ExternalResult<T> for StdResult<T, E>
+impl<T, E> ExternalResult<T> for ::std::result::Result<T, E>
 where
     E: ExternalError,
 {

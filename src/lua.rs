@@ -191,6 +191,15 @@ impl Lua {
 
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
     ///
+    /// The function's return value is always a `Result`: If the function returns `Err`, the error
+    /// is raised as a Lua error, which can be caught using `(x)pcall` or bubble up to the Rust code
+    /// that invoked the Lua code. This allows using the `?` operator to propagate errors through
+    /// intermediate Lua code.
+    ///
+    /// If the function returns `Ok`, the contained value will be converted to one or more Lua
+    /// values. For details on Rust-to-Lua conversions, refer to the [`ToLua`] and [`ToLuaMulti`]
+    /// traits.
+    ///
     /// # Examples
     ///
     /// Create a function which prints its argument:
@@ -232,6 +241,9 @@ impl Lua {
     /// #     try_main().unwrap();
     /// # }
     /// ```
+    ///
+    /// [`ToLua`]: trait.ToLua.html
+    /// [`ToLuaMulti`]: trait.ToLuaMulti.html
     pub fn create_function<'lua, A, R, F>(&'lua self, mut func: F) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'lua>,
