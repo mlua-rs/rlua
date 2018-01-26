@@ -12,8 +12,8 @@ use lua::Lua;
 
 /// Kinds of metamethods that can be overridden.
 ///
-/// For safety reasons, this mechanism does not allow overriding the `__gc` metamethod. [`UserData`]
-/// implementors can instead just use `Drop`.
+/// Currently, this mechanism does not allow overriding the `__gc` metamethod, since there is
+/// generally no need to do so: [`UserData`] implementors can instead just implement `Drop`.
 ///
 /// [`UserData`]: trait.UserData.html
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
