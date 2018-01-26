@@ -11,6 +11,11 @@ use value::{FromLua, FromLuaMulti, ToLuaMulti};
 use lua::Lua;
 
 /// Kinds of metamethods that can be overridden.
+///
+/// For safety reasons, this mechanism does not allow overriding the `__gc` metamethod. [`UserData`]
+/// implementors can instead just use `Drop`.
+///
+/// [`UserData`]: trait.UserData.html
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum MetaMethod {
     /// The `+` operator.
@@ -57,7 +62,9 @@ pub enum MetaMethod {
     NewIndex,
     /// The call "operator" `obj(arg1, args2, ...)`.
     Call,
-    /// tostring(ud) will call this if it exists
+    /// The `__tostring` metamethod.
+    ///
+    /// This is not an operator, but will be called by methods such as `tostring` and `print`.
     ToString,
 }
 
