@@ -11,24 +11,22 @@ to expose as easy to use, practical, and flexible of an API between Rust and Lua
 as possible, while also being completely safe.
 
 There are other high level Lua bindings systems for rust, and this crate is an
-exploration of a different part of the design space.  The other high level
-interface to Lua that I am aware of right now is
-[hlua](https://github.com/tomaka/hlua/) which you should definitely check out
-and use if it suits your needs.  This crate has the following differences with
-hlua:
+exploration of a different part of the design space.  The other major rust high
+level interface to Lua that I am aware of right now is
+[hlua](https://github.com/tomaka/hlua/).  Some of the differences between `rlua`
+and `hlua` are:
 
-  * Handles to Lua values use the Lua registry, not the stack
-  * Handles to Lua values are all internally mutable
-  * Handles to Lua values have non-mutable borrows to the main Lua object, so
-    there can be multiple handles or long lived handles
-  * Targets Lua 5.3
+  * In `rlua`, handles to Lua values use the Lua registry, not the stack
+  * `rlua` handles are all internally mutable, and non-mutably borrow the main
+    Lua, so there can be multiple handles or long lived handles.
+  * `rlua` targets Lua 5.3
 
 The key difference here is that rlua handles rust-side references to Lua values
 in a fundamentally different way than hlua, more similar to other Lua bindings
 systems like [Selene](https://github.com/jeremyong/Selene) for C++.  Values like
 `rlua::Table` and `rlua::Function` that hold onto Lua values in the Rust stack,
 instead of pointing at values in the Lua stack, are placed into the registry
-with luaL_ref.  In this way, it is possible to have an arbitrary number of
+with `luaL_ref`.  In this way, it is possible to have an arbitrary number of
 handles to internal Lua values at any time, created and destroyed in arbitrary
 order.  This approach IS slightly slower than the approach that hlua takes of
 only manipulating the Lua stack, but this, combined with internal mutability,
@@ -38,9 +36,9 @@ There are currently a few notable missing pieces of this API:
 
   * Complete panic / abort safety.  This is a near term goal, but currently
     there are ways to cause panics / aborts with the API and with lua scripts.
-  * Security limits on Lua code such as total instruction limits and control
-    over which potentially dangerous libraries (e.g. io) are available to
-    scripts.
+  * Security limits on Lua code such as total instruction limits / memory limits
+    and control over which potentially dangerous libraries (e.g. io) are
+    available to scripts.
   * Lua profiling support
   * "Context" or "Sandboxing" support.  There should be the ability to set the
     `_ENV` upvalue of a loaded chunk to a table other than `_G`, so that you can
@@ -78,7 +76,7 @@ all*, please file a bug report.
 There are, however, currently a few known ways to cause *panics* and even
 *aborts* with this API.  There is a near term goal to completely eliminate all
 ways to cause panics / aborts from scripts, so many of these can be considered
-bugs, but since they're known only file a bug repor if you notice any behavior
+bugs, but since they're known only file a bug report if you notice any behavior
 that does not match what's described here.
 
 Panic / abort considerations when using this API:
@@ -111,14 +109,19 @@ Panic / abort considerations when using this API:
     bug*.
   * The internal Lua allocator is set to use `realloc` from `libc`, but it is
     wrapped in such a way that OOM errors are guaranteed to abort.  This is not
-    such a big deal, as this matches the behavior of rust itself.  This allows
-    the internals of `rlua` to, in certain cases, call 'm' Lua C API functions
-    with the garbage collector disabled and know that these cannot error.
+    currently such a big deal, as this matches the behavior of rust itself.
+    This allows the internals of `rlua` to, in certain cases, call 'm' Lua C API
+    functions with the garbage collector disabled and know that these cannot
+    error.  Eventually, `rlua` will support memory limits on scripts, and those
+    memory limits will cause regular memory errors rather than OOM aborts.
   * There are currently no recursion limits on callbacks.  This could cause one
     of two problems, either the API will run out of stack space and cause a
     panic in Rust, or more likely it will cause an internal `LUA_USE_APICHECK`
     abort, from exceeding LUAI_MAXCCALLS.  This may be a source of unsafety if
-    `LUA_USE_APICHECK` is disabled, and is considered a bug.
+    `LUA_USE_APICHECK` is disabled, and is considered a bug.  It is very hard to
+    trigger this currently, because right now rust callbacks cannot be
+    re-entered.  If this restriction were lifted with a `Fn` callback (as
+    opposed to `FnMut`), then this would be much easier to trigger.
   * There are currently no checks on argument sizes, and I think you may be able
     to cause an abort by providing a large enough `rlua::Variadic`.  I believe
     this would be unsafe without `LUA_USE_APICHECK` and should be considered a
