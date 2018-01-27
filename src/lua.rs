@@ -957,7 +957,7 @@ impl Lua {
                     ephemeral: true,
                 };
 
-                let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1))?;
+                let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1));
                 let mut func = (*func)
                     .try_borrow_mut()
                     .map_err(|_| Error::RecursiveCallbackError)?;

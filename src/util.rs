@@ -104,21 +104,25 @@ pub unsafe fn protect_lua_call<F, R>(
     f: F,
 ) -> Result<R>
 where
-    F: FnMut(*mut ffi::lua_State) -> R,
+    F: FnOnce(*mut ffi::lua_State) -> R,
 {
     struct Params<F, R> {
         function: F,
-        ret: Option<R>,
+        result: R,
         nresults: c_int,
     }
 
     unsafe extern "C" fn do_call<F, R>(state: *mut ffi::lua_State) -> c_int
     where
-        F: FnMut(*mut ffi::lua_State) -> R,
+        F: FnOnce(*mut ffi::lua_State) -> R,
     {
         let params = ffi::lua_touserdata(state, -1) as *mut Params<F, R>;
         ffi::lua_pop(state, 1);
-        (*params).ret = Some(((*params).function)(state));
+
+        let function = mem::replace(&mut (*params).function, mem::uninitialized());
+        mem::replace(&mut (*params).result, function(state));
+        // params now has function uninitialied and result initialized
+
         if (*params).nresults == ffi::LUA_MULTRET {
             ffi::lua_gettop(state)
         } else {
@@ -132,20 +136,32 @@ where
     ffi::lua_pushcfunction(state, do_call::<F, R>);
     ffi::lua_rotate(state, stack_start + 1, 2);
 
+    // We are about to do some really scary stuff with the Params structure, both because
+    // protect_lua_call is very hot, and becuase we would like to allow the function type to be
+    // FnOnce rather than FnMut.  We are using Params here both to pass data to the callback and
+    // return data from the callback.
+    //
+    // params starts out with function initialized and result uninitialized, nresults is Copy so we
+    // don't care about it.
     let mut params = Params {
         function: f,
-        ret: None,
+        result: mem::uninitialized(),
         nresults,
     };
 
     ffi::lua_pushlightuserdata(state, &mut params as *mut Params<F, R> as *mut c_void);
 
     let ret = ffi::lua_pcall(state, nargs + 1, nresults, stack_start + 1);
+    let result = mem::replace(&mut params.result, mem::uninitialized());
+
+    // params now has both function and result uninitialized, so we need to forget it so Drop isn't
+    // run.
+    mem::forget(params);
 
     ffi::lua_remove(state, stack_start + 1);
 
     if ret == ffi::LUA_OK {
-        Ok(params.ret.unwrap())
+        Ok(result)
     } else {
         Err(pop_error(state, ret))
     }
@@ -164,8 +180,7 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
     if let Some(err) = pop_wrapped_error(state) {
         err
     } else if is_wrapped_panic(state, -1) {
-        let panic = get_userdata::<WrappedPanic>(state, -1)
-            .expect("WrappedPanic was somehow resurrected after garbage collection");
+        let panic = get_userdata::<WrappedPanic>(state, -1);
         if let Some(p) = (*panic).0.take() {
             ffi::lua_settop(state, 0);
             resume_unwind(p);
@@ -220,26 +235,30 @@ pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) -> Result<()> {
 
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
-    let mut t = Some(t);
-    protect_lua_call(state, 0, 1, |state| {
-        let ud = ffi::lua_newuserdata(state, mem::size_of::<Option<T>>()) as *mut Option<T>;
-        ptr::write(ud, t.take());
+    protect_lua_call(state, 0, 1, move |state| {
+        let ud = ffi::lua_newuserdata(state, mem::size_of::<T>()) as *mut T;
+        ptr::write(ud, t);
     })
 }
 
 // Returns None in the case that the userdata has already been garbage collected.
-pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> Result<*mut T> {
-    let ud = ffi::lua_touserdata(state, index) as *mut Option<T>;
+pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
+    let ud = ffi::lua_touserdata(state, index) as *mut T;
     lua_assert!(state, !ud.is_null(), "userdata pointer is null");
-    (*ud)
-        .as_mut()
-        .map(|v| v as *mut T)
-        .ok_or(Error::ExpiredUserData)
+    ud
 }
 
 pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
     callback_error(state, || {
-        *(ffi::lua_touserdata(state, 1) as *mut Option<T>) = None;
+        // We clear the metatable of userdata on __gc so that it will not be double dropped, and
+        // also so that it cannot be used or identified as any particular userdata type after the
+        // first call to __gc.
+        gc_guard(state, || {
+            ffi::lua_newtable(state);
+            ffi::lua_setmetatable(state, -2);
+        });
+        let ud = &mut *(ffi::lua_touserdata(state, 1) as *mut T);
+        mem::replace(ud, mem::uninitialized());
         Ok(0)
     })
 }
@@ -367,9 +386,8 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
     ffi::luaL_checkstack(state, 2, ptr::null());
 
     gc_guard(state, || {
-        let ud = ffi::lua_newuserdata(state, mem::size_of::<Option<WrappedError>>())
-            as *mut Option<WrappedError>;
-        ptr::write(ud, Some(WrappedError(err)))
+        let ud = ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as *mut WrappedError;
+        ptr::write(ud, WrappedError(err))
     });
 
     get_error_metatable(state);
@@ -382,8 +400,7 @@ pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<Error> {
     if ffi::lua_gettop(state) == 0 || !is_wrapped_error(state, -1) {
         None
     } else {
-        let err = &*get_userdata::<WrappedError>(state, -1)
-            .expect("WrappedError was somehow resurrected after garbage collection");
+        let err = &*get_userdata::<WrappedError>(state, -1);
         let err = err.0.clone();
         ffi::lua_pop(state, 1);
         Some(err)
@@ -415,9 +432,8 @@ unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>)
     ffi::luaL_checkstack(state, 2, ptr::null());
 
     gc_guard(state, || {
-        let ud = ffi::lua_newuserdata(state, mem::size_of::<Option<WrappedPanic>>())
-            as *mut Option<WrappedPanic>;
-        ptr::write(ud, Some(WrappedPanic(Some(panic))))
+        let ud = ffi::lua_newuserdata(state, mem::size_of::<WrappedPanic>()) as *mut WrappedPanic;
+        ptr::write(ud, WrappedPanic(Some(panic)))
     });
 
     get_panic_metatable(state);
@@ -480,8 +496,7 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
         callback_error(state, || {
             if is_wrapped_error(state, -1) {
-                let error = get_userdata::<WrappedError>(state, -1)
-                    .expect("WrappedError was somehow resurrected after garbage collection");
+                let error = get_userdata::<WrappedError>(state, -1);
                 let error_str = (*error).0.to_string();
                 gc_guard(state, || {
                     ffi::lua_pushlstring(

@@ -386,7 +386,7 @@ impl<'lua> AnyUserData<'lua> {
                     ffi::lua_pop(lua.state, 3);
                     Err(Error::UserDataTypeMismatch)
                 } else {
-                    let res = func(&*get_userdata::<RefCell<T>>(lua.state, -3)?);
+                    let res = func(&*get_userdata::<RefCell<T>>(lua.state, -3));
                     ffi::lua_pop(lua.state, 3);
                     res
                 }
@@ -434,7 +434,7 @@ impl<'lua> AnyUserData<'lua> {
 #[cfg(test)]
 mod tests {
     use super::{MetaMethod, UserData, UserDataMethods};
-    use error::{Error, ExternalError};
+    use error::ExternalError;
     use string::String;
     use function::Function;
     use lua::Lua;
@@ -568,7 +568,7 @@ mod tests {
             globals.set("userdata", MyUserdata { id: 123 }).unwrap();
         }
 
-        match lua.eval::<()>(
+        assert!(lua.eval::<()>(
             r#"
                 local tbl = setmetatable({
                     userdata = userdata
@@ -582,14 +582,8 @@ mod tests {
                 collectgarbage("collect")
                 hatch:access()
             "#,
-            None,
-        ) {
-            Err(Error::CallbackError { cause, .. }) => match *cause {
-                Error::ExpiredUserData { .. } => {}
-                ref other => panic!("incorrect result: {}", other),
-            },
-            other => panic!("incorrect result: {:?}", other),
-        }
+            None
+        ).is_err());
     }
 
     #[test]
