@@ -1,3 +1,20 @@
+## [0.11.0]
+- `rlua::Error` now implements `failure::Fail` and not `std::error::Error`, and
+  external errors now require `failure::Fail`.  This is the only API
+  incompatible change for 0.11, and my hope is that it is relatively minor.
+  There are no additional bounds on external errors, since there is a blanket
+  impl for `T: std::error::Error + Send + Sync` of `failure::Fail`, but
+  `rlua::Error` no longer implements `std::error::Error` and there is an
+  additional dependency, and that is more likely to cause breakage.
+- protect a call to `luaL_ref` when creating new userdata types.
+- Some documentation improvements for `Error`, `Lua::create_function`, and
+  `MetaMethod`, and a rustdoc warning fix (thanks @jonas-schievink!)
+- Expose the `RegistryKey` type in the API properly, which makes the API around
+  it vastly easier to use!  Also fixes a safety hole around using the
+  `RegistryKey` API with the wrong `Lua` instance.
+- Add an API for "user values", which are arbitrary Lua values that can be
+  attached to userdata.
+
 ## [0.10.2]
 - Registry API for storing values inside the `Lua` instance, either by string or
   by automatically generated keys.
