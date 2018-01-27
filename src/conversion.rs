@@ -270,14 +270,16 @@ impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Vec<T> {
 }
 
 impl<'lua, K: Eq + Hash + ToLua<'lua>, V: ToLua<'lua>, S: BuildHasher> ToLua<'lua>
-    for HashMap<K, V, S> {
+    for HashMap<K, V, S>
+{
     fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>> {
         Ok(Value::Table(lua.create_table_from(self)?))
     }
 }
 
 impl<'lua, K: Eq + Hash + FromLua<'lua>, V: FromLua<'lua>, S: BuildHasher + Default> FromLua<'lua>
-    for HashMap<K, V, S> {
+    for HashMap<K, V, S>
+{
     fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<Self> {
         if let Value::Table(table) = value {
             table.pairs().collect()

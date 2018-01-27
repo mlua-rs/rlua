@@ -14,7 +14,7 @@ use ffi;
 use error::*;
 use util::*;
 use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-use types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
+use types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey, SharedId};
 use string::String;
 use table::Table;
 use function::Function;
@@ -28,6 +28,12 @@ pub struct Lua {
     ephemeral: bool,
 }
 
+// Data associated with the main lua_State via lua_getextraspace.
+struct ExtraData {
+    lua_id: SharedId,
+    registered_userdata: HashMap<TypeId, c_int>,
+}
+
 impl Drop for Lua {
     fn drop(&mut self) {
         unsafe {
@@ -39,6 +45,9 @@ impl Drop for Lua {
                         process::abort()
                     }
                 }
+
+                let extra_data = *(ffi::lua_getextraspace(self.state) as *mut *mut ExtraData);
+                Box::from_raw(extra_data);
 
                 ffi::lua_close(self.state);
             }
@@ -496,7 +505,10 @@ impl Lua {
 
                 ffi::lua_pop(self.state, 1);
 
-                Ok(RegistryKey(id))
+                Ok(RegistryKey {
+                    lua_id: (*self.extra()).lua_id.clone(),
+                    registry_id: id,
+                })
             })
         }
     }
@@ -507,6 +519,12 @@ impl Lua {
     /// value previously placed by `create_registry_value`.
     pub fn registry_value<'lua, T: FromLua<'lua>>(&'lua self, key: &RegistryKey) -> Result<T> {
         unsafe {
+            lua_assert!(
+                self.state,
+                key.lua_id == (*self.extra()).lua_id,
+                "Lua instance passed RegistryKey created from a different Lua"
+            );
+
             stack_err_guard(self.state, 0, || {
                 check_stack(self.state, 2);
 
@@ -516,7 +534,7 @@ impl Lua {
                 );
                 ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
 
-                ffi::lua_rawgeti(self.state, -1, key.0 as ffi::lua_Integer);
+                ffi::lua_rawgeti(self.state, -1, key.registry_id as ffi::lua_Integer);
 
                 let t = T::from_lua(self.pop_value(self.state), self)?;
 
@@ -533,6 +551,12 @@ impl Lua {
     /// `create_registry_value`
     pub fn remove_registry_value<'lua>(&'lua self, key: RegistryKey) {
         unsafe {
+            lua_assert!(
+                self.state,
+                key.lua_id == (*self.extra()).lua_id,
+                "Lua instance passed RegistryKey created from a different Lua"
+            );
+
             stack_guard(self.state, 0, || {
                 check_stack(self.state, 2);
 
@@ -543,7 +567,7 @@ impl Lua {
                 ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
 
                 ffi::lua_pushnil(self.state);
-                ffi::lua_rawseti(self.state, -2, key.0 as ffi::lua_Integer);
+                ffi::lua_rawseti(self.state, -2, key.registry_id as ffi::lua_Integer);
 
                 ffi::lua_pop(self.state, 1);
             })
@@ -707,15 +731,7 @@ impl Lua {
         stack_err_guard(self.state, 0, move || {
             check_stack(self.state, 5);
 
-            ffi::lua_pushlightuserdata(
-                self.state,
-                &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
-            );
-            ffi::lua_gettable(self.state, ffi::LUA_REGISTRYINDEX);
-            let registered_userdata = get_userdata::<HashMap<TypeId, c_int>>(self.state, -1)?;
-            ffi::lua_pop(self.state, 1);
-
-            if let Some(table_id) = (*registered_userdata).get(&TypeId::of::<T>()) {
+            if let Some(table_id) = (*self.extra()).registered_userdata.get(&TypeId::of::<T>()) {
                 return Ok(*table_id);
             }
 
@@ -822,7 +838,9 @@ impl Lua {
             let id = gc_guard(self.state, || {
                 ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX)
             });
-            (*registered_userdata).insert(TypeId::of::<T>(), id);
+            (*self.extra())
+                .registered_userdata
+                .insert(TypeId::of::<T>(), id);
             Ok(id)
         })
     }
@@ -875,25 +893,6 @@ impl Lua {
                 ffi::lua_pop(state, 1);
             }
 
-            // Create the userdata registry table
-
-            ffi::lua_pushlightuserdata(
-                state,
-                &LUA_USERDATA_REGISTRY_KEY as *const u8 as *mut c_void,
-            );
-
-            push_userdata::<HashMap<TypeId, c_int>>(state, HashMap::new()).unwrap();
-
-            ffi::lua_newtable(state);
-
-            push_string(state, "__gc").unwrap();
-            ffi::lua_pushcfunction(state, userdata_destructor::<HashMap<TypeId, c_int>>);
-            ffi::lua_rawset(state, -3);
-
-            ffi::lua_setmetatable(state, -2);
-
-            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
-
             // Create the function metatable
 
             ffi::lua_pushlightuserdata(
@@ -932,6 +931,14 @@ impl Lua {
             ffi::lua_rawset(state, -3);
 
             ffi::lua_pop(state, 1);
+
+            // Create ExtraData, and place it in the lua_State "extra space"
+
+            let extra_data = Box::into_raw(Box::new(ExtraData {
+                lua_id: SharedId::new(),
+                registered_userdata: HashMap::new(),
+            }));
+            *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra_data;
         });
 
         Lua {
@@ -996,8 +1003,11 @@ impl Lua {
             })
         }
     }
+
+    unsafe fn extra(&self) -> *mut ExtraData {
+        *(ffi::lua_getextraspace(self.main_state) as *mut *mut ExtraData)
+    }
 }
 
-static LUA_USERDATA_REGISTRY_KEY: u8 = 0;
 static FUNCTION_METATABLE_REGISTRY_KEY: u8 = 0;
 static USER_REGISTRY_KEY: u8 = 0;

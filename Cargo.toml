@@ -16,9 +16,11 @@ travis-ci = { repository = "chucklefish/rlua", branch = "master" }
 default = ["builtin-lua"]
 # Builds the correct version of Lua 5.3 inside the crate. If you want to link a
 # specialized version of lua into your binary, you can disable this feature to
-# do that, but care must be taken.  `rlua` expects the linked lua to define
-# LUA_INTEGER as long long, and LUA_NUMBER as double, and may make other
-# assumptions about how lua is built.
+# do that, but care must be taken.  `rlua` makes at least the following
+# assumptions about the linked lua library:
+#   * LUA_INTEGER is long long
+#   * LUA_NUMBER as double
+#   * LUA_EXTRASPACE is sizeof(void*)
 builtin-lua = ["gcc"]
 
 [dependencies]

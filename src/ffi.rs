@@ -3,24 +3,19 @@
 #![allow(unused)]
 
 use std::ptr;
+use std::mem;
 use std::os::raw::{c_char, c_double, c_int, c_longlong, c_void};
 
 pub type lua_Integer = c_longlong;
 pub type lua_Number = c_double;
 
 pub enum lua_State {}
-pub type lua_Alloc = unsafe extern "C" fn(
-    ud: *mut c_void,
-    ptr: *mut c_void,
-    osize: usize,
-    nsize: usize,
-) -> *mut c_void;
+pub type lua_Alloc =
+    unsafe extern "C" fn(ud: *mut c_void, ptr: *mut c_void, osize: usize, nsize: usize)
+        -> *mut c_void;
 pub type lua_KContext = *mut c_void;
-pub type lua_KFunction = unsafe extern "C" fn(
-    state: *mut lua_State,
-    status: c_int,
-    ctx: lua_KContext,
-) -> c_int;
+pub type lua_KFunction =
+    unsafe extern "C" fn(state: *mut lua_State, status: c_int, ctx: lua_KContext) -> c_int;
 pub type lua_CFunction = unsafe extern "C" fn(state: *mut lua_State) -> c_int;
 
 pub const LUA_OK: c_int = 0;
@@ -175,6 +170,10 @@ extern "C" {
         level: c_int,
     );
     pub fn luaL_len(push_state: *mut lua_State, index: c_int) -> lua_Integer;
+}
+
+pub unsafe fn lua_getextraspace(state: *mut lua_State) -> *mut c_void {
+    (state as *mut c_void).offset(-(mem::size_of::<*mut c_void>() as isize))
 }
 
 pub unsafe fn lua_pop(state: *mut lua_State, n: c_int) {

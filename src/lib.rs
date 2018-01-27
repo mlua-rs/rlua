@@ -64,7 +64,7 @@ mod userdata;
 mod tests;
 
 pub use error::{Error, ExternalError, ExternalResult, Result};
-pub use types::{Integer, LightUserData, Number};
+pub use types::{Integer, LightUserData, Number, RegistryKey};
 pub use multi::Variadic;
 pub use string::String;
 pub use table::{Table, TablePairs, TableSequence};

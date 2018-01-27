@@ -536,6 +536,28 @@ fn test_registry_value() {
     f.call::<_, ()>(()).unwrap();
 }
 
+#[test]
+#[should_panic]
+fn test_mismatched_lua_ref() {
+    let lua1 = Lua::new();
+    let lua2 = Lua::new();
+
+    let s = lua1.create_string("hello").unwrap();
+    let f = lua2.create_function(|_, _: String| Ok(())).unwrap();
+
+    f.call::<_, ()>(s).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn test_mismatched_registry_key() {
+    let lua1 = Lua::new();
+    let lua2 = Lua::new();
+
+    let r = lua1.create_registry_value("hello").unwrap();
+    lua2.remove_registry_value(r);
+}
+
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.
 /*
 #[test]
