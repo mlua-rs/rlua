@@ -120,7 +120,7 @@ where
         ffi::lua_pop(state, 1);
 
         let function = mem::replace(&mut (*params).function, mem::uninitialized());
-        mem::replace(&mut (*params).result, function(state));
+        ptr::write(&mut (*params).result, function(state));
         // params now has function uninitialied and result initialized
 
         if (*params).nresults == ffi::LUA_MULTRET {
