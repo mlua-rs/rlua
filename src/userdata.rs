@@ -7,7 +7,7 @@ use ffi;
 use error::*;
 use util::*;
 use types::{Callback, LuaRef};
-use value::{FromLua, FromLuaMulti, ToLuaMulti};
+use value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
 use lua::Lua;
 
 /// Kinds of metamethods that can be overridden.
@@ -393,6 +393,42 @@ impl<'lua> AnyUserData<'lua> {
             })
         }
     }
+
+    /// Sets an associated value to this `AnyUserData`.
+    ///
+    /// The value may be any Lua value whatsoever, and can be retrieved with [`get_user_value`].
+    ///
+    /// [`get_user_value`]: #method.get_user_value
+    pub fn set_user_value<V: ToLua<'lua>>(&self, v: V) -> Result<()> {
+        let lua = self.0.lua;
+        unsafe {
+            stack_guard(lua.state, 0, || {
+                check_stack(lua.state, 2);
+                lua.push_ref(lua.state, &self.0);
+                lua.push_value(lua.state, v.to_lua(lua)?);
+                ffi::lua_setuservalue(lua.state, -2);
+                ffi::lua_pop(lua.state, 1);
+                Ok(())
+            })
+        }
+    }
+
+    /// Returns an associated value set by [`set_user_value`].
+    ///
+    /// [`set_user_value`]: #method.set_user_value
+    pub fn get_user_value<V: FromLua<'lua>>(&self) -> Result<V> {
+        let lua = self.0.lua;
+        unsafe {
+            stack_guard(lua.state, 0, || {
+                check_stack(lua.state, 2);
+                lua.push_ref(lua.state, &self.0);
+                ffi::lua_getuservalue(lua.state, -1);
+                let res = V::from_lua(lua.pop_value(lua.state), lua)?;
+                ffi::lua_pop(lua.state, 1);
+                Ok(res)
+            })
+        }
+    }
 }
 
 #[cfg(test)]
@@ -581,5 +617,17 @@ mod tests {
         assert_eq!(DROPPED.load(Ordering::SeqCst), false);
         drop(lua); // should destroy all objects
         assert_eq!(DROPPED.load(Ordering::SeqCst), true);
+    }
+
+    #[test]
+    fn user_value() {
+        let lua = Lua::new();
+
+        struct MyUserData;
+        impl UserData for MyUserData {}
+
+        let ud = lua.create_userdata(MyUserData).unwrap();
+        ud.set_user_value("hello").unwrap();
+        assert_eq!(ud.get_user_value::<String>().unwrap(), "hello");
     }
 }

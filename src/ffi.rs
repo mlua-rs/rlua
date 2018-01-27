@@ -121,6 +121,9 @@ extern "C" {
     pub fn lua_newuserdata(state: *mut lua_State, size: usize) -> *mut c_void;
     pub fn lua_newthread(state: *mut lua_State) -> *mut lua_State;
 
+    pub fn lua_setuservalue(state: *mut lua_State, index: c_int);
+    pub fn lua_getuservalue(state: *mut lua_State, index: c_int) -> c_int;
+
     pub fn lua_settable(state: *mut lua_State, index: c_int);
     pub fn lua_rawset(state: *mut lua_State, index: c_int);
     pub fn lua_setmetatable(state: *mut lua_State, index: c_int);
