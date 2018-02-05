@@ -250,13 +250,12 @@ pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut 
 
 pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
     callback_error(state, || {
-        // We clear the metatable of userdata on __gc so that it will not be double dropped, and
-        // also so that it cannot be used or identified as any particular userdata type after the
-        // first call to __gc.
-        gc_guard(state, || {
-            ffi::lua_newtable(state);
-            ffi::lua_setmetatable(state, -2);
-        });
+        // We set the metatable of userdata on __gc to a special table with no __gc method and with
+        // metamethods that trigger an error on access.  We do this so that it will not be double
+        // dropped, and also so that it cannot be used or identified as any particular userdata type
+        // after the first call to __gc.
+        get_gc_userdata_metatable(state);
+        ffi::lua_setmetatable(state, -2);
         let ud = &mut *(ffi::lua_touserdata(state, 1) as *mut T);
         mem::replace(ud, mem::uninitialized());
         Ok(0)
@@ -581,6 +580,66 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
             ffi::lua_pushstring(state, cstr!("__metatable"));
             ffi::lua_pushboolean(state, 0);
             ffi::lua_rawset(state, -3);
+
+            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+        });
+    }
+
+    ffi::LUA_TTABLE
+}
+
+unsafe fn get_gc_userdata_metatable(state: *mut ffi::lua_State) -> c_int {
+    static GC_USERDATA_METATABLE: u8 = 0;
+
+    unsafe extern "C" fn gc_error(state: *mut ffi::lua_State) -> c_int {
+        ffi::lua_pushstring(state, cstr!("userdata has been garbage collected"));
+        ffi::lua_error(state)
+    }
+
+    ffi::lua_pushlightuserdata(state, &GC_USERDATA_METATABLE as *const u8 as *mut c_void);
+    let t = ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX);
+
+    if t != ffi::LUA_TTABLE {
+        ffi::lua_pop(state, 1);
+
+        ffi::luaL_checkstack(state, 8, ptr::null());
+
+        gc_guard(state, || {
+            ffi::lua_newtable(state);
+            ffi::lua_pushlightuserdata(state, &GC_USERDATA_METATABLE as *const u8 as *mut c_void);
+            ffi::lua_pushvalue(state, -2);
+
+            for &method in &[
+                cstr!("__add"),
+                cstr!("__sub"),
+                cstr!("__mul"),
+                cstr!("__div"),
+                cstr!("__mod"),
+                cstr!("__pow"),
+                cstr!("__unm"),
+                cstr!("__idiv"),
+                cstr!("__band"),
+                cstr!("__bor"),
+                cstr!("__bxor"),
+                cstr!("__bnot"),
+                cstr!("__shl"),
+                cstr!("__shr"),
+                cstr!("__concat"),
+                cstr!("__len"),
+                cstr!("__eq"),
+                cstr!("__lt"),
+                cstr!("__le"),
+                cstr!("__index"),
+                cstr!("__newindex"),
+                cstr!("__call"),
+                cstr!("__tostring"),
+                cstr!("__pairs"),
+                cstr!("__ipairs"),
+            ] {
+                ffi::lua_pushstring(state, method);
+                ffi::lua_pushcfunction(state, gc_error);
+                ffi::lua_rawset(state, -3);
+            }
 
             ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
         });

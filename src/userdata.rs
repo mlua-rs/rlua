@@ -548,7 +548,7 @@ mod tests {
     }
 
     #[test]
-    fn test_expired_userdata() {
+    fn test_gc_userdata() {
         struct MyUserdata {
             id: u8,
         }
