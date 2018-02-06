@@ -549,6 +549,20 @@ fn test_mismatched_lua_ref() {
 }
 
 #[test]
+fn test_lua_registry_ownership() {
+    let lua1 = Lua::new();
+    let lua2 = Lua::new();
+
+    let r1 = lua1.create_registry_value("hello").unwrap();
+    let r2 = lua2.create_registry_value("hello").unwrap();
+
+    assert!(lua1.owns_registry_value(&r1));
+    assert!(!lua2.owns_registry_value(&r1));
+    assert!(lua2.owns_registry_value(&r2));
+    assert!(!lua1.owns_registry_value(&r2));
+}
+
+#[test]
 #[should_panic]
 fn test_mismatched_registry_key() {
     let lua1 = Lua::new();
