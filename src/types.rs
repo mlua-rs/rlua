@@ -1,6 +1,6 @@
 use std::fmt;
 use std::os::raw::{c_int, c_void};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use ffi;
 use error::Result;
@@ -18,17 +18,17 @@ pub struct LightUserData(pub *mut c_void);
 
 // Clone-able id where every clone of the same id compares equal, and are guaranteed unique.
 #[derive(Debug, Clone)]
-pub(crate) struct SharedId(Rc<()>);
+pub(crate) struct SharedId(Arc<()>);
 
 impl SharedId {
     pub(crate) fn new() -> SharedId {
-        SharedId(Rc::new(()))
+        SharedId(Arc::new(()))
     }
 }
 
 impl PartialEq for SharedId {
     fn eq(&self, other: &SharedId) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        Arc::ptr_eq(&self.0, &other.0)
     }
 }
 
