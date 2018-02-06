@@ -586,13 +586,15 @@ fn test_lua_registry_ownership() {
 }
 
 #[test]
-#[should_panic]
 fn test_mismatched_registry_key() {
     let lua1 = Lua::new();
     let lua2 = Lua::new();
 
     let r = lua1.create_registry_value("hello").unwrap();
-    lua2.remove_registry_value(r);
+    match lua2.remove_registry_value(r) {
+        Err(Error::MismatchedRegistryKey) => {}
+        r => panic!("wrong result type for mismatched registry key, {:?}", r),
+    };
 }
 
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.

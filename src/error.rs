@@ -87,6 +87,8 @@ pub enum Error {
     /// [`AnyUserData`]: struct.AnyUserData.html
     /// [`UserData`]: trait.UserData.html
     UserDataBorrowMutError,
+    /// A `RegistryKey` produced from a different Lua state was used.
+    MismatchedRegistryKey,
     /// A Rust callback returned `Err`, raising the contained `Error` as a Lua error.
     CallbackError {
         /// Lua call stack backtrace.
@@ -142,6 +144,9 @@ impl fmt::Display for Error {
             Error::UserDataTypeMismatch => write!(fmt, "userdata is not expected type"),
             Error::UserDataBorrowError => write!(fmt, "userdata already mutably borrowed"),
             Error::UserDataBorrowMutError => write!(fmt, "userdata already borrowed"),
+            Error::MismatchedRegistryKey => {
+                write!(fmt, "RegistryKey used from different Lua state")
+            }
             Error::CallbackError { ref traceback, .. } => {
                 write!(fmt, "callback error: {}", traceback)
             }

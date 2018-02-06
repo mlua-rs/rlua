@@ -504,11 +504,9 @@ impl Lua {
     /// value previously placed by `create_registry_value`.
     pub fn registry_value<'lua, T: FromLua<'lua>>(&'lua self, key: &RegistryKey) -> Result<T> {
         unsafe {
-            lua_assert!(
-                self.state,
-                Arc::ptr_eq(&key.drop_list, &(*self.extra()).registry_drop_list),
-                "Lua instance passed RegistryKey created from a different Lua"
-            );
+            if !Arc::ptr_eq(&key.drop_list, &(*self.extra()).registry_drop_list) {
+                return Err(Error::MismatchedRegistryKey);
+            }
 
             stack_err_guard(self.state, 0, || {
                 check_stack(self.state, 1);
@@ -528,25 +526,25 @@ impl Lua {
     /// `create_registry_value`. In addition to manual `RegistryKey` removal, you can also call
     /// `expire_registry_values` to automatically remove values from the registry whose
     /// `RegistryKey`s have been dropped.
-    pub fn remove_registry_value(&self, mut key: RegistryKey) {
+    pub fn remove_registry_value(&self, mut key: RegistryKey) -> Result<()> {
         unsafe {
-            lua_assert!(
-                self.state,
-                Arc::ptr_eq(&key.drop_list, &(*self.extra()).registry_drop_list),
-                "Lua instance passed RegistryKey created from a different Lua"
-            );
+            if !Arc::ptr_eq(&key.drop_list, &(*self.extra()).registry_drop_list) {
+                return Err(Error::MismatchedRegistryKey);
+            }
 
             ffi::luaL_unref(self.state, ffi::LUA_REGISTRYINDEX, key.registry_id);
             // Don't adding to the registry drop list when dropping the key
             key.registry_id = ffi::LUA_REFNIL;
+            Ok(())
         }
     }
 
     /// Returns true if the given `RegistryKey` was created by a `Lua` which shares the underlying
     /// main state with this `Lua` instance.
     ///
-    /// Other than this, methods that accept a `RegistryKey` will panic if passed a `RegistryKey`
-    /// that was not created with a matching `Lua` state.
+    /// Other than this, methods that accept a `RegistryKey` will return
+    /// `Error::MismatchedRegistryKey` if passed a `RegistryKey` that was not created with a
+    /// matching `Lua` state.
     pub fn owns_registry_value(&self, key: &RegistryKey) -> bool {
         unsafe { Arc::ptr_eq(&key.drop_list, &(*self.extra()).registry_drop_list) }
     }
