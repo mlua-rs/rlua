@@ -433,6 +433,8 @@ impl<'lua> AnyUserData<'lua> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use super::{MetaMethod, UserData, UserDataMethods};
     use error::ExternalError;
     use string::String;
@@ -588,29 +590,21 @@ mod tests {
 
     #[test]
     fn detroys_userdata() {
-        use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
-
-        static DROPPED: AtomicBool = ATOMIC_BOOL_INIT;
-
-        struct MyUserdata;
+        struct MyUserdata(Rc<()>);
 
         impl UserData for MyUserdata {}
 
-        impl Drop for MyUserdata {
-            fn drop(&mut self) {
-                DROPPED.store(true, Ordering::SeqCst);
-            }
-        }
+        let rc = Rc::new(());
 
         let lua = Lua::new();
         {
             let globals = lua.globals();
-            globals.set("userdata", MyUserdata).unwrap();
+            globals.set("userdata", MyUserdata(rc.clone())).unwrap();
         }
 
-        assert_eq!(DROPPED.load(Ordering::SeqCst), false);
+        assert_eq!(Rc::strong_count(&rc), 2);
         drop(lua); // should destroy all objects
-        assert_eq!(DROPPED.load(Ordering::SeqCst), true);
+        assert_eq!(Rc::strong_count(&rc), 1);
     }
 
     #[test]

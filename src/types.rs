@@ -1,6 +1,6 @@
 use std::fmt;
 use std::os::raw::{c_int, c_void};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use ffi;
 use error::Result;
@@ -16,28 +16,24 @@ pub type Number = ffi::lua_Number;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LightUserData(pub *mut c_void);
 
-// Clone-able id where every clone of the same id compares equal, and are guaranteed unique.
-#[derive(Debug, Clone)]
-pub(crate) struct SharedId(Arc<()>);
-
-impl SharedId {
-    pub(crate) fn new() -> SharedId {
-        SharedId(Arc::new(()))
-    }
-}
-
-impl PartialEq for SharedId {
-    fn eq(&self, other: &SharedId) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-impl Eq for SharedId {}
-
 /// An auto generated key into the Lua registry.
+///
+/// This is a handle into a value stored inside the Lua registry, similar to the normal handle types
+/// like `Table` or `Function`.  The difference is that this handle does not require holding a
+/// reference to a parent `Lua` instance, and thus is managed differently.  Though it is more
+/// difficult to use than the normal handle types, it is Send + Sync + 'static, which means that it
+/// can be used in many situations where it would be impossible to store a regular handle value.
 pub struct RegistryKey {
-    pub(crate) lua_id: SharedId,
     pub(crate) registry_id: c_int,
+    pub(crate) drop_list: Arc<Mutex<Vec<c_int>>>,
+}
+
+impl Drop for RegistryKey {
+    fn drop(&mut self) {
+        if self.registry_id != ffi::LUA_REFNIL {
+            self.drop_list.lock().unwrap().push(self.registry_id);
+        }
+    }
 }
 
 pub(crate) type Callback<'lua> =

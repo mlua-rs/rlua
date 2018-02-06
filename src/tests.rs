@@ -1,8 +1,9 @@
 use std::fmt;
 use std::error;
+use std::rc::Rc;
 use std::panic::catch_unwind;
 
-use {Error, ExternalError, Function, Lua, Nil, Result, Table, Value, Variadic};
+use {Error, ExternalError, Function, Lua, Nil, Result, Table, UserData, Value, Variadic};
 
 #[test]
 fn test_load() {
@@ -534,6 +535,28 @@ fn test_registry_value() {
     }).unwrap();
 
     f.call::<_, ()>(()).unwrap();
+}
+
+#[test]
+fn test_drop_registry_value() {
+    struct MyUserdata(Rc<()>);
+
+    impl UserData for MyUserdata {}
+
+    let lua = Lua::new();
+
+    let rc = Rc::new(());
+
+    let r = lua.create_registry_value(MyUserdata(rc.clone())).unwrap();
+    assert_eq!(Rc::strong_count(&rc), 2);
+
+    drop(r);
+    lua.expire_registry_values();
+
+    lua.exec::<()>(r#"collectgarbage("collect")"#, None)
+        .unwrap();
+
+    assert_eq!(Rc::strong_count(&rc), 1);
 }
 
 #[test]
