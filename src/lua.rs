@@ -549,7 +549,7 @@ impl Lua {
     ///
     /// You MUST call this function to remove a value placed in the registry with
     /// `create_registry_value`
-    pub fn remove_registry_value<'lua>(&'lua self, key: RegistryKey) {
+    pub fn remove_registry_value(&self, key: RegistryKey) {
         unsafe {
             lua_assert!(
                 self.state,
@@ -572,6 +572,14 @@ impl Lua {
                 ffi::lua_pop(self.state, 1);
             })
         }
+    }
+
+    /// Returns true if the given `RegistryKey` was created by this `Lua` instance.
+    ///
+    /// Other than this one, methods that accept a `RegistryKey` will panic if passed a
+    /// `RegistryKey` that was not created with this `Lua` instance.
+    pub fn owns_registry_value(&self, key: &RegistryKey) -> bool {
+        unsafe { key.lua_id == (*self.extra()).lua_id }
     }
 
     // Uses 1 stack space, does not call checkstack
