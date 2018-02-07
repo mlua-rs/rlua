@@ -39,7 +39,7 @@ pub struct Scope<'lua> {
 // Data associated with the main lua_State via lua_getextraspace.
 struct ExtraData {
     registered_userdata: HashMap<TypeId, c_int>,
-    registry_unref_list: Arc<Mutex<Vec<c_int>>>,
+    registry_unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
 }
 
 unsafe impl Send for Lua {}
@@ -57,6 +57,7 @@ impl Drop for Lua {
                 }
 
                 let extra_data = *(ffi::lua_getextraspace(self.state) as *mut *mut ExtraData);
+                *(*extra_data).registry_unref_list.lock().unwrap() = None;
                 Box::from_raw(extra_data);
 
                 ffi::lua_close(self.state);
@@ -569,10 +570,10 @@ impl Lua {
     pub fn expire_registry_values(&self) {
         unsafe {
             let unref_list = mem::replace(
-                (*self.extra()).registry_unref_list.lock().unwrap().as_mut(),
-                Vec::new(),
+                &mut *(*self.extra()).registry_unref_list.lock().unwrap(),
+                Some(Vec::new()),
             );
-            for id in unref_list {
+            for id in unref_list.unwrap() {
                 ffi::luaL_unref(self.state, ffi::LUA_REGISTRYINDEX, id);
             }
         }
@@ -935,7 +936,7 @@ impl Lua {
 
             let extra_data = Box::into_raw(Box::new(ExtraData {
                 registered_userdata: HashMap::new(),
-                registry_unref_list: Arc::new(Mutex::new(Vec::new())),
+                registry_unref_list: Arc::new(Mutex::new(Some(Vec::new()))),
             }));
             *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra_data;
         });

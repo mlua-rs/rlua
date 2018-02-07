@@ -25,14 +25,16 @@ pub struct LightUserData(pub *mut c_void);
 /// can be used in many situations where it would be impossible to store a regular handle value.
 pub struct RegistryKey {
     pub(crate) registry_id: c_int,
-    pub(crate) unref_list: Arc<Mutex<Vec<c_int>>>,
+    pub(crate) unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
     pub(crate) drop_unref: bool,
 }
 
 impl Drop for RegistryKey {
     fn drop(&mut self) {
         if self.drop_unref {
-            self.unref_list.lock().unwrap().push(self.registry_id);
+            if let Some(list) = self.unref_list.lock().unwrap().as_mut() {
+                list.push(self.registry_id);
+            }
         }
     }
 }
