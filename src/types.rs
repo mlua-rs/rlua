@@ -25,13 +25,16 @@ pub struct LightUserData(pub *mut c_void);
 /// can be used in many situations where it would be impossible to store a regular handle value.
 pub struct RegistryKey {
     pub(crate) registry_id: c_int,
-    pub(crate) drop_list: Arc<Mutex<Vec<c_int>>>,
+    pub(crate) unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
+    pub(crate) drop_unref: bool,
 }
 
 impl Drop for RegistryKey {
     fn drop(&mut self) {
-        if self.registry_id != ffi::LUA_REFNIL {
-            self.drop_list.lock().unwrap().push(self.registry_id);
+        if self.drop_unref {
+            if let Some(list) = self.unref_list.lock().unwrap().as_mut() {
+                list.push(self.registry_id);
+            }
         }
     }
 }
@@ -42,6 +45,7 @@ pub(crate) type Callback<'lua> =
 pub(crate) struct LuaRef<'lua> {
     pub lua: &'lua Lua,
     pub registry_id: c_int,
+    pub drop_unref: bool,
 }
 
 impl<'lua> fmt::Debug for LuaRef<'lua> {
@@ -52,17 +56,27 @@ impl<'lua> fmt::Debug for LuaRef<'lua> {
 
 impl<'lua> Clone for LuaRef<'lua> {
     fn clone(&self) -> Self {
-        unsafe {
-            self.lua.push_ref(self.lua.state, self);
-            self.lua.pop_ref(self.lua.state)
+        if self.drop_unref {
+            unsafe {
+                self.lua.push_ref(self.lua.state, self);
+                self.lua.pop_ref(self.lua.state)
+            }
+        } else {
+            LuaRef {
+                lua: self.lua,
+                registry_id: self.registry_id,
+                drop_unref: self.drop_unref,
+            }
         }
     }
 }
 
 impl<'lua> Drop for LuaRef<'lua> {
     fn drop(&mut self) {
-        unsafe {
-            ffi::luaL_unref(self.lua.state, ffi::LUA_REGISTRYINDEX, self.registry_id);
+        if self.drop_unref {
+            unsafe {
+                ffi::luaL_unref(self.lua.state, ffi::LUA_REGISTRYINDEX, self.registry_id);
+            }
         }
     }
 }

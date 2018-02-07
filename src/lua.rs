@@ -1,14 +1,12 @@
-use std::{ptr, str};
+use std::{mem, process, ptr, str};
 use std::sync::{Arc, Mutex};
 use std::ops::DerefMut;
 use std::cell::RefCell;
 use std::ffi::CString;
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_int, c_void};
-use std::mem;
-use std::process;
 
 use libc;
 
@@ -30,11 +28,20 @@ pub struct Lua {
     ephemeral: bool,
 }
 
+/// Constructed by the `Lua::scope` method, allows temporarily passing to Lua userdata that is
+/// !Send, and callbacks that are !Send and not 'static.
+pub struct Scope<'lua> {
+    lua: &'lua Lua,
+    destructors: RefCell<Vec<Box<FnMut(*mut ffi::lua_State) -> Box<Any>>>>,
+}
+
 // Data associated with the main lua_State via lua_getextraspace.
 struct ExtraData {
     registered_userdata: HashMap<TypeId, c_int>,
-    registry_drop_list: Arc<Mutex<Vec<c_int>>>,
+    registry_unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
 }
+
+unsafe impl Send for Lua {}
 
 impl Drop for Lua {
     fn drop(&mut self) {
@@ -49,6 +56,7 @@ impl Drop for Lua {
                 }
 
                 let extra_data = *(ffi::lua_getextraspace(self.state) as *mut *mut ExtraData);
+                *(*extra_data).registry_unref_list.lock().unwrap() = None;
                 Box::from_raw(extra_data);
 
                 ffi::lua_close(self.state);
@@ -259,7 +267,7 @@ impl Lua {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
     {
         self.create_callback_function(Box::new(move |lua, args| {
             func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
@@ -286,25 +294,9 @@ impl Lua {
     /// Create a Lua userdata object from a custom userdata type.
     pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData>
     where
-        T: UserData,
+        T: Send + UserData,
     {
-        unsafe {
-            stack_err_guard(self.state, 0, move || {
-                check_stack(self.state, 3);
-
-                push_userdata::<RefCell<T>>(self.state, RefCell::new(data))?;
-
-                ffi::lua_rawgeti(
-                    self.state,
-                    ffi::LUA_REGISTRYINDEX,
-                    self.userdata_metatable::<T>()? as ffi::lua_Integer,
-                );
-
-                ffi::lua_setmetatable(self.state, -2);
-
-                Ok(AnyUserData(self.pop_ref(self.state)))
-            })
-        }
+        self.do_create_userdata(data)
     }
 
     /// Returns a handle to the global environment.
@@ -316,6 +308,28 @@ impl Lua {
                 Table(self.pop_ref(self.state))
             })
         }
+    }
+
+    /// Calls the given function with a `Scope` parameter, giving the function the ability to create
+    /// userdata from rust types that are !Send, and rust callbacks that are !Send and not 'static.
+    /// The lifetime of any function or userdata created through `Scope` lasts only until the
+    /// completion of this method call, on completion all such created values are automatically
+    /// dropped and Lua references to them are invalidated.  If a script accesses a value created
+    /// through `Scope` outside of this method, a Lua error will result.  Since we can ensure the
+    /// lifetime of values created through `Scope`, and we know that `Lua` cannot be sent to another
+    /// thread while `Scope` is live, it is safe to allow !Send datatypes and functions whose
+    /// lifetimes only outlive the scope lifetime.
+    pub fn scope<'lua, F, R>(&'lua self, f: F) -> R
+    where
+        F: FnOnce(&mut Scope<'lua>) -> R,
+    {
+        let mut scope = Scope {
+            lua: self,
+            destructors: RefCell::new(Vec::new()),
+        };
+        let r = f(&mut scope);
+        drop(scope);
+        r
     }
 
     /// Coerces a Lua value to a string.
@@ -492,7 +506,8 @@ impl Lua {
 
                 Ok(RegistryKey {
                     registry_id,
-                    drop_list: (*self.extra()).registry_drop_list.clone(),
+                    unref_list: (*self.extra()).registry_unref_list.clone(),
+                    drop_unref: true,
                 })
             })
         }
@@ -504,7 +519,7 @@ impl Lua {
     /// value previously placed by `create_registry_value`.
     pub fn registry_value<'lua, T: FromLua<'lua>>(&'lua self, key: &RegistryKey) -> Result<T> {
         unsafe {
-            if !Arc::ptr_eq(&key.drop_list, &(*self.extra()).registry_drop_list) {
+            if !Arc::ptr_eq(&key.unref_list, &(*self.extra()).registry_unref_list) {
                 return Err(Error::MismatchedRegistryKey);
             }
 
@@ -528,13 +543,12 @@ impl Lua {
     /// `RegistryKey`s have been dropped.
     pub fn remove_registry_value(&self, mut key: RegistryKey) -> Result<()> {
         unsafe {
-            if !Arc::ptr_eq(&key.drop_list, &(*self.extra()).registry_drop_list) {
+            if !Arc::ptr_eq(&key.unref_list, &(*self.extra()).registry_unref_list) {
                 return Err(Error::MismatchedRegistryKey);
             }
 
             ffi::luaL_unref(self.state, ffi::LUA_REGISTRYINDEX, key.registry_id);
-            // Don't adding to the registry drop list when dropping the key
-            key.registry_id = ffi::LUA_REFNIL;
+            key.drop_unref = false;
             Ok(())
         }
     }
@@ -546,7 +560,7 @@ impl Lua {
     /// `Error::MismatchedRegistryKey` if passed a `RegistryKey` that was not created with a
     /// matching `Lua` state.
     pub fn owns_registry_value(&self, key: &RegistryKey) -> bool {
-        unsafe { Arc::ptr_eq(&key.drop_list, &(*self.extra()).registry_drop_list) }
+        unsafe { Arc::ptr_eq(&key.unref_list, &(*self.extra()).registry_unref_list) }
     }
 
     /// Remove any registry values whose `RegistryKey`s have all been dropped.  Unlike normal handle
@@ -554,11 +568,11 @@ impl Lua {
     /// can call this method to remove any unreachable registry values.
     pub fn expire_registry_values(&self) {
         unsafe {
-            let drop_list = mem::replace(
-                (*self.extra()).registry_drop_list.lock().unwrap().as_mut(),
-                Vec::new(),
+            let unref_list = mem::replace(
+                &mut *(*self.extra()).registry_unref_list.lock().unwrap(),
+                Some(Vec::new()),
             );
-            for id in drop_list {
+            for id in unref_list.unwrap() {
                 ffi::luaL_unref(self.state, ffi::LUA_REGISTRYINDEX, id);
             }
         }
@@ -694,6 +708,7 @@ impl Lua {
         LuaRef {
             lua: self,
             registry_id: registry_id,
+            drop_unref: true,
         }
     }
 
@@ -920,7 +935,7 @@ impl Lua {
 
             let extra_data = Box::into_raw(Box::new(ExtraData {
                 registered_userdata: HashMap::new(),
-                registry_drop_list: Arc::new(Mutex::new(Vec::new())),
+                registry_unref_list: Arc::new(Mutex::new(Some(Vec::new()))),
             }));
             *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra_data;
         });
@@ -934,6 +949,11 @@ impl Lua {
 
     fn create_callback_function<'lua>(&'lua self, func: Callback<'lua>) -> Result<Function<'lua>> {
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
+            if ffi::lua_type(state, ffi::lua_upvalueindex(1)) == ffi::LUA_TNIL {
+                ffi::lua_pushstring(state, cstr!("rust callback has been destructed"));
+                ffi::lua_error(state)
+            }
+
             callback_error(state, || {
                 let lua = Lua {
                     state: state,
@@ -976,7 +996,7 @@ impl Lua {
                     self.state,
                     &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
                 );
-                ffi::lua_gettable(self.state, ffi::LUA_REGISTRYINDEX);
+                ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
                 ffi::lua_setmetatable(self.state, -2);
 
                 protect_lua_call(self.state, 1, 1, |state| {
@@ -988,8 +1008,105 @@ impl Lua {
         }
     }
 
+    fn do_create_userdata<T>(&self, data: T) -> Result<AnyUserData>
+    where
+        T: UserData,
+    {
+        unsafe {
+            stack_err_guard(self.state, 0, move || {
+                check_stack(self.state, 3);
+
+                push_userdata::<RefCell<T>>(self.state, RefCell::new(data))?;
+
+                ffi::lua_rawgeti(
+                    self.state,
+                    ffi::LUA_REGISTRYINDEX,
+                    self.userdata_metatable::<T>()? as ffi::lua_Integer,
+                );
+
+                ffi::lua_setmetatable(self.state, -2);
+
+                Ok(AnyUserData(self.pop_ref(self.state)))
+            })
+        }
+    }
+
     unsafe fn extra(&self) -> *mut ExtraData {
         *(ffi::lua_getextraspace(self.main_state) as *mut *mut ExtraData)
+    }
+}
+
+impl<'lua> Scope<'lua> {
+    pub fn create_function<'scope, A, R, F>(&'scope self, mut func: F) -> Result<Function<'scope>>
+    where
+        A: FromLuaMulti<'scope>,
+        R: ToLuaMulti<'scope>,
+        F: 'scope + FnMut(&'scope Lua, A) -> Result<R>,
+    {
+        unsafe {
+            let mut f = self.lua
+                .create_callback_function(Box::new(move |lua, args| {
+                    func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+                }))?;
+            f.0.drop_unref = false;
+            let mut destructors = self.destructors.borrow_mut();
+            let registry_id = f.0.registry_id;
+            destructors.push(Box::new(move |state| {
+                check_stack(state, 2);
+                ffi::lua_rawgeti(
+                    state,
+                    ffi::LUA_REGISTRYINDEX,
+                    registry_id as ffi::lua_Integer,
+                );
+                ffi::lua_getupvalue(state, -1, 1);
+                let ud = take_userdata::<RefCell<Callback>>(state);
+
+                ffi::lua_pushnil(state);
+                ffi::lua_setupvalue(state, -2, 1);
+
+                ffi::lua_pop(state, 1);
+                Box::new(ud)
+            }));
+            Ok(f)
+        }
+    }
+
+    pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData>
+    where
+        T: UserData,
+    {
+        unsafe {
+            let mut u = self.lua.do_create_userdata(data)?;
+            u.0.drop_unref = false;
+            let mut destructors = self.destructors.borrow_mut();
+            let registry_id = u.0.registry_id;
+            destructors.push(Box::new(move |state| {
+                check_stack(state, 1);
+                ffi::lua_rawgeti(
+                    state,
+                    ffi::LUA_REGISTRYINDEX,
+                    registry_id as ffi::lua_Integer,
+                );
+                Box::new(take_userdata::<RefCell<T>>(state))
+            }));
+            Ok(u)
+        }
+    }
+}
+
+impl<'lua> Drop for Scope<'lua> {
+    fn drop(&mut self) {
+        // We separate the action of invalidating the userdata in Lua and actually dropping the
+        // userdata type into two phases.  This is so that, in the event a userdata drop panics, we
+        // can be sure that all of the userdata in Lua is actually invalidated.
+
+        let state = self.lua.state;
+        let to_drop = self.destructors
+            .get_mut()
+            .drain(..)
+            .map(|mut destructor| destructor(state))
+            .collect::<Vec<_>>();
+        drop(to_drop);
     }
 }
 

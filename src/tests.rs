@@ -1,6 +1,8 @@
 use std::fmt;
 use std::error;
 use std::rc::Rc;
+use std::cell::Cell;
+use std::sync::Arc;
 use std::panic::catch_unwind;
 
 use {Error, ExternalError, Function, Lua, Nil, Result, Table, UserData, Value, Variadic};
@@ -539,16 +541,16 @@ fn test_registry_value() {
 
 #[test]
 fn test_drop_registry_value() {
-    struct MyUserdata(Rc<()>);
+    struct MyUserdata(Arc<()>);
 
     impl UserData for MyUserdata {}
 
     let lua = Lua::new();
 
-    let rc = Rc::new(());
+    let rc = Arc::new(());
 
     let r = lua.create_registry_value(MyUserdata(rc.clone())).unwrap();
-    assert_eq!(Rc::strong_count(&rc), 2);
+    assert_eq!(Arc::strong_count(&rc), 2);
 
     drop(r);
     lua.expire_registry_values();
@@ -556,7 +558,7 @@ fn test_drop_registry_value() {
     lua.exec::<()>(r#"collectgarbage("collect")"#, None)
         .unwrap();
 
-    assert_eq!(Rc::strong_count(&rc), 1);
+    assert_eq!(Arc::strong_count(&rc), 1);
 }
 
 #[test]
@@ -597,6 +599,72 @@ fn test_mismatched_registry_key() {
     };
 }
 
+#[test]
+fn scope_func() {
+    let rc = Rc::new(Cell::new(0));
+
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        let r = rc.clone();
+        let f = scope
+            .create_function(move |_, ()| {
+                r.set(42);
+                Ok(())
+            })
+            .unwrap();
+        lua.globals().set("bad", f.clone()).unwrap();
+        f.call::<_, ()>(()).unwrap();
+    });
+    assert_eq!(rc.get(), 42);
+    assert_eq!(Rc::strong_count(&rc), 1);
+
+    assert!(
+        lua.globals()
+            .get::<_, Function>("bad")
+            .unwrap()
+            .call::<_, ()>(())
+            .is_err()
+    );
+}
+
+#[test]
+fn scope_drop() {
+    struct MyUserdata(Rc<()>);
+    impl UserData for MyUserdata {}
+
+    let rc = Rc::new(());
+
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        lua.globals()
+            .set(
+                "test",
+                scope.create_userdata(MyUserdata(rc.clone())).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(Rc::strong_count(&rc), 2);
+    });
+    assert_eq!(Rc::strong_count(&rc), 1);
+}
+
+#[test]
+fn scope_capture() {
+    let mut i = 0;
+
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        scope
+            .create_function(|_, ()| {
+                i = 42;
+                Ok(())
+            })
+            .unwrap()
+            .call::<_, ()>(())
+            .unwrap();
+    });
+    assert_eq!(i, 42);
+}
+
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.
 /*
 #[test]
@@ -619,5 +687,15 @@ fn should_not_compile() {
     globals.set("boom", lua.create_function(|_, _| {
         lua.eval::<i32>("1 + 1", None)
     })).unwrap();
+
+    // Should not allow Scope references to leak
+    struct MyUserdata(Rc<()>);
+    impl UserData for MyUserdata {}
+
+    let lua = Lua::new();
+    let mut r = None;
+    lua.scope(|scope| {
+    r = Some(scope.create_userdata(MyUserdata(Rc::new(()))).unwrap());
+        });
 }
 */

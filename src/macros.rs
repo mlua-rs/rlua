@@ -6,48 +6,54 @@ macro_rules! cstr {
 
 // A panic that clears the given lua stack before panicking
 macro_rules! lua_panic {
-    ($state:expr) => {
-        {
-            $crate::ffi::lua_settor($state, 0);
-            panic!("rlua internal error");
-        }
-    };
-
     ($state:expr, $msg:expr) => {
         {
             $crate::ffi::lua_settop($state, 0);
-            panic!(concat!("rlua internal error: ", $msg));
+            panic!($msg);
         }
     };
 
-    ($state:expr, $fmt:expr, $($arg:tt)+) => {
+    ($state:expr, $msg:expr, $($arg:tt)+) => {
         {
             $crate::ffi::lua_settop($state, 0);
-            panic!(concat!("rlua internal error: ", $fmt), $($arg)+);
+            panic!($msg, $($arg)+);
         }
     };
 }
 
 // An assert that clears the given lua stack before panicking
 macro_rules! lua_assert {
-    ($state:expr, $cond:expr) => {
-        if !$cond {
-            $crate::ffi::lua_settop($state, 0);
-            panic!("rlua internal error");
-        }
-    };
-
     ($state:expr, $cond:expr, $msg:expr) => {
         if !$cond {
             $crate::ffi::lua_settop($state, 0);
-            panic!(concat!("rlua internal error: ", $msg));
+            panic!($msg);
         }
     };
 
-    ($state:expr, $cond:expr, $fmt:expr, $($arg:tt)+) => {
+    ($state:expr, $cond:expr, $msg:expr, $($arg:tt)+) => {
         if !$cond {
             $crate::ffi::lua_settop($state, 0);
-            panic!(concat!("rlua internal error: ", $fmt), $($arg)+);
+            panic!($msg, $($arg)+);
         }
+    };
+}
+
+macro_rules! lua_internal_panic {
+    ($state:expr, $msg:expr) => {
+        lua_panic!($state, concat!("rlua internal error: ", $msg));
+    };
+
+    ($state:expr, $msg:expr, $($arg:tt)+) => {
+        lua_panic!($state, concat!("rlua internal error: ", $msg), $($arg)+);
+    };
+}
+
+macro_rules! lua_internal_assert {
+    ($state:expr, $cond:expr, $msg:expr) => {
+        lua_assert!($state, $cond, concat!("rlua internal error: ", $msg));
+    };
+
+    ($state:expr, $cond:expr, $msg:expr, $($arg:tt)+) => {
+        lua_assert!($state, $cond, concat!("rlua internal error: ", $msg), $($arg)+);
     };
 }

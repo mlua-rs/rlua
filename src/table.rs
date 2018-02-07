@@ -266,6 +266,7 @@ impl<'lua> Table<'lua> {
         let next_key = Some(LuaRef {
             lua: self.0.lua,
             registry_id: ffi::LUA_REFNIL,
+            drop_unref: true,
         });
 
         TablePairs {
