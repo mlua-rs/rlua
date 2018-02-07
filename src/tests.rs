@@ -527,7 +527,7 @@ fn test_registry_value() {
     let f = lua.create_function(move |lua, ()| {
         if let Some(r) = r.take() {
             assert_eq!(lua.registry_value::<i32>(&r)?, 42);
-            lua.remove_registry_value(r);
+            lua.remove_registry_value(r).unwrap();
         } else {
             panic!();
         }
