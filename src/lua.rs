@@ -1101,10 +1101,12 @@ impl<'lua> Drop for Scope<'lua> {
         // can be sure that all of the userdata in Lua is actually invalidated.
 
         let state = self.lua.state;
-        let mut drops = Vec::new();
-        for mut destructor in self.destructors.get_mut().drain(..) {
-            drops.push(destructor(state));
-        }
+        let to_drop = self.destructors
+            .get_mut()
+            .drain(..)
+            .map(|mut destructor| destructor(state))
+            .collect::<Vec<_>>();
+        drop(to_drop);
     }
 }
 
