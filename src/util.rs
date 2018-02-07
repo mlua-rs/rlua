@@ -250,16 +250,22 @@ pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut 
 
 pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
     callback_error(state, || {
-        // We set the metatable of userdata on __gc to a special table with no __gc method and with
-        // metamethods that trigger an error on access.  We do this so that it will not be double
-        // dropped, and also so that it cannot be used or identified as any particular userdata type
-        // after the first call to __gc.
-        get_gc_userdata_metatable(state);
-        ffi::lua_setmetatable(state, -2);
-        let ud = &mut *(ffi::lua_touserdata(state, 1) as *mut T);
-        mem::replace(ud, mem::uninitialized());
+        destruct_userdata::<T>(state);
         Ok(0)
     })
+}
+
+// Pops the userdata off of the top of the stack and drops it
+pub unsafe fn destruct_userdata<T>(state: *mut ffi::lua_State) {
+    // We set the metatable of userdata on __gc to a special table with no __gc method and with
+    // metamethods that trigger an error on access.  We do this so that it will not be double
+    // dropped, and also so that it cannot be used or identified as any particular userdata type
+    // after the first call to __gc.
+    get_destructed_userdata_metatable(state);
+    ffi::lua_setmetatable(state, -2);
+    let ud = &mut *(ffi::lua_touserdata(state, -1) as *mut T);
+    ffi::lua_pop(state, 1);
+    mem::replace(ud, mem::uninitialized());
 }
 
 // In the context of a lua callback, this will call the given function and if the given function
@@ -517,7 +523,7 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
         state,
         &ERROR_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
     );
-    let t = ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX);
+    let t = ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
 
     if t != ffi::LUA_TTABLE {
         ffi::lua_pop(state, 1);
@@ -558,7 +564,7 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
         state,
         &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
     );
-    let t = ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX);
+    let t = ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
 
     if t != ffi::LUA_TTABLE {
         ffi::lua_pop(state, 1);
@@ -588,16 +594,19 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
     ffi::LUA_TTABLE
 }
 
-unsafe fn get_gc_userdata_metatable(state: *mut ffi::lua_State) -> c_int {
-    static GC_USERDATA_METATABLE: u8 = 0;
+unsafe fn get_destructed_userdata_metatable(state: *mut ffi::lua_State) -> c_int {
+    static DESTRUCTED_USERDATA_METATABLE: u8 = 0;
 
-    unsafe extern "C" fn gc_error(state: *mut ffi::lua_State) -> c_int {
-        ffi::lua_pushstring(state, cstr!("userdata has been garbage collected"));
+    unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
+        ffi::lua_pushstring(state, cstr!("userdata has been destructed"));
         ffi::lua_error(state)
     }
 
-    ffi::lua_pushlightuserdata(state, &GC_USERDATA_METATABLE as *const u8 as *mut c_void);
-    let t = ffi::lua_gettable(state, ffi::LUA_REGISTRYINDEX);
+    ffi::lua_pushlightuserdata(
+        state,
+        &DESTRUCTED_USERDATA_METATABLE as *const u8 as *mut c_void,
+    );
+    let t = ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
 
     if t != ffi::LUA_TTABLE {
         ffi::lua_pop(state, 1);
@@ -606,7 +615,10 @@ unsafe fn get_gc_userdata_metatable(state: *mut ffi::lua_State) -> c_int {
 
         gc_guard(state, || {
             ffi::lua_newtable(state);
-            ffi::lua_pushlightuserdata(state, &GC_USERDATA_METATABLE as *const u8 as *mut c_void);
+            ffi::lua_pushlightuserdata(
+                state,
+                &DESTRUCTED_USERDATA_METATABLE as *const u8 as *mut c_void,
+            );
             ffi::lua_pushvalue(state, -2);
 
             for &method in &[
@@ -637,7 +649,7 @@ unsafe fn get_gc_userdata_metatable(state: *mut ffi::lua_State) -> c_int {
                 cstr!("__ipairs"),
             ] {
                 ffi::lua_pushstring(state, method);
-                ffi::lua_pushcfunction(state, gc_error);
+                ffi::lua_pushcfunction(state, destructed_error);
                 ffi::lua_rawset(state, -3);
             }
 

@@ -89,7 +89,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
+        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
         self.methods
             .insert(name.to_owned(), Self::box_method(method));
@@ -104,7 +104,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
+        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
         self.methods
             .insert(name.to_owned(), Self::box_method_mut(method));
@@ -121,7 +121,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
     {
         self.methods
             .insert(name.to_owned(), Self::box_function(function));
@@ -139,7 +139,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
+        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
@@ -156,7 +156,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
+        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
@@ -170,7 +170,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_function(function));
     }
@@ -179,7 +179,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
     {
         Box::new(move |lua, args| function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua))
     }
@@ -188,7 +188,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
+        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
     {
         Box::new(move |lua, mut args| {
             if let Some(front) = args.pop_front() {
@@ -209,7 +209,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
+        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
         Box::new(move |lua, mut args| {
             if let Some(front) = args.pop_front() {
@@ -433,7 +433,7 @@ impl<'lua> AnyUserData<'lua> {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use super::{MetaMethod, UserData, UserDataMethods};
     use error::ExternalError;
@@ -590,11 +590,11 @@ mod tests {
 
     #[test]
     fn detroys_userdata() {
-        struct MyUserdata(Rc<()>);
+        struct MyUserdata(Arc<()>);
 
         impl UserData for MyUserdata {}
 
-        let rc = Rc::new(());
+        let rc = Arc::new(());
 
         let lua = Lua::new();
         {
@@ -602,9 +602,9 @@ mod tests {
             globals.set("userdata", MyUserdata(rc.clone())).unwrap();
         }
 
-        assert_eq!(Rc::strong_count(&rc), 2);
+        assert_eq!(Arc::strong_count(&rc), 2);
         drop(lua); // should destroy all objects
-        assert_eq!(Rc::strong_count(&rc), 1);
+        assert_eq!(Arc::strong_count(&rc), 1);
     }
 
     #[test]
