@@ -370,7 +370,7 @@ impl<'lua> AnyUserData<'lua> {
 
                 lua.push_ref(lua.state, &self.0);
 
-                lua_assert!(
+                lua_internal_assert!(
                     lua.state,
                     ffi::lua_getmetatable(lua.state, -1) != 0,
                     "AnyUserData missing metatable"
