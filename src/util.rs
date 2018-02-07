@@ -248,15 +248,9 @@ pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut 
     ud
 }
 
-pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
-    callback_error(state, || {
-        destruct_userdata::<T>(state);
-        Ok(0)
-    })
-}
-
-// Pops the userdata off of the top of the stack and drops it
-pub unsafe fn destruct_userdata<T>(state: *mut ffi::lua_State) {
+// Pops the userdata off of the top of the stack and returns it to rust, invalidating the lua
+// userdata.
+pub unsafe fn take_userdata<T>(state: *mut ffi::lua_State) -> T {
     // We set the metatable of userdata on __gc to a special table with no __gc method and with
     // metamethods that trigger an error on access.  We do this so that it will not be double
     // dropped, and also so that it cannot be used or identified as any particular userdata type
@@ -265,7 +259,14 @@ pub unsafe fn destruct_userdata<T>(state: *mut ffi::lua_State) {
     ffi::lua_setmetatable(state, -2);
     let ud = &mut *(ffi::lua_touserdata(state, -1) as *mut T);
     ffi::lua_pop(state, 1);
-    mem::replace(ud, mem::uninitialized());
+    mem::replace(ud, mem::uninitialized())
+}
+
+pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
+    callback_error(state, || {
+        take_userdata::<T>(state);
+        Ok(0)
+    })
 }
 
 // In the context of a lua callback, this will call the given function and if the given function

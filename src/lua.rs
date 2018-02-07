@@ -3,11 +3,10 @@ use std::sync::{Arc, Mutex};
 use std::ops::DerefMut;
 use std::cell::RefCell;
 use std::ffi::CString;
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_int, c_void};
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use libc;
 
@@ -33,7 +32,7 @@ pub struct Lua {
 /// !Send, and callbacks that are !Send and not 'static.
 pub struct Scope<'lua> {
     lua: &'lua Lua,
-    destructors: RefCell<Vec<Box<FnMut(*mut ffi::lua_State)>>>,
+    destructors: RefCell<Vec<Box<FnMut(*mut ffi::lua_State) -> Box<Any>>>>,
 }
 
 // Data associated with the main lua_State via lua_getextraspace.
@@ -1060,12 +1059,13 @@ impl<'lua> Scope<'lua> {
                     registry_id as ffi::lua_Integer,
                 );
                 ffi::lua_getupvalue(state, -1, 1);
-                destruct_userdata::<RefCell<Callback>>(state);
+                let ud = take_userdata::<RefCell<Callback>>(state);
 
                 ffi::lua_pushnil(state);
                 ffi::lua_setupvalue(state, -2, 1);
 
                 ffi::lua_pop(state, 1);
+                Box::new(ud)
             }));
             Ok(f)
         }
@@ -1087,7 +1087,7 @@ impl<'lua> Scope<'lua> {
                     ffi::LUA_REGISTRYINDEX,
                     registry_id as ffi::lua_Integer,
                 );
-                destruct_userdata::<RefCell<T>>(state);
+                Box::new(take_userdata::<RefCell<T>>(state))
             }));
             Ok(u)
         }
@@ -1096,15 +1096,14 @@ impl<'lua> Scope<'lua> {
 
 impl<'lua> Drop for Scope<'lua> {
     fn drop(&mut self) {
+        // We separate the action of invalidating the userdata in Lua and actually dropping the
+        // userdata type into two phases.  This is so that, in the event a userdata drop panics, we
+        // can be sure that all of the userdata in Lua is actually invalidated.
+
         let state = self.lua.state;
+        let mut drops = Vec::new();
         for mut destructor in self.destructors.get_mut().drain(..) {
-            match catch_unwind(AssertUnwindSafe(move || destructor(state))) {
-                Ok(_) => {}
-                Err(_) => {
-                    eprintln!("Scope userdata Drop impl has panicked, aborting!");
-                    process::abort()
-                }
-            }
+            drops.push(destructor(state));
         }
     }
 }
