@@ -40,7 +40,7 @@ impl Drop for RegistryKey {
 }
 
 pub(crate) type Callback<'lua> =
-    Box<FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'lua>;
+    Box<FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>>;
 
 pub(crate) struct LuaRef<'lua> {
     pub lua: &'lua Lua,

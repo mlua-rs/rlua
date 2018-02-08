@@ -30,10 +30,11 @@ pub struct Lua {
 
 /// Constructed by the `Lua::scope` method, allows temporarily passing to Lua userdata that is
 /// !Send, and callbacks that are !Send and not 'static.
-pub struct Scope<'scope> {
-    lua: &'scope Lua,
+pub struct Scope<'lua, 'scope> {
+    lua: &'lua Lua,
     destructors: RefCell<Vec<Box<FnMut(*mut ffi::lua_State) -> Box<Any>>>>,
-    _phantom: PhantomData<RefCell<&'scope ()>>,
+    // 'scope lifetime must be invariant
+    _phantom: PhantomData<&'scope mut &'scope ()>,
 }
 
 // Data associated with the main lua_State via lua_getextraspace.
@@ -313,6 +314,7 @@ impl Lua {
 
     /// Calls the given function with a `Scope` parameter, giving the function the ability to create
     /// userdata from rust types that are !Send, and rust callbacks that are !Send and not 'static.
+    ///
     /// The lifetime of any function or userdata created through `Scope` lasts only until the
     /// completion of this method call, on completion all such created values are automatically
     /// dropped and Lua references to them are invalidated.  If a script accesses a value created
@@ -320,16 +322,23 @@ impl Lua {
     /// lifetime of values created through `Scope`, and we know that `Lua` cannot be sent to another
     /// thread while `Scope` is live, it is safe to allow !Send datatypes and functions whose
     /// lifetimes only outlive the scope lifetime.
-    pub fn scope<'scope, F, R>(&'scope self, f: F) -> R
+    ///
+    /// To make the lifetimes work out, handles that `Lua::scope` produces have the `'lua` lifetime
+    /// of the parent `Lua` instance.  This allows the handles to scoped values to escape the
+    /// callback, but this was possible anyway by going through Lua itself.  This is safe to do, but
+    /// not useful, because after the scope is dropped, all references to scoped values, whether in
+    /// Lua or in rust, are invalidated.  `Function` types will error when called, and `AnyUserData`
+    /// types will be typeless.
+    pub fn scope<'lua, 'scope, F, R>(&'lua self, f: F) -> R
     where
-        F: FnOnce(&mut Scope<'scope>) -> R,
+        F: FnOnce(&Scope<'lua, 'scope>) -> R,
     {
-        let mut scope = Scope {
+        let scope = Scope {
             lua: self,
             destructors: RefCell::new(Vec::new()),
             _phantom: PhantomData,
         };
-        let r = f(&mut scope);
+        let r = f(&scope);
         drop(scope);
         r
     }
@@ -1038,18 +1047,21 @@ impl Lua {
     }
 }
 
-impl<'scope> Scope<'scope> {
-    pub fn create_function<A, R, F>(&self, mut func: F) -> Result<Function<'scope>>
+impl<'lua, 'scope> Scope<'lua, 'scope> {
+    pub fn create_function<A, R, F>(&self, mut func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'scope>,
-        R: ToLuaMulti<'scope>,
-        F: 'scope + FnMut(&'scope Lua, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'scope + FnMut(&'lua Lua, A) -> Result<R>,
     {
         unsafe {
-            let mut f = self.lua
-                .create_callback_function(Box::new(move |lua, args| {
-                    func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-                }))?;
+            let f: Box<FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>> = Box::new(
+                move |lua, args| func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua),
+            );
+
+            // SCARY, we are transmuting away the 'static requirement
+            let mut f = self.lua.create_callback_function(mem::transmute(f))?;
+
             f.0.drop_unref = false;
             let mut destructors = self.destructors.borrow_mut();
             let registry_id = f.0.registry_id;
@@ -1073,7 +1085,7 @@ impl<'scope> Scope<'scope> {
         }
     }
 
-    pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData<'scope>>
+    pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: UserData,
     {
@@ -1096,7 +1108,7 @@ impl<'scope> Scope<'scope> {
     }
 }
 
-impl<'scope> Drop for Scope<'scope> {
+impl<'lua, 'scope> Drop for Scope<'lua, 'scope> {
     fn drop(&mut self) {
         // We separate the action of invalidating the userdata in Lua and actually dropping the
         // userdata type into two phases.  This is so that, in the event a userdata drop panics, we
