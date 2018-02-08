@@ -30,8 +30,8 @@ pub struct Lua {
 
 /// Constructed by the `Lua::scope` method, allows temporarily passing to Lua userdata that is
 /// !Send, and callbacks that are !Send and not 'static.
-pub struct Scope<'lua> {
-    lua: &'lua Lua,
+pub struct Scope<'scope> {
+    lua: &'scope Lua,
     destructors: RefCell<Vec<Box<FnMut(*mut ffi::lua_State) -> Box<Any>>>>,
 }
 
@@ -319,9 +319,9 @@ impl Lua {
     /// lifetime of values created through `Scope`, and we know that `Lua` cannot be sent to another
     /// thread while `Scope` is live, it is safe to allow !Send datatypes and functions whose
     /// lifetimes only outlive the scope lifetime.
-    pub fn scope<'lua, F, R>(&'lua self, f: F) -> R
+    pub fn scope<'scope, F, R>(&'scope self, f: F) -> R
     where
-        F: FnOnce(&mut Scope<'lua>) -> R,
+        F: FnOnce(&mut Scope<'scope>) -> R,
     {
         let mut scope = Scope {
             lua: self,
@@ -1036,8 +1036,8 @@ impl Lua {
     }
 }
 
-impl<'lua> Scope<'lua> {
-    pub fn create_function<'scope, A, R, F>(&'scope self, mut func: F) -> Result<Function<'scope>>
+impl<'scope> Scope<'scope> {
+    pub fn create_function<A, R, F>(&self, mut func: F) -> Result<Function<'scope>>
     where
         A: FromLuaMulti<'scope>,
         R: ToLuaMulti<'scope>,
@@ -1071,7 +1071,7 @@ impl<'lua> Scope<'lua> {
         }
     }
 
-    pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData>
+    pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData<'scope>>
     where
         T: UserData,
     {
@@ -1094,7 +1094,7 @@ impl<'lua> Scope<'lua> {
     }
 }
 
-impl<'lua> Drop for Scope<'lua> {
+impl<'scope> Drop for Scope<'scope> {
     fn drop(&mut self) {
         // We separate the action of invalidating the userdata in Lua and actually dropping the
         // userdata type into two phases.  This is so that, in the event a userdata drop panics, we

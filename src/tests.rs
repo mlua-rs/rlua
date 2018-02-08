@@ -695,7 +695,24 @@ fn should_not_compile() {
     let lua = Lua::new();
     let mut r = None;
     lua.scope(|scope| {
-    r = Some(scope.create_userdata(MyUserdata(Rc::new(()))).unwrap());
-        });
+        r = Some(scope.create_userdata(MyUserdata(Rc::new(()))).unwrap());
+    });
+
+    struct Test {
+        field: i32,
+    }
+
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        let mut test = Test { field: 0 };
+
+        let f = scope
+            .create_function(|_, ()| {
+                test.field = 42;
+                Ok(())
+            })
+            .unwrap();
+        lua.globals().set("bad!", f).unwrap();
+    });
 }
 */
