@@ -33,6 +33,7 @@ pub struct Lua {
 pub struct Scope<'scope> {
     lua: &'scope Lua,
     destructors: RefCell<Vec<Box<FnMut(*mut ffi::lua_State) -> Box<Any>>>>,
+    _phantom: PhantomData<RefCell<&'scope ()>>,
 }
 
 // Data associated with the main lua_State via lua_getextraspace.
@@ -326,6 +327,7 @@ impl Lua {
         let mut scope = Scope {
             lua: self,
             destructors: RefCell::new(Vec::new()),
+            _phantom: PhantomData,
         };
         let r = f(&mut scope);
         drop(scope);
