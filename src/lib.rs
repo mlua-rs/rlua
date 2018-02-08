@@ -72,6 +72,6 @@ pub use function::Function;
 pub use thread::{Thread, ThreadStatus};
 pub use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 pub use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-pub use lua::Lua;
+pub use lua::{Lua, Scope};
 
 pub mod prelude;

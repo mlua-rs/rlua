@@ -5,7 +5,7 @@ pub use {AnyUserData as LuaAnyUserData, Error as LuaError, ExternalError as LuaE
          Integer as LuaInteger, LightUserData as LuaLightUserData, Lua,
          MetaMethod as LuaMetaMethod, MultiValue as LuaMultiValue, Nil as LuaNil,
          Number as LuaNumber, RegistryKey as LuaRegistryKey, Result as LuaResult,
-         String as LuaString, Table as LuaTable, TablePairs as LuaTablePairs,
+         Scope as LuaScope, String as LuaString, Table as LuaTable, TablePairs as LuaTablePairs,
          TableSequence as LuaTableSequence, Thread as LuaThread, ThreadStatus as LuaThreadStatus,
          ToLua, ToLuaMulti, UserData as LuaUserData, UserDataMethods as LuaUserDataMethods,
          Value as LuaValue};
