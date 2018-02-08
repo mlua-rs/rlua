@@ -34,7 +34,7 @@ pub struct Scope<'lua, 'scope> {
     lua: &'lua Lua,
     destructors: RefCell<Vec<Box<FnMut(*mut ffi::lua_State) -> Box<Any>>>>,
     // 'scope lifetime must be invariant
-    _phantom: PhantomData<&'scope mut &'scope ()>,
+    _scope: PhantomData<&'scope mut &'scope ()>,
 }
 
 // Data associated with the main lua_State via lua_getextraspace.
@@ -265,11 +265,14 @@ impl Lua {
     ///
     /// [`ToLua`]: trait.ToLua.html
     /// [`ToLuaMulti`]: trait.ToLuaMulti.html
-    pub fn create_function<'lua, A, R, F>(&'lua self, mut func: F) -> Result<Function<'lua>>
+    pub fn create_function<'lua, 'callback, A, R, F>(
+        &'lua self,
+        mut func: F,
+    ) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+        A: FromLuaMulti<'callback>,
+        R: ToLuaMulti<'callback>,
+        F: 'static + Send + FnMut(&'callback Lua, A) -> Result<R>,
     {
         self.create_callback_function(Box::new(move |lua, args| {
             func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
@@ -336,7 +339,7 @@ impl Lua {
         let scope = Scope {
             lua: self,
             destructors: RefCell::new(Vec::new()),
-            _phantom: PhantomData,
+            _scope: PhantomData,
         };
         let r = f(&scope);
         drop(scope);
@@ -958,7 +961,10 @@ impl Lua {
         }
     }
 
-    fn create_callback_function<'lua>(&'lua self, func: Callback<'lua>) -> Result<Function<'lua>> {
+    fn create_callback_function<'lua, 'callback>(
+        &'lua self,
+        func: Callback<'callback>,
+    ) -> Result<Function<'lua>> {
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
             if ffi::lua_type(state, ffi::lua_upvalueindex(1)) == ffi::LUA_TNIL {
                 ffi::lua_pushstring(state, cstr!("rust callback has been destructed"));
@@ -1048,16 +1054,18 @@ impl Lua {
 }
 
 impl<'lua, 'scope> Scope<'lua, 'scope> {
-    pub fn create_function<A, R, F>(&self, mut func: F) -> Result<Function<'lua>>
+    pub fn create_function<'callback, A, R, F>(&self, mut func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'scope + FnMut(&'lua Lua, A) -> Result<R>,
+        A: FromLuaMulti<'callback>,
+        R: ToLuaMulti<'callback>,
+        F: 'scope + FnMut(&'callback Lua, A) -> Result<R>,
     {
         unsafe {
-            let f: Box<FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>> = Box::new(
-                move |lua, args| func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua),
-            );
+            let f: Box<
+                FnMut(&'callback Lua, MultiValue<'callback>) -> Result<MultiValue<'callback>>,
+            > = Box::new(move |lua, args| {
+                func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+            });
 
             // SCARY, we are transmuting away the 'static requirement
             let mut f = self.lua.create_callback_function(mem::transmute(f))?;
