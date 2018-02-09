@@ -614,6 +614,7 @@ fn scope_func() {
             .unwrap();
         lua.globals().set("bad", f.clone()).unwrap();
         f.call::<_, ()>(()).unwrap();
+        assert_eq!(Rc::strong_count(&rc), 2);
     });
     assert_eq!(rc.get(), 42);
     assert_eq!(Rc::strong_count(&rc), 1);

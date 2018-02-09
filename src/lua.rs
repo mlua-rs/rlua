@@ -1080,6 +1080,8 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
                     ffi::LUA_REGISTRYINDEX,
                     registry_id as ffi::lua_Integer,
                 );
+                ffi::luaL_unref(state, ffi::LUA_REGISTRYINDEX, registry_id);
+
                 ffi::lua_getupvalue(state, -1, 1);
                 let ud = take_userdata::<RefCell<Callback>>(state);
 
@@ -1109,6 +1111,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
                     ffi::LUA_REGISTRYINDEX,
                     registry_id as ffi::lua_Integer,
                 );
+                ffi::luaL_unref(state, ffi::LUA_REGISTRYINDEX, registry_id);
                 Box::new(take_userdata::<RefCell<T>>(state))
             }));
             Ok(u)
