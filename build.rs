@@ -21,10 +21,9 @@ fn main() {
             config.define("LUA_USE_WINDOWS", None);
         }
 
-        // Enables lua api checking, which has a slight performance penalty.  We
-        // could allow disabling this via cfg one day when there is much more
-        // confidence in the soundness of the API.
-        config.define("LUA_USE_APICHECK", None);
+        if cfg!(debug_assertions) || !cfg!(feature = "disable-lua-apicheck") {
+            config.define("LUA_USE_APICHECK", None);
+        }
 
         config
             .include("lua")

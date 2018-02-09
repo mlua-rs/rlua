@@ -24,25 +24,29 @@ pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F
 where
     F: FnOnce() -> R,
 {
-    let expected = ffi::lua_gettop(state) + change;
-    lua_internal_assert!(
-        state,
-        expected >= 0,
-        "too many stack values would be popped"
-    );
+    if cfg!(debug_assertions) {
+        let expected = ffi::lua_gettop(state) + change;
+        lua_internal_assert!(
+            state,
+            expected >= 0,
+            "too many stack values would be popped"
+        );
 
-    let res = op();
+        let res = op();
 
-    let top = ffi::lua_gettop(state);
-    lua_internal_assert!(
-        state,
-        ffi::lua_gettop(state) == expected,
-        "expected stack to be {}, got {}",
-        expected,
-        top
-    );
+        let top = ffi::lua_gettop(state);
+        lua_internal_assert!(
+            state,
+            ffi::lua_gettop(state) == expected,
+            "expected stack to be {}, got {}",
+            expected,
+            top
+        );
 
-    res
+        res
+    } else {
+        op()
+    }
 }
 
 // Run an operation on a lua_State and automatically clean up the stack before
@@ -58,37 +62,45 @@ pub unsafe fn stack_err_guard<F, R>(state: *mut ffi::lua_State, change: c_int, o
 where
     F: FnOnce() -> Result<R>,
 {
-    let expected = ffi::lua_gettop(state) + change;
-    lua_internal_assert!(
-        state,
-        expected >= 0,
-        "too many stack values would be popped"
-    );
-
-    let res = op();
-
-    let top = ffi::lua_gettop(state);
-    if res.is_ok() {
+    if cfg!(debug_assertions) {
+        let expected = ffi::lua_gettop(state) + change;
         lua_internal_assert!(
             state,
-            ffi::lua_gettop(state) == expected,
-            "expected stack to be {}, got {}",
-            expected,
-            top
+            expected >= 0,
+            "too many stack values would be popped"
         );
-    } else {
-        lua_internal_assert!(
-            state,
-            top >= expected,
-            "{} too many stack values popped",
-            top - expected
-        );
-        if top > expected {
-            ffi::lua_settop(state, expected);
+
+        let res = op();
+
+        let top = ffi::lua_gettop(state);
+        if res.is_ok() {
+            lua_internal_assert!(
+                state,
+                ffi::lua_gettop(state) == expected,
+                "expected stack to be {}, got {}",
+                expected,
+                top
+            );
+        } else {
+            lua_internal_assert!(
+                state,
+                top >= expected,
+                "{} too many stack values popped",
+                top - expected
+            );
+            if top > expected {
+                ffi::lua_settop(state, expected);
+            }
         }
+        res
+    } else {
+        let prev = ffi::lua_gettop(state) + change;
+        let res = op();
+        if res.is_err() {
+            ffi::lua_settop(state, prev);
+        }
+        res
     }
-
-    res
 }
 
 // Call a function that calls into the Lua API and may trigger a Lua error (longjmp) in a safe way.
