@@ -7,6 +7,5 @@ matrix:
     - rust: beta
     - rust: nightly 
       script: cargo test --features compiletest_rs
-matrix:
   allow_failures:
     - rust: nightly
