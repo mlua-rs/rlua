@@ -13,13 +13,13 @@ as possible, while also being completely safe.
 `rlua` is designed around "registry handles" to values inside the Lua state.
 This means that when you get a type like `rlua::Table` or `rlua::Function` in
 Rust, what you actually hold is an integer key into the Lua registry.  This is
-also different from the bare Lua C API, where you create tables / functions on
-the Lua stack and must be aware of their location.  This is also similar to how
-other Lua bindings systems like [Selene](https://github.com/jeremyong/Selene)
-for C++ work, but it means that using `rlua` may be slightly slower than what
-you could conceivably write using the C API.  This is done for reasons of safety
-and flexibility, and to prevent the user of `rlua` from having to be aware of
-the Lua stack at all.
+different from the bare Lua C API, where you create tables / functions on the
+Lua stack and must be aware of their stack location.  This is also similar to
+how other Lua bindings systems like
+[Selene](https://github.com/jeremyong/Selene) for C++ work, but it means that
+using `rlua` may be slightly slower than what you could conceivably write using
+the C API.  The reasons for this design are safety and flexibility, and to
+prevent the user of `rlua` from having to be aware of the Lua stack at all.
 
 There are currently a few missing pieces of this API:
 
