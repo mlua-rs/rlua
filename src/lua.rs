@@ -51,8 +51,7 @@ impl Drop for Lua {
                 if cfg!(test) {
                     let top = ffi::lua_gettop(self.state);
                     if top != 0 {
-                        eprintln!("Lua stack leak detected, stack top is {}", top);
-                        process::abort()
+                        lua_internal_abort!("Lua stack leak detected, stack top is {}", top);
                     }
                 }
 
@@ -894,8 +893,7 @@ impl Lua {
                     // not really a huge loss.  Importantly, this allows us to turn off the gc, and
                     // then know that calling Lua API functions marked as 'm' will not result in a
                     // 'longjmp' error while the gc is off.
-                    eprintln!("Out of memory in Lua allocation, aborting!");
-                    process::abort()
+                    lua_abort!("out of memory in Lua allocation, aborting!");
                 } else {
                     p as *mut c_void
                 }

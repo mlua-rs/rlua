@@ -226,8 +226,7 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
             ffi::LUA_ERRMEM => {
                 // This should be impossible, as we set the lua allocator to one that aborts
                 // instead of failing.
-                eprintln!("impossible Lua allocation error, aborting!");
-                process::abort()
+                lua_internal_abort!("impossible Lua allocation error, aborting!")
             }
             ffi::LUA_ERRGCMM => Error::GarbageCollectorError(err_string),
             _ => lua_internal_panic!(state, "unrecognized lua error code"),

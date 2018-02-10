@@ -38,6 +38,22 @@ macro_rules! lua_assert {
     };
 }
 
+macro_rules! lua_abort {
+    ($msg:expr) => {
+        {
+            eprintln!($msg);
+            ::std::process::abort()
+        }
+    };
+
+    ($msg:expr, $($arg:tt)+) => {
+        {
+            eprintln!($msg, $($arg)+);
+            ::std::process::abort()
+        }
+    };
+}
+
 macro_rules! lua_internal_panic {
     ($state:expr, $msg:expr) => {
         lua_panic!($state, concat!("rlua internal error: ", $msg));
@@ -55,5 +71,19 @@ macro_rules! lua_internal_assert {
 
     ($state:expr, $cond:expr, $msg:expr, $($arg:tt)+) => {
         lua_assert!($state, $cond, concat!("rlua internal error: ", $msg), $($arg)+);
+    };
+}
+
+macro_rules! lua_internal_abort {
+    ($msg:expr) => {
+        {
+            lua_abort!(concat!("rlua internal error: ", $msg));
+        }
+    };
+
+    ($msg:expr, $($arg:tt)+) => {
+        {
+            lua_abort!(concat!("rlua internal error, aborting!: ", $msg), $($arg)+);
+        }
     };
 }
