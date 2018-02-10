@@ -93,7 +93,7 @@ impl<'lua> Thread<'lua> {
 
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
-                check_stack(thread_state, nargs);
+                check_stack_err(thread_state, nargs + 1)?;
 
                 for arg in args {
                     lua.push_value(thread_state, arg);

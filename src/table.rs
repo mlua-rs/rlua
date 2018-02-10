@@ -125,7 +125,7 @@ impl<'lua> Table<'lua> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
-                check_stack(lua.state, 3);
+                check_stack(lua.state, 6);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
                 lua.push_value(lua.state, value.to_lua(lua)?);
@@ -142,7 +142,7 @@ impl<'lua> Table<'lua> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
-                check_stack(lua.state, 2);
+                check_stack(lua.state, 3);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
                 ffi::lua_rawget(lua.state, -2);

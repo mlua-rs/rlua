@@ -8,14 +8,24 @@ use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
 use ffi;
 use error::{Error, Result};
 
-// Checks that Lua has enough free stack space for future stack operations.
-// On failure, this will clear the stack and panic.
+// Checks that Lua has enough free stack space for future stack operations.  On failure, this will
+// clear the stack and panic.
 pub unsafe fn check_stack(state: *mut ffi::lua_State, amount: c_int) {
     lua_internal_assert!(
         state,
         ffi::lua_checkstack(state, amount) != 0,
         "out of stack space"
     );
+}
+
+// Similar to `check_stack`, but returns `Error::StackError` on failure.  Useful for user controlled
+// sizes, which should not cause a panic.
+pub unsafe fn check_stack_err(state: *mut ffi::lua_State, amount: c_int) -> Result<()> {
+    if ffi::lua_checkstack(state, amount) == 0 {
+        Err(Error::StackError)
+    } else {
+        Ok(())
+    }
 }
 
 // Run an operation on a lua_State and check that the stack change is what is
@@ -279,10 +289,12 @@ where
     match catch_unwind(f) {
         Ok(Ok(r)) => r,
         Ok(Err(err)) => {
+            ffi::luaL_checkstack(state, 2, ptr::null());
             push_wrapped_error(state, err);
             ffi::lua_error(state)
         }
         Err(p) => {
+            ffi::luaL_checkstack(state, 2, ptr::null());
             push_wrapped_panic(state, p);
             ffi::lua_error(state)
         }
@@ -293,6 +305,8 @@ where
 // Error::CallbackError with a traceback, if it is some lua type, prints the error along with a
 // traceback, and if it is a WrappedPanic, does not modify it.
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
+    ffi::luaL_checkstack(state, 2, ptr::null());
+
     if let Some(error) = pop_wrapped_error(state) {
         ffi::luaL_traceback(state, state, ptr::null(), 0);
         let traceback = CStr::from_ptr(ffi::lua_tostring(state, -1))
@@ -386,10 +400,9 @@ pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
     main_state
 }
 
-// Pushes a WrappedError::Error to the top of the stack
+// Pushes a WrappedError::Error to the top of the stack.  Uses two stack spaces and does not call
+// lua_checkstack.
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
-    ffi::luaL_checkstack(state, 2, ptr::null());
-
     gc_guard(state, || {
         let ud = ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as *mut WrappedError;
         ptr::write(ud, WrappedError(err))
@@ -432,10 +445,9 @@ pub unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) ->
 struct WrappedError(pub Error);
 struct WrappedPanic(pub Option<Box<Any + Send>>);
 
-// Pushes a WrappedError::Panic to the top of the stack
+// Pushes a WrappedError::Panic to the top of the stack.  Uses two stack spaces and does not call
+// lua_checkstack.
 unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>) {
-    ffi::luaL_checkstack(state, 2, ptr::null());
-
     gc_guard(state, || {
         let ud = ffi::lua_newuserdata(state, mem::size_of::<WrappedPanic>()) as *mut WrappedPanic;
         ptr::write(ud, WrappedPanic(Some(panic)))
@@ -598,6 +610,7 @@ unsafe fn get_destructed_userdata_metatable(state: *mut ffi::lua_State) -> c_int
     static DESTRUCTED_USERDATA_METATABLE: u8 = 0;
 
     unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
+        ffi::luaL_checkstack(state, 2, ptr::null());
         push_wrapped_error(state, Error::CallbackDestructed);
         ffi::lua_error(state)
     }

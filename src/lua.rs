@@ -1,6 +1,5 @@
 use std::{mem, process, ptr, str};
 use std::sync::{Arc, Mutex};
-use std::ops::DerefMut;
 use std::cell::RefCell;
 use std::ffi::CString;
 use std::any::{Any, TypeId};
@@ -32,7 +31,7 @@ pub struct Lua {
 /// !Send, and callbacks that are !Send and not 'static.
 pub struct Scope<'lua, 'scope> {
     lua: &'lua Lua,
-    destructors: RefCell<Vec<Box<FnMut(*mut ffi::lua_State) -> Box<Any>>>>,
+    destructors: RefCell<Vec<Box<Fn(*mut ffi::lua_State) -> Box<Any>>>>,
     // 'scope lifetime must be invariant
     _scope: PhantomData<&'scope mut &'scope ()>,
 }
@@ -265,18 +264,31 @@ impl Lua {
     ///
     /// [`ToLua`]: trait.ToLua.html
     /// [`ToLuaMulti`]: trait.ToLuaMulti.html
-    pub fn create_function<'lua, 'callback, A, R, F>(
+    pub fn create_function<'lua, 'callback, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
+    where
+        A: FromLuaMulti<'callback>,
+        R: ToLuaMulti<'callback>,
+        F: 'static + Send + Fn(&'callback Lua, A) -> Result<R>,
+    {
+        self.create_callback_function(Box::new(move |lua, args| {
+            func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+        }))
+    }
+
+    pub fn create_function_mut<'lua, 'callback, A, R, F>(
         &'lua self,
-        mut func: F,
+        func: F,
     ) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'callback>,
         R: ToLuaMulti<'callback>,
         F: 'static + Send + FnMut(&'callback Lua, A) -> Result<R>,
     {
-        self.create_callback_function(Box::new(move |lua, args| {
-            func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-        }))
+        let func = RefCell::new(func);
+        self.create_function(move |lua, args| {
+            (&mut *func.try_borrow_mut()
+                .map_err(|_| Error::RecursiveMutCallback)?)(lua, args)
+        })
     }
 
     /// Wraps a Lua function into a new thread (or coroutine).
@@ -354,7 +366,7 @@ impl Lua {
             Value::String(s) => Ok(s),
             v => unsafe {
                 stack_err_guard(self.state, 0, || {
-                    check_stack(self.state, 2);
+                    check_stack(self.state, 4);
                     let ty = v.type_name();
                     self.push_value(self.state, v);
                     let s =
@@ -383,7 +395,7 @@ impl Lua {
             Value::Integer(i) => Ok(i),
             v => unsafe {
                 stack_guard(self.state, 0, || {
-                    check_stack(self.state, 1);
+                    check_stack(self.state, 2);
                     let ty = v.type_name();
                     self.push_value(self.state, v);
                     let mut isint = 0;
@@ -412,7 +424,7 @@ impl Lua {
             Value::Number(n) => Ok(n),
             v => unsafe {
                 stack_guard(self.state, 0, || {
-                    check_stack(self.state, 1);
+                    check_stack(self.state, 2);
                     let ty = v.type_name();
                     self.push_value(self.state, v);
                     let mut isnum = 0;
@@ -511,7 +523,7 @@ impl Lua {
     pub fn create_registry_value<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> Result<RegistryKey> {
         unsafe {
             stack_guard(self.state, 0, || {
-                check_stack(self.state, 1);
+                check_stack(self.state, 2);
 
                 self.push_value(self.state, t.to_lua(self)?);
                 let registry_id = gc_guard(self.state, || {
@@ -592,7 +604,7 @@ impl Lua {
         }
     }
 
-    // Uses 1 stack space, does not call checkstack
+    // Uses 2 stack spaces, does not call checkstack
     pub(crate) unsafe fn push_value(&self, state: *mut ffi::lua_State, value: Value) {
         match value {
             Value::Nil => {
@@ -730,7 +742,7 @@ impl Lua {
         // Used if both an __index metamethod is set and regular methods, checks methods table
         // first, then __index metamethod.
         unsafe extern "C" fn meta_index_impl(state: *mut ffi::lua_State) -> c_int {
-            check_stack(state, 2);
+            ffi::luaL_checkstack(state, 2, ptr::null());
 
             ffi::lua_pushvalue(state, -1);
             ffi::lua_gettable(state, ffi::lua_upvalueindex(1));
@@ -922,7 +934,7 @@ impl Lua {
             ffi::lua_newtable(state);
 
             push_string(state, "__gc").unwrap();
-            ffi::lua_pushcfunction(state, userdata_destructor::<RefCell<Callback>>);
+            ffi::lua_pushcfunction(state, userdata_destructor::<Callback>);
             ffi::lua_rawset(state, -3);
 
             push_string(state, "__metatable").unwrap();
@@ -977,10 +989,7 @@ impl Lua {
                     return Err(Error::CallbackDestructed);
                 }
 
-                let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1));
-                let mut func = (*func)
-                    .try_borrow_mut()
-                    .map_err(|_| Error::RecursiveCallback)?;
+                let func = get_userdata::<Callback>(state, ffi::lua_upvalueindex(1));
 
                 let nargs = ffi::lua_gettop(state);
                 let mut args = MultiValue::new();
@@ -989,10 +998,10 @@ impl Lua {
                     args.push_front(lua.pop_value(state));
                 }
 
-                let results = func.deref_mut()(&lua, args)?;
+                let results = (*func)(&lua, args)?;
                 let nresults = results.len() as c_int;
 
-                check_stack(state, nresults);
+                check_stack_err(state, nresults)?;
 
                 for r in results {
                     lua.push_value(state, r);
@@ -1006,7 +1015,7 @@ impl Lua {
             stack_err_guard(self.state, 0, move || {
                 check_stack(self.state, 2);
 
-                push_userdata::<RefCell<Callback>>(self.state, RefCell::new(func))?;
+                push_userdata::<Callback>(self.state, func)?;
 
                 ffi::lua_pushlightuserdata(
                     self.state,
@@ -1053,15 +1062,15 @@ impl Lua {
 }
 
 impl<'lua, 'scope> Scope<'lua, 'scope> {
-    pub fn create_function<'callback, A, R, F>(&self, mut func: F) -> Result<Function<'lua>>
+    pub fn create_function<'callback, A, R, F>(&self, func: F) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'callback>,
         R: ToLuaMulti<'callback>,
-        F: 'scope + FnMut(&'callback Lua, A) -> Result<R>,
+        F: 'scope + Fn(&'callback Lua, A) -> Result<R>,
     {
         unsafe {
             let f: Box<
-                FnMut(&'callback Lua, MultiValue<'callback>) -> Result<MultiValue<'callback>>,
+                Fn(&'callback Lua, MultiValue<'callback>) -> Result<MultiValue<'callback>>,
             > = Box::new(move |lua, args| {
                 func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             });
@@ -1082,7 +1091,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
                 ffi::luaL_unref(state, ffi::LUA_REGISTRYINDEX, registry_id);
 
                 ffi::lua_getupvalue(state, -1, 1);
-                let ud = take_userdata::<RefCell<Callback>>(state);
+                let ud = take_userdata::<Callback>(state);
 
                 ffi::lua_pushnil(state);
                 ffi::lua_setupvalue(state, -2, 1);
@@ -1092,6 +1101,19 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
             }));
             Ok(f)
         }
+    }
+
+    pub fn create_function_mut<'callback, A, R, F>(&self, func: F) -> Result<Function<'lua>>
+    where
+        A: FromLuaMulti<'callback>,
+        R: ToLuaMulti<'callback>,
+        F: 'scope + FnMut(&'callback Lua, A) -> Result<R>,
+    {
+        let func = RefCell::new(func);
+        self.create_function(move |lua, args| {
+            (&mut *func.try_borrow_mut()
+                .map_err(|_| Error::RecursiveMutCallback)?)(lua, args)
+        })
     }
 
     pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
@@ -1128,7 +1150,7 @@ impl<'lua, 'scope> Drop for Scope<'lua, 'scope> {
         let to_drop = self.destructors
             .get_mut()
             .drain(..)
-            .map(|mut destructor| destructor(state))
+            .map(|destructor| destructor(state))
             .collect::<Vec<_>>();
         drop(to_drop);
     }

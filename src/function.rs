@@ -1,3 +1,4 @@
+use std::ptr;
 use std::os::raw::c_int;
 
 use ffi;
@@ -65,7 +66,7 @@ impl<'lua> Function<'lua> {
             stack_err_guard(lua.state, 0, || {
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
-                check_stack(lua.state, nargs + 3);
+                check_stack_err(lua.state, nargs + 3)?;
 
                 ffi::lua_pushcfunction(lua.state, error_traceback);
                 let stack_start = ffi::lua_gettop(lua.state);
@@ -124,7 +125,7 @@ impl<'lua> Function<'lua> {
         unsafe extern "C" fn bind_call_impl(state: *mut ffi::lua_State) -> c_int {
             let nargs = ffi::lua_gettop(state);
             let nbinds = ffi::lua_tointeger(state, ffi::lua_upvalueindex(2)) as c_int;
-            check_stack(state, nbinds + 2);
+            ffi::luaL_checkstack(state, nbinds + 2, ptr::null());
 
             ffi::lua_settop(state, nargs + nbinds + 1);
             ffi::lua_rotate(state, -(nargs + nbinds + 1), nbinds + 1);
@@ -144,10 +145,16 @@ impl<'lua> Function<'lua> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
+                const MAX_LUA_UPVALUES: c_int = 255;
+
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
 
-                check_stack(lua.state, nargs + 3);
+                if nargs > MAX_LUA_UPVALUES {
+                    return Err(Error::BindError);
+                }
+
+                check_stack_err(lua.state, nargs + 3)?;
                 lua.push_ref(lua.state, &self.0);
                 ffi::lua_pushinteger(lua.state, nargs as ffi::lua_Integer);
                 for arg in args {

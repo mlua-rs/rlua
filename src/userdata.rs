@@ -89,7 +89,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
+        M: 'static + Send + for<'a> Fn(&'lua Lua, &'a T, A) -> Result<R>,
     {
         self.methods
             .insert(name.to_owned(), Self::box_method(method));
@@ -121,7 +121,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
     {
         self.methods
             .insert(name.to_owned(), Self::box_function(function));
@@ -139,7 +139,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
+        M: 'static + Send + for<'a> Fn(&'lua Lua, &'a T, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
@@ -170,25 +170,25 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_function(function));
     }
 
-    fn box_function<A, R, F>(mut function: F) -> Callback<'lua>
+    fn box_function<A, R, F>(function: F) -> Callback<'lua>
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
     {
         Box::new(move |lua, args| function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua))
     }
 
-    fn box_method<A, R, M>(mut method: M) -> Callback<'lua>
+    fn box_method<A, R, M>(method: M) -> Callback<'lua>
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a T, A) -> Result<R>,
+        M: 'static + Send + for<'a> Fn(&'lua Lua, &'a T, A) -> Result<R>,
     {
         Box::new(move |lua, mut args| {
             if let Some(front) = args.pop_front() {
@@ -205,17 +205,21 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         })
     }
 
-    fn box_method_mut<A, R, M>(mut method: M) -> Callback<'lua>
+    fn box_method_mut<A, R, M>(method: M) -> Callback<'lua>
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
         M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
     {
+        let method = RefCell::new(method);
         Box::new(move |lua, mut args| {
             if let Some(front) = args.pop_front() {
                 let userdata = AnyUserData::from_lua(front, lua)?;
                 let mut userdata = userdata.borrow_mut::<T>()?;
-                method(lua, &mut userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+                let mut method = method
+                    .try_borrow_mut()
+                    .map_err(|_| Error::RecursiveMutCallback)?;
+                (&mut *method)(lua, &mut userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             } else {
                 Err(Error::FromLuaConversionError {
                     from: "missing argument",

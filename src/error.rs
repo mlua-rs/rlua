@@ -26,17 +26,25 @@ pub enum Error {
     ///
     /// The Lua VM returns this error when there is an error running a `__gc` metamethod.
     GarbageCollectorError(String),
-    /// A callback has triggered Lua code that has called the same callback again.
+    /// A mutable callback has triggered Lua code that has called the same mutable callback again.
     ///
-    /// This is an error because `rlua` callbacks are FnMut and thus can only be mutably borrowed
-    /// once.
-    RecursiveCallback,
+    /// This is an error because a mutable callback can only be borrowed mutably once.
+    RecursiveMutCallback,
     /// Either a callback or a userdata method has been called, but the callback or userdata has
     /// been destructed.
     ///
     /// This can happen either due to to being destructed in a previous __gc, or due to being
     /// destructed from exiting a `Lua::scope` call.
     CallbackDestructed,
+    /// Not enough stack space to place arguments to Lua functions or return values from callbacks.
+    ///
+    /// Due to the way `rlua` works, it should not be directly possible to run out of stack space
+    /// during normal use. The only way that this error can be triggered is if a `Function` is
+    /// called with a huge number of arguments, or a rust callback returns a huge number of return
+    /// values.
+    StackError,
+    /// Too many arguments to `Function::bind`
+    BindError,
     /// A Rust value could not be converted to a Lua value.
     ToLuaConversionError {
         /// Name of the Rust type that could not be converted.
@@ -123,10 +131,18 @@ impl fmt::Display for Error {
             Error::GarbageCollectorError(ref msg) => {
                 write!(fmt, "garbage collector error: {}", msg)
             }
-            Error::RecursiveCallback => write!(fmt, "callback called recursively"),
+            Error::RecursiveMutCallback => write!(fmt, "mutable callback called recursively"),
             Error::CallbackDestructed => write!(
                 fmt,
                 "a destructed callback or destructed userdata method was called"
+            ),
+            Error::StackError => write!(
+                fmt,
+                "out of Lua stack, too many arguments to a Lua function or too many return values from a callback"
+            ),
+            Error::BindError => write!(
+                fmt,
+                "too many arguments to Function::bind"
             ),
             Error::ToLuaConversionError {
                 from,

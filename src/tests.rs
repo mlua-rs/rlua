@@ -1,5 +1,5 @@
-use std::fmt;
-use std::error;
+use std::{error, fmt};
+use std::iter::FromIterator;
 use std::rc::Rc;
 use std::cell::Cell;
 use std::sync::Arc;
@@ -432,11 +432,11 @@ fn test_pcall_xpcall() {
 }
 
 #[test]
-fn test_recursive_callback_error() {
+fn test_recursive_mut_callback_error() {
     let lua = Lua::new();
 
     let mut v = Some(Box::new(123));
-    let f = lua.create_function::<_, (), _>(move |lua, mutate: bool| {
+    let f = lua.create_function_mut::<_, (), _>(move |lua, mutate: bool| {
         if mutate {
             v = None;
         } else {
@@ -459,7 +459,7 @@ fn test_recursive_callback_error() {
     {
         Err(Error::CallbackError { ref cause, .. }) => match *cause.as_ref() {
             Error::CallbackError { ref cause, .. } => match *cause.as_ref() {
-                Error::RecursiveCallback { .. } => {}
+                Error::RecursiveMutCallback { .. } => {}
                 ref other => panic!("incorrect result: {:?}", other),
             },
             ref other => panic!("incorrect result: {:?}", other),
@@ -527,7 +527,7 @@ fn test_registry_value() {
     let lua = Lua::new();
 
     let mut r = Some(lua.create_registry_value::<i32>(42).unwrap());
-    let f = lua.create_function(move |lua, ()| {
+    let f = lua.create_function_mut(move |lua, ()| {
         if let Some(r) = r.take() {
             assert_eq!(lua.registry_value::<i32>(&r)?, 42);
             lua.remove_registry_value(r).unwrap();
@@ -666,7 +666,7 @@ fn scope_capture() {
     let lua = Lua::new();
     lua.scope(|scope| {
         scope
-            .create_function(|_, ()| {
+            .create_function_mut(|_, ()| {
                 i = 42;
                 Ok(())
             })
@@ -675,6 +675,67 @@ fn scope_capture() {
             .unwrap();
     });
     assert_eq!(i, 42);
+}
+
+#[test]
+fn too_many_returns() {
+    let lua = Lua::new();
+    let f = lua.create_function(|_, ()| Ok(Variadic::from_iter(1..1000000)))
+        .unwrap();
+    assert!(f.call::<_, Vec<u32>>(()).is_err());
+}
+
+#[test]
+fn too_many_arguments() {
+    let lua = Lua::new();
+    lua.exec::<()>("function test(...) end", None).unwrap();
+    let args = Variadic::from_iter(1..1000000);
+    assert!(
+        lua.globals()
+            .get::<_, Function>("test")
+            .unwrap()
+            .call::<_, ()>(args)
+            .is_err()
+    );
+}
+
+#[test]
+fn too_many_recursions() {
+    let lua = Lua::new();
+
+    let f = lua.create_function(move |lua, ()| {
+        lua.globals().get::<_, Function>("f")?.call::<_, ()>(())
+    }).unwrap();
+    lua.globals().set("f", f).unwrap();
+
+    assert!(
+        lua.globals()
+            .get::<_, Function>("f")
+            .unwrap()
+            .call::<_, ()>(())
+            .is_err()
+    );
+}
+
+#[test]
+fn too_many_binds() {
+    let lua = Lua::new();
+    let globals = lua.globals();
+    lua.exec::<()>(
+        r#"
+            function f(...)
+            end
+        "#,
+        None,
+    ).unwrap();
+
+    let concat = globals.get::<_, Function>("f").unwrap();
+    assert!(concat.bind(Variadic::from_iter(1..1000000)).is_err());
+    assert!(
+        concat
+            .call::<_, ()>(Variadic::from_iter(1..1000000))
+            .is_err()
+    );
 }
 
 // TODO: Need to use compiletest-rs or similar to make sure these don't compile.
