@@ -105,7 +105,7 @@ If you encounter them, a bug report would be very welcome:
     define set.  Any abort caused by this internal Lua API checking is
     *absolutely* a bug, particularly because without `LUA_USE_APICHECK` it would
     generally be unsafe.
-  * Lua API errors are handled by lonjmp.  *ALL* instances where the Lua API
+  * Lua C API errors are handled by lonjmp.  *ALL* instances where the Lua C API
     would longjmp should be protected from Rust, except in a few cases of
     internal callbacks where there are only Copy types on the stack.  If you
     detect that `rlua` is triggering a longjmp over rust stack frames (other
