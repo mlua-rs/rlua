@@ -10,32 +10,19 @@ This library is a high level interface between Rust and Lua.  Its major goal is
 to expose as easy to use, practical, and flexible of an API between Rust and Lua
 as possible, while also being completely safe.
 
-There are other high level Lua bindings systems for rust, and this crate is an
-exploration of a different part of the design space.  The other major rust high
-level interface to Lua that I am aware of right now is
-[hlua](https://github.com/tomaka/hlua/).  Some of the differences between `rlua`
-and `hlua` are:
+`rlua` is designed around "registry handles" to values inside the Lua state.
+This means that when you get a type like `rlua::Table` or `rlua::Function` in
+Rust, what you actually hold is an integer key into the Lua registry.  This is
+also different from the bare Lua C API, where you create tables / functions on
+the Lua stack and must be aware of their location.  This is also similar to how
+other Lua bindings systems like [Selene](https://github.com/jeremyong/Selene)
+for C++ work, but it means that using `rlua` may be slightly slower than what
+you could conceivably write using the C API.  This is done for reasons of safety
+and flexibility, and to prevent the user of `rlua` from having to be aware of
+the Lua stack at all.
 
-  * In `rlua`, handles to Lua values use the Lua registry, not the stack
-  * `rlua` handles are all internally mutable, and non-mutably borrow the main
-    Lua, so there can be multiple handles or long lived handles.
-  * `rlua` targets Lua 5.3
+There are currently a few missing pieces of this API:
 
-The key difference here is that rlua handles rust-side references to Lua values
-in a fundamentally different way than hlua, more similar to other Lua bindings
-systems like [Selene](https://github.com/jeremyong/Selene) for C++.  Values like
-`rlua::Table` and `rlua::Function` that hold onto Lua values in the Rust stack,
-instead of pointing at values in the Lua stack, are placed into the registry
-with `luaL_ref`.  In this way, it is possible to have an arbitrary number of
-handles to internal Lua values at any time, created and destroyed in arbitrary
-order.  This approach IS slightly slower than the approach that hlua takes of
-only manipulating the Lua stack, but this, combined with internal mutability,
-allows for a much more flexible API.
-
-There are currently a few notable missing pieces of this API:
-
-  * Complete panic / abort safety.  This is a near term goal, but currently
-    there are ways to cause panics / aborts with the API and with lua scripts.
   * Security limits on Lua code such as total instruction limits / memory limits
     and control over which potentially dangerous libraries (e.g. io) are
     available to scripts.
@@ -51,7 +38,7 @@ in rustc.  For example:
 
   * Currently, variadics are handled entirely with tuples and traits implemented
     by macro for tuples up to size 12, it would be great if this was replaced
-    with real variadic generics when this is available in rust.
+    with real variadic generics when this is available in Rust.
 
 It is also worth it to list some non-goals for the project:
 
@@ -73,56 +60,58 @@ safety level of the crate "Work In Progress".  Still, UB is considered the most
 serious kind of bug, so if you find the ability to cause UB with this API *at
 all*, please file a bug report.
 
-There are, however, currently a few known ways to cause *panics* and even
-*aborts* with this API.  There is a near term goal to completely eliminate all
-ways to cause panics / aborts from scripts, so many of these can be considered
-bugs, but since they're known only file a bug report if you notice any behavior
-that does not match what's described here.
+Another goal of this library is complete protection from panics and aborts.
+Currently, it should not be possible for a script to trigger a panic or abort
+(with some important caveats described below).  Similarly to the safety goal,
+there ARE several internal panics and even aborts in `rlua` source, but they
+should not be possible to trigger, and if you trigger them this should be
+considered a bug.
 
-Panic / abort considerations when using this API:
+There are some caveats to the panic / abort guarantee, however:
 
-  * The API should be panic safe currently, whenever a panic is generated the
-    Lua stack is cleared and the `Lua` instance should continue to be usable.
-  * Panic unwinds in Rust callbacks should currently be handled correctly, the
-    unwind is caught and carried across the Lua API boundary, and Lua code
-    cannot catch rust panics.  This is done by overriding the normal Lua 'pcall'
-    and 'xpcall' with custom versions that cannot catch rust panics being piped
-    through the normal Lua error system.
-  * There are a few panics marked "internal error" that should be impossible to
-    trigger.  If you encounter one of these this is a bug.
-  * When the internal version of Lua is built using the `gcc` crate (the
-    default), `LUA_USE_APICHECK` is enabled.  Any abort caused by this internal
-    Lua API checking should be considered a bug, particularly because without
-    `LUA_USE_APICHECK` it would generally be unsafe.
-  * The library internally calls lua_checkstack to ensure that there is
-    sufficient stack space, and if the stack cannot be sufficiently grown this
-    is a panic.  There should not be a way to cause this using this API, and if
-    you encounter this, it is a bug.
-  * Previous to version 0.10, `rlua` had a complicated system to guard against
-    LUA_ERRGCMM, and this system could cause aborts.  This is no longer the case
-    as of version 0.10, `rlua` now attempts to handle all errors that the Lua C
-    API can generate, including functions that can cause memory errors (any
-    function marked as 'v', 'e', or 'm' in the Lua C API docs).  This is,
-    however, extremely complicated and difficult to test, so if there is any
-    indication when using this API that a Lua error (longjmp) is being triggered
-    without being turned into an `rlua::Error`, *please please report this as a
-    bug*.
+  * `rlua` reserves the right to panic on API usage errors.  Currently, the only
+    time this will happen is when passed a registry handle type from a different
+    main Lua state.
+  * Currently, there are no memory or execution limits on scripts, so untrusted
+    scripts can always at minimum infinite loop or allocate arbitrary amounts of
+    memory.
   * The internal Lua allocator is set to use `realloc` from `libc`, but it is
-    wrapped in such a way that OOM errors are guaranteed to abort.  This is not
-    currently such a big deal, as this matches the behavior of rust itself.
+    wrapped in such a way that OOM errors are guaranteed to *abort*.  This is
+    not currently such a big deal, as this matches the behavior of Rust itself.
     This allows the internals of `rlua` to, in certain cases, call 'm' Lua C API
     functions with the garbage collector disabled and know that these cannot
     error.  Eventually, `rlua` will support memory limits on scripts, and those
     memory limits will cause regular memory errors rather than OOM aborts.
-  * There are currently no recursion limits on callbacks.  This could cause one
-    of two problems, either the API will run out of stack space and cause a
-    panic in Rust, or more likely it will cause an internal `LUA_USE_APICHECK`
-    abort, from exceeding LUAI_MAXCCALLS.  This may be a source of unsafety if
-    `LUA_USE_APICHECK` is disabled, and is considered a bug.  It is very hard to
-    trigger this currently, because right now rust callbacks cannot be
-    re-entered.  If this restriction were lifted with a `Fn` callback (as
-    opposed to `FnMut`), then this would be much easier to trigger.
-  * There are currently no checks on argument sizes, and I think you may be able
-    to cause an abort by providing a large enough `rlua::Variadic`.  I believe
-    this would be unsafe without `LUA_USE_APICHECK` and should be considered a
-    bug.
+
+Yet another goal of the library is to, in all cases, safely handle panics
+generated by Rust callbacks.  Panic unwinds in Rust callbacks should currently
+be handled correctly -- the unwind is caught and carried across the Lua API
+boundary as a regular lua error in a way that prevents Lua from catching it.
+This is done by overriding the normal Lua 'pcall' and 'xpcall' with custom
+versions that cannot catch errors that are actually from Rust panics, and by
+handling panic errors on the receiving rust side by resuming the panic.
+
+In summary, here is a list of `rlua` behaviors that should be considered a bug.
+If you encounter them, a bug report would be very welcome:
+
+  * If your code panics / aborts with a message that contains the string "rlua
+    internal error", this is a bug.
+  * The above is true even for the internal panic about running out of stack
+    space!  There are a few ways to generate normal script errors by running out
+    of stack, but if you encounter a *panic* based on running out of stack, this
+    is a bug.
+  * When the internal version of Lua is built using the `gcc` crate, and
+    `cfg!(debug_assertions)` is true, Lua is built with the `LUA_USE_APICHECK`
+    define set.  Any abort caused by this internal Lua API checking is
+    *absolutely* a bug, particularly because without `LUA_USE_APICHECK` it would
+    generally be unsafe.
+  * Lua API errors are handled by lonjmp.  *ALL* instances where the Lua API
+    would longjmp should be protected from Rust, except in a few cases of
+    internal callbacks where there are only Copy types on the stack.  If you
+    detect that `rlua` is triggering a longjmp over rust stack frames (other
+    than the internal ones), this is a bug!  (NOTE: I believe it is still an
+    open question whether technically Rust allows longjmp over rust stack frames
+    *at all*, even if there are only Copy types on the stack.  Currently `rlua`
+    uses this to avoid having to write a lot of messy C shims.  It *currently*
+    works fine, and it is difficult to imagine how it would ever NOT work, but
+    what is and isn't UB in unsafe rust is not precisely specified.)
