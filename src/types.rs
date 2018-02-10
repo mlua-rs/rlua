@@ -79,32 +79,3 @@ impl<'lua> Drop for LuaRef<'lua> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::LightUserData;
-    use function::Function;
-    use lua::Lua;
-
-    use std::os::raw::c_void;
-
-    #[test]
-    fn test_lightuserdata() {
-        let lua = Lua::new();
-        let globals = lua.globals();
-        lua.exec::<()>(
-            r#"
-            function id(a)
-                return a
-            end
-        "#,
-            None,
-        ).unwrap();
-        let res = globals
-            .get::<_, Function>("id")
-            .unwrap()
-            .call::<_, LightUserData>(LightUserData(42 as *mut c_void))
-            .unwrap();
-        assert_eq!(res, LightUserData(42 as *mut c_void));
-    }
-}

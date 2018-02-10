@@ -1,3 +1,10 @@
+mod function;
+mod string;
+mod table;
+mod thread;
+mod types;
+mod userdata;
+
 use std::{error, fmt};
 use std::iter::FromIterator;
 use std::rc::Rc;
