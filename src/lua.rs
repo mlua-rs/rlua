@@ -966,11 +966,6 @@ impl Lua {
         func: Callback<'callback>,
     ) -> Result<Function<'lua>> {
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
-            if ffi::lua_type(state, ffi::lua_upvalueindex(1)) == ffi::LUA_TNIL {
-                ffi::lua_pushstring(state, cstr!("rust callback has been destructed"));
-                ffi::lua_error(state)
-            }
-
             callback_error(state, || {
                 let lua = Lua {
                     state: state,
@@ -978,10 +973,14 @@ impl Lua {
                     ephemeral: true,
                 };
 
+                if ffi::lua_type(state, ffi::lua_upvalueindex(1)) == ffi::LUA_TNIL {
+                    return Err(Error::CallbackDestructed);
+                }
+
                 let func = get_userdata::<RefCell<Callback>>(state, ffi::lua_upvalueindex(1));
                 let mut func = (*func)
                     .try_borrow_mut()
-                    .map_err(|_| Error::RecursiveCallbackError)?;
+                    .map_err(|_| Error::RecursiveCallback)?;
 
                 let nargs = ffi::lua_gettop(state);
                 let mut args = MultiValue::new();

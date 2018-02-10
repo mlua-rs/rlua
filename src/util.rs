@@ -24,29 +24,25 @@ pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F
 where
     F: FnOnce() -> R,
 {
-    if cfg!(debug_assertions) {
-        let expected = ffi::lua_gettop(state) + change;
-        lua_internal_assert!(
-            state,
-            expected >= 0,
-            "too many stack values would be popped"
-        );
+    let expected = ffi::lua_gettop(state) + change;
+    lua_internal_assert!(
+        state,
+        expected >= 0,
+        "too many stack values would be popped"
+    );
 
-        let res = op();
+    let res = op();
 
-        let top = ffi::lua_gettop(state);
-        lua_internal_assert!(
-            state,
-            ffi::lua_gettop(state) == expected,
-            "expected stack to be {}, got {}",
-            expected,
-            top
-        );
+    let top = ffi::lua_gettop(state);
+    lua_internal_assert!(
+        state,
+        ffi::lua_gettop(state) == expected,
+        "expected stack to be {}, got {}",
+        expected,
+        top
+    );
 
-        res
-    } else {
-        op()
-    }
+    res
 }
 
 // Run an operation on a lua_State and automatically clean up the stack before
@@ -62,45 +58,36 @@ pub unsafe fn stack_err_guard<F, R>(state: *mut ffi::lua_State, change: c_int, o
 where
     F: FnOnce() -> Result<R>,
 {
-    if cfg!(debug_assertions) {
-        let expected = ffi::lua_gettop(state) + change;
+    let expected = ffi::lua_gettop(state) + change;
+    lua_internal_assert!(
+        state,
+        expected >= 0,
+        "too many stack values would be popped"
+    );
+
+    let res = op();
+
+    let top = ffi::lua_gettop(state);
+    if res.is_ok() {
         lua_internal_assert!(
             state,
-            expected >= 0,
-            "too many stack values would be popped"
+            ffi::lua_gettop(state) == expected,
+            "expected stack to be {}, got {}",
+            expected,
+            top
         );
-
-        let res = op();
-
-        let top = ffi::lua_gettop(state);
-        if res.is_ok() {
-            lua_internal_assert!(
-                state,
-                ffi::lua_gettop(state) == expected,
-                "expected stack to be {}, got {}",
-                expected,
-                top
-            );
-        } else {
-            lua_internal_assert!(
-                state,
-                top >= expected,
-                "{} too many stack values popped",
-                top - expected
-            );
-            if top > expected {
-                ffi::lua_settop(state, expected);
-            }
-        }
-        res
     } else {
-        let prev = ffi::lua_gettop(state) + change;
-        let res = op();
-        if res.is_err() {
-            ffi::lua_settop(state, prev);
+        lua_internal_assert!(
+            state,
+            top >= expected,
+            "{} too many stack values popped",
+            top - expected
+        );
+        if top > expected {
+            ffi::lua_settop(state, expected);
         }
-        res
     }
+    res
 }
 
 // Call a function that calls into the Lua API and may trigger a Lua error (longjmp) in a safe way.
@@ -253,7 +240,6 @@ pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
     })
 }
 
-// Returns None in the case that the userdata has already been garbage collected.
 pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
     let ud = ffi::lua_touserdata(state, index) as *mut T;
     lua_internal_assert!(state, !ud.is_null(), "userdata pointer is null");
@@ -269,9 +255,10 @@ pub unsafe fn take_userdata<T>(state: *mut ffi::lua_State) -> T {
     // after the first call to __gc.
     get_destructed_userdata_metatable(state);
     ffi::lua_setmetatable(state, -2);
-    let ud = &mut *(ffi::lua_touserdata(state, -1) as *mut T);
+    let ud = ffi::lua_touserdata(state, -1) as *mut T;
+    lua_internal_assert!(state, !ud.is_null(), "userdata pointer is null");
     ffi::lua_pop(state, 1);
-    mem::replace(ud, mem::uninitialized())
+    ptr::read(ud)
 }
 
 pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
@@ -611,7 +598,7 @@ unsafe fn get_destructed_userdata_metatable(state: *mut ffi::lua_State) -> c_int
     static DESTRUCTED_USERDATA_METATABLE: u8 = 0;
 
     unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
-        ffi::lua_pushstring(state, cstr!("userdata has been destructed"));
+        push_wrapped_error(state, Error::CallbackDestructed);
         ffi::lua_error(state)
     }
 

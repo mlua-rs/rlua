@@ -5,7 +5,8 @@ use std::cell::Cell;
 use std::sync::Arc;
 use std::panic::catch_unwind;
 
-use {Error, ExternalError, Function, Lua, Nil, Result, Table, UserData, Value, Variadic};
+use {Error, ExternalError, Function, Lua, Nil, Result, Table, UserData, UserDataMethods, Value,
+     Variadic};
 
 #[test]
 fn test_load() {
@@ -458,7 +459,7 @@ fn test_recursive_callback_error() {
     {
         Err(Error::CallbackError { ref cause, .. }) => match *cause.as_ref() {
             Error::CallbackError { ref cause, .. } => match *cause.as_ref() {
-                Error::RecursiveCallbackError { .. } => {}
+                Error::RecursiveCallback { .. } => {}
                 ref other => panic!("incorrect result: {:?}", other),
             },
             ref other => panic!("incorrect result: {:?}", other),
@@ -619,19 +620,24 @@ fn scope_func() {
     assert_eq!(rc.get(), 42);
     assert_eq!(Rc::strong_count(&rc), 1);
 
-    assert!(
-        lua.globals()
-            .get::<_, Function>("bad")
-            .unwrap()
-            .call::<_, ()>(())
-            .is_err()
-    );
+    match lua.globals()
+        .get::<_, Function>("bad")
+        .unwrap()
+        .call::<_, ()>(())
+    {
+        Err(Error::CallbackError { .. }) => {}
+        r => panic!("improper return for destructed function: {:?}", r),
+    };
 }
 
 #[test]
 fn scope_drop() {
     struct MyUserdata(Rc<()>);
-    impl UserData for MyUserdata {}
+    impl UserData for MyUserdata {
+        fn add_methods(methods: &mut UserDataMethods<Self>) {
+            methods.add_method("method", |_, _, ()| Ok(()));
+        }
+    }
 
     let rc = Rc::new(());
 
@@ -646,6 +652,11 @@ fn scope_drop() {
         assert_eq!(Rc::strong_count(&rc), 2);
     });
     assert_eq!(Rc::strong_count(&rc), 1);
+
+    match lua.exec::<()>("test:method()", None) {
+        Err(Error::CallbackError { .. }) => {}
+        r => panic!("improper return for destructed userdata: {:?}", r),
+    };
 }
 
 #[test]

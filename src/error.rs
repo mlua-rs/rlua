@@ -30,7 +30,13 @@ pub enum Error {
     ///
     /// This is an error because `rlua` callbacks are FnMut and thus can only be mutably borrowed
     /// once.
-    RecursiveCallbackError,
+    RecursiveCallback,
+    /// Either a callback or a userdata method has been called, but the callback or userdata has
+    /// been destructed.
+    ///
+    /// This can happen either due to to being destructed in a previous __gc, or due to being
+    /// destructed from exiting a `Lua::scope` call.
+    CallbackDestructed,
     /// A Rust value could not be converted to a Lua value.
     ToLuaConversionError {
         /// Name of the Rust type that could not be converted.
@@ -117,7 +123,11 @@ impl fmt::Display for Error {
             Error::GarbageCollectorError(ref msg) => {
                 write!(fmt, "garbage collector error: {}", msg)
             }
-            Error::RecursiveCallbackError => write!(fmt, "callback called recursively"),
+            Error::RecursiveCallback => write!(fmt, "callback called recursively"),
+            Error::CallbackDestructed => write!(
+                fmt,
+                "a destructed callback or destructed userdata method was called"
+            ),
             Error::ToLuaConversionError {
                 from,
                 to,
