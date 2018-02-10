@@ -22,12 +22,6 @@ default = ["builtin-lua"]
 #   * LUA_NUMBER as double
 #   * LUA_EXTRASPACE is sizeof(void*)
 builtin-lua = ["gcc"]
-# Don't define LUA_USE_APICHECK if we are in release mode.  When
-# debug_assertions are enabled, LUA_USE_APICHECK is enabled regardless.  There
-# are still a few known ways to trigger LUA_USE_APICHECK checks with rlua, but
-# when these bugs are fixed, this option will go away and this behavior will be
-# the default.
-disable-lua-apicheck = []
 
 [dependencies]
 libc = { version = "0.2" }

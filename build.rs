@@ -21,7 +21,7 @@ fn main() {
             config.define("LUA_USE_WINDOWS", None);
         }
 
-        if cfg!(debug_assertions) || !cfg!(feature = "disable-lua-apicheck") {
+        if cfg!(debug_assertions) {
             config.define("LUA_USE_APICHECK", None);
         }
 
