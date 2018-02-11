@@ -406,7 +406,7 @@ impl<'lua> AnyUserData<'lua> {
     pub fn set_user_value<V: ToLua<'lua>>(&self, v: V) -> Result<()> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, 0, || {
                 check_stack(lua.state, 2);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, v.to_lua(lua)?);
@@ -423,7 +423,7 @@ impl<'lua> AnyUserData<'lua> {
     pub fn get_user_value<V: FromLua<'lua>>(&self) -> Result<V> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, 0, || {
                 check_stack(lua.state, 2);
                 lua.push_ref(lua.state, &self.0);
                 ffi::lua_getuservalue(lua.state, -1);

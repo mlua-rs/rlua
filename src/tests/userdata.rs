@@ -1,4 +1,3 @@
-
 use std::sync::Arc;
 
 use {ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods};
@@ -179,4 +178,5 @@ fn user_value() {
     let ud = lua.create_userdata(MyUserData).unwrap();
     ud.set_user_value("hello").unwrap();
     assert_eq!(ud.get_user_value::<String>().unwrap(), "hello");
+    assert!(ud.get_user_value::<u32>().is_err());
 }
