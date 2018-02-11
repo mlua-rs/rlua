@@ -5,7 +5,7 @@
   it will error with `CallbackDestructed`.  From the rust side, an expired
   userdata `AnyUserData` will not appear to be any rust type.
 - Changed the `RegistryKey` API to be more useful and general.  Now, it is not
-  100% necessary to manually drop `RegistryKey` instances in order to clean up
+  100% necessary to manually remove `RegistryKey` instances in order to clean up
   the registry, instead you can periodically call `Lua::expire_registry_values`
   to remove registry values with `RegistryKey`s that have all been dropped.
   Also, it is no longer a panic to use a `RegistryKey` from a mismatched Lua
