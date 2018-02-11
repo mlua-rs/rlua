@@ -1,3 +1,34 @@
+## [0.12.0]
+- Changed how userdata values are garbage collected, both to fix potential
+  panics and to simplify it.  Now, when userdata is garbage collected, it will
+  be given a special "destructed userdata" metatable, and all interactions with
+  it will error with `CallbackDestructed`.  From the rust side, an expired
+  userdata `AnyUserData` will not appear to be any rust type.
+- Changed the `RegistryKey` API to be more useful and general.  Now, it is not
+  100% necessary to manually drop `RegistryKey` instances in order to clean up
+  the registry, instead you can periodically call `Lua::expire_registry_values`
+  to remove registry values with `RegistryKey`s that have all been dropped.
+  Also, it is no longer a panic to use a `RegistryKey` from a mismatched Lua
+  instance, it is simply an error.
+- Lua is now `Send`, and all userdata / callback functions have a Send
+  requirement.  This is a potentially annoying breaking change, but there is a
+  new way to pass !Send types to Lua in a limited way.
+- HUGE change, there is now a `Lua::scope` method, which allows passing
+  non-'static functions to Lua in a controlled way.  It also allows passing
+  !Send functions and !Send userdata to Lua, with the same limitations.  In
+  order to make this safe, the scope method behaves similarly to the `crossbeam`
+  crate's `crossbeam::scope` method, which ensures that types created within the
+  scope are destructed at the end of the scope.  When using callbacks / userdata
+  created within the scope, the callbakcs / userdata are guaranteed to be
+  destructed at the end of the scope, and inside Lua references to them are in
+  an invalidated "destructed" state.  This destructed state was already possible
+  to observe through `__gc` methods, so it doesn't introduce anything new, but
+  it has been fixed so that it cannot cause panics, and has a specific error
+  type.
+- Correctly error on passing too many arguments to an `rlua::Function`, and
+  correctly error when returning too many results from a callback.  Previously,
+  this was a panic.
+
 ## [0.11.0]
 - `rlua::Error` now implements `failure::Fail` and not `std::error::Error`, and
   external errors now require `failure::Fail`.  This is the only API

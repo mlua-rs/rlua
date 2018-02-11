@@ -1,10 +1,10 @@
 # rlua -- High level bindings between Rust and Lua
 
 [![Build Status](https://travis-ci.org/chucklefish/rlua.svg?branch=master)](https://travis-ci.org/chucklefish/rlua)
+[![Latest Version](https://img.shields.io/crates/v/rlua.svg)](https://crates.io/crates/rlua)
+[![API Documentation](https://docs.rs/rlua/badge.svg)](https://docs.rs/rlua)
 
-[API Documentation](https://docs.rs/rlua)
-
-[Examples](examples/examples.rs)
+[Guided Tour](examples/guided_tour.rs)
 
 This library is a high level interface between Rust and Lua.  Its major goal is
 to expose as easy to use, practical, and flexible of an API between Rust and Lua
