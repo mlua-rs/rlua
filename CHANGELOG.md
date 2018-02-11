@@ -5,11 +5,11 @@
   it will error with `CallbackDestructed`.  From the rust side, an expired
   userdata `AnyUserData` will not appear to be any rust type.
 - Changed the `RegistryKey` API to be more useful and general.  Now, it is not
-  100% necessary to manually remove `RegistryKey` instances in order to clean up
-  the registry, instead you can periodically call `Lua::expire_registry_values`
-  to remove registry values with `RegistryKey`s that have all been dropped.
-  Also, it is no longer a panic to use a `RegistryKey` from a mismatched Lua
-  instance, it is simply an error.
+  100% necessary to manually remove `RegistryKey`s in order to clean up the
+  registry, instead you can periodically call `Lua::expire_registry_values` to
+  remove registry values with `RegistryKey`s that have all been dropped.  Also,
+  it is no longer a panic to use a `RegistryKey` from a mismatched Lua instance,
+  it is simply an error.
 - Lua is now `Send`, and all userdata / callback functions have a Send
   requirement.  This is a potentially annoying breaking change, but there is a
   new way to pass !Send types to Lua in a limited way.
@@ -19,7 +19,7 @@
   order to make this safe, the scope method behaves similarly to the `crossbeam`
   crate's `crossbeam::scope` method, which ensures that types created within the
   scope are destructed at the end of the scope.  When using callbacks / userdata
-  created within the scope, the callbakcs / userdata are guaranteed to be
+  created within the scope, the callbacks / userdata are guaranteed to be
   destructed at the end of the scope, and inside Lua references to them are in
   an invalidated "destructed" state.  This destructed state was already possible
   to observe through `__gc` methods, so it doesn't introduce anything new, but
