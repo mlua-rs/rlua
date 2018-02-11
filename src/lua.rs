@@ -973,7 +973,7 @@ impl Lua {
 
     fn create_callback_function<'lua, 'callback>(
         &'lua self,
-        func: Callback<'callback>,
+        func: Callback<'callback, 'static>,
     ) -> Result<Function<'lua>> {
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, || {
@@ -1066,16 +1066,11 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
         R: ToLuaMulti<'callback>,
         F: 'scope + Fn(&'callback Lua, A) -> Result<R>,
     {
-        let f: Box<
-            Fn(&'callback Lua, MultiValue<'callback>) -> Result<MultiValue<'callback>> + 'scope,
-        > = Box::new(move |lua, args| func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua));
-
         unsafe {
-            // SCARY, we are transmuting the 'scope lifetime to 'static.
-            let f: Box<
-                Fn(&'callback Lua, MultiValue<'callback>) -> Result<MultiValue<'callback>>,
-            > = mem::transmute(f);
-
+            let f = Box::new(move |lua, args| {
+                func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+            });
+            let f = mem::transmute::<Callback<'callback, 'scope>, Callback<'callback, 'static>>(f);
             let mut f = self.lua.create_callback_function(f)?;
 
             f.0.drop_unref = false;

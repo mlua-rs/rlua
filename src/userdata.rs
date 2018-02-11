@@ -72,8 +72,8 @@ pub enum MetaMethod {
 ///
 /// [`UserData`]: trait.UserData.html
 pub struct UserDataMethods<'lua, T> {
-    pub(crate) methods: HashMap<StdString, Callback<'lua>>,
-    pub(crate) meta_methods: HashMap<MetaMethod, Callback<'lua>>,
+    pub(crate) methods: HashMap<StdString, Callback<'lua, 'static>>,
+    pub(crate) meta_methods: HashMap<MetaMethod, Callback<'lua, 'static>>,
     pub(crate) _type: PhantomData<T>,
 }
 
@@ -175,7 +175,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         self.meta_methods.insert(meta, Self::box_function(function));
     }
 
-    fn box_function<A, R, F>(function: F) -> Callback<'lua>
+    fn box_function<A, R, F>(function: F) -> Callback<'lua, 'static>
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
@@ -184,7 +184,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         Box::new(move |lua, args| function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua))
     }
 
-    fn box_method<A, R, M>(method: M) -> Callback<'lua>
+    fn box_method<A, R, M>(method: M) -> Callback<'lua, 'static>
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
@@ -205,7 +205,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         })
     }
 
-    fn box_method_mut<A, R, M>(method: M) -> Callback<'lua>
+    fn box_method_mut<A, R, M>(method: M) -> Callback<'lua, 'static>
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
