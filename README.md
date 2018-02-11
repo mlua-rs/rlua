@@ -97,15 +97,18 @@ In summary, here is a list of `rlua` behaviors that should be considered a bug.
 If you encounter them, a bug report would be very welcome:
 
   * If you can cause UB at all with `rlua` without typing the word "unsafe",
-    this is absolutely 100% a bug.  This does not include loading the "debug"
-    library, which requires typing "unsafe".  If you load the debug library,
-    every guarantee goes out the window.
+    this is absolutely 100% a bug.
   * If your code panics / aborts with a message that contains the string "rlua
     internal error", this is a bug.
   * The above is true even for the internal panic about running out of stack
     space!  There are a few ways to generate normal script errors by running out
     of stack, but if you encounter a *panic* based on running out of stack, this
     is a bug.
+  * If you load the "debug" library (which requires typing "unsafe"), every
+    safety / panic / abort guarantee goes out the window.  The debug library can
+    be used to do extremely scary things.  If you use the debug library and
+    encounter a bug, it may still very well be a bug, but try to find a
+    reproduction that does not involve the debug library first.
   * When the internal version of Lua is built using the `gcc` crate, and
     `cfg!(debug_assertions)` is true, Lua is built with the `LUA_USE_APICHECK`
     define set.  Any abort caused by this internal Lua API checking is
