@@ -1068,12 +1068,12 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
     {
         unsafe {
             let f: Box<
-                Fn(&'callback Lua, MultiValue<'callback>) -> Result<MultiValue<'callback>>,
+                Fn(&'callback Lua, MultiValue<'callback>) -> Result<MultiValue<'callback>> + 'scope,
             > = Box::new(move |lua, args| {
                 func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             });
 
-            // SCARY, we are transmuting away the 'static requirement
+            // SCARY, we are transmuting the 'scope lifetime to 'static.
             let mut f = self.lua.create_callback_function(mem::transmute(f))?;
 
             f.0.drop_unref = false;
