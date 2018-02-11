@@ -522,7 +522,7 @@ impl Lua {
 
     /// Removes a named value in the Lua registry.
     ///
-    /// Equivalent to calling [`Lua::set_named_registry_value`] with a value of Nil.
+    /// Equivalent to calling [`set_named_registry_value`] with a value of Nil.
     ///
     /// [`set_named_registry_value`]: #method.set_named_registry_value
     pub fn unset_named_registry_value<'lua>(&'lua self, name: &str) -> Result<()> {
@@ -1147,7 +1147,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
 
     /// Create a Lua userdata object from a custom userdata type.
     ///
-    /// This is a version of [`Lua::create_userdata`] that creates a callback which expires on scope
+    /// This is a version of [`Lua::create_userdata`] that creates a userdata which expires on scope
     /// drop.  See [`Lua::scope`] for more details.
     ///
     /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
