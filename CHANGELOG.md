@@ -1,3 +1,11 @@
+## [0.12.1]
+- Fix a stupid bug where `AnyUserData::set_user_value` /
+  `AnyUserData::get_user_value` could panic if the `ToLua` / `FromLua` type
+  conversion failed.
+- Add `UserDataMethods::add_function_mut` and
+  `UserDataMethods::add_meta_function_mut` for symmetry.
+- Add some more documentation for changes in 0.12, and fix some minor problems.
+
 ## [0.12.0]
 - Changed how userdata values are garbage collected, both to fix potential
   panics and to simplify it.  Now, when userdata is garbage collected, it will
@@ -28,6 +36,13 @@
 - Correctly error on passing too many arguments to an `rlua::Function`, and
   correctly error when returning too many results from a callback.  Previously,
   this was a panic.
+- `Lua::create_function` is now split into `Lua::create_function` and
+  `Lua::create_function_mut`, where the first takes a Fn and the second takes a
+  FnMut.  This allows for recursion into rust functions if the function is not
+  FnMut.  There is a similar change for `UserDataMethods`, where the mut
+  variants of the functions now take `FnMut`, and the non-mut variants take
+  `Fn`.  There is not a way to make a non-mut `UserDataMethods` method with a
+  FnMut function.
 
 ## [0.11.0]
 - `rlua::Error` now implements `failure::Fail` and not `std::error::Error`, and
