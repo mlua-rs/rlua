@@ -56,9 +56,10 @@ by 0.x version bumps.
 The goal of this library is complete safety, it should not be possible to cause
 undefined behavior whatsoever with the API, even in edge cases.  There is,
 however, QUITE a lot of unsafe code in this crate, and I would call the current
-safety level of the crate "Work In Progress".  Still, UB is considered the most
-serious kind of bug, so if you find the ability to cause UB with this API *at
-all*, please file a bug report.
+safety level of the crate "Work In Progress".  Still, I am not *currently* aware
+of any way to cause UB, and UB is considered the most serious kind of bug, so if
+you find the ability to cause UB with this API *at all*, please file a bug
+report.
 
 Another goal of this library is complete protection from panics and aborts.
 Currently, it should not be possible for a script to trigger a panic or abort
@@ -95,6 +96,10 @@ handling panic errors on the receiving Rust side by resuming the panic.
 In summary, here is a list of `rlua` behaviors that should be considered a bug.
 If you encounter them, a bug report would be very welcome:
 
+  * If you can cause UB at all with `rlua` without typing the word "unsafe",
+    this is absolutely 100% a bug.  This does not include loading the "debug"
+    library, which requires typing "unsafe".  If you load the debug library,
+    every guarantee goes out the window.
   * If your code panics / aborts with a message that contains the string "rlua
     internal error", this is a bug.
   * The above is true even for the internal panic about running out of stack
@@ -110,9 +115,10 @@ If you encounter them, a bug report would be very welcome:
     would longjmp should be protected from Rust, except in a few cases of
     internal callbacks where there are only Copy types on the stack.  If you
     detect that `rlua` is triggering a longjmp over Rust stack frames (other
-    than the internal ones), this is a bug!  (NOTE: I believe it is still an
-    open question whether technically Rust allows longjmp over Rust stack frames
-    *at all*, even if there are only Copy types on the stack.  Currently `rlua`
-    uses this to avoid having to write a lot of messy C shims.  It *currently*
-    works fine, and it is difficult to imagine how it would ever NOT work, but
-    what is and isn't UB in unsafe Rust is not precisely specified.)
+    than the internal ones where this is intentional), this is a bug!  (NOTE: I
+    believe it is still an open question whether technically Rust allows longjmp
+    over Rust stack frames *at all*, even if there are only Copy types on the
+    stack.  Currently `rlua` uses this to avoid having to write a lot of messy C
+    shims.  It *currently* works fine, and it is difficult to imagine how it
+    would ever NOT work, but what is and isn't UB in unsafe Rust is not
+    precisely specified.)
