@@ -27,8 +27,12 @@ pub struct Lua {
     ephemeral: bool,
 }
 
-/// Constructed by the `Lua::scope` method, allows temporarily passing to Lua userdata that is
+/// Constructed by the [`Lua::scope`] method, allows temporarily passing to Lua userdata that is
 /// !Send, and callbacks that are !Send and not 'static.
+///
+/// See [`Lua::scope`] for more details.
+///
+/// [`Lua::scope`]: struct.Lua.html#method.scope
 pub struct Scope<'lua, 'scope> {
     lua: &'lua Lua,
     destructors: RefCell<Vec<Box<Fn(*mut ffi::lua_State) -> Box<Any>>>>,
@@ -274,6 +278,12 @@ impl Lua {
         }))
     }
 
+    /// Wraps a Rust mutable closure, creating a callable Lua function handle to it.
+    ///
+    /// This is a version of [`create_function`] that accepts a FnMut argument.  Refer to
+    /// [`create_function`] for more information about the implementation.
+    ///
+    /// [`create_function`]: #method.create_function
     pub fn create_function_mut<'lua, 'callback, A, R, F>(
         &'lua self,
         func: F,
@@ -491,8 +501,10 @@ impl Lua {
 
     /// Get a value from the Lua registry based on a string name.
     ///
-    /// Any Lua instance which shares the underlying main state may call `named_registry_value` to
-    /// get a value previously set by `set_named_registry_value`.
+    /// Any Lua instance which shares the underlying main state may call this method to
+    /// get a value previously set by [`set_named_registry_value`].
+    ///
+    /// [`set_named_registry_value`]: #method.set_named_registry_value
     pub fn named_registry_value<'lua, T: FromLua<'lua>>(&'lua self, name: &str) -> Result<T> {
         unsafe {
             stack_err_guard(self.state, 0, || {
@@ -510,7 +522,9 @@ impl Lua {
 
     /// Removes a named value in the Lua registry.
     ///
-    /// Equivalent to calling `Lua::set_named_registry_value` with a value of Nil.
+    /// Equivalent to calling [`Lua::set_named_registry_value`] with a value of Nil.
+    ///
+    /// [`set_named_registry_value`]: #method.set_named_registry_value
     pub fn unset_named_registry_value<'lua>(&'lua self, name: &str) -> Result<()> {
         self.set_named_registry_value(name, Nil)
     }
@@ -540,8 +554,10 @@ impl Lua {
 
     /// Get a value from the Lua registry by its `RegistryKey`
     ///
-    /// Any Lua instance which shares the underlying main state may call `registry_value` to get a
-    /// value previously placed by `create_registry_value`.
+    /// Any Lua instance which shares the underlying main state may call this method to get a value
+    /// previously placed by [`create_registry_value`].
+    ///
+    /// [`create_registry_value`]: #method.create_registry_value
     pub fn registry_value<'lua, T: FromLua<'lua>>(&'lua self, key: &RegistryKey) -> Result<T> {
         unsafe {
             if !Arc::ptr_eq(&key.unref_list, &(*self.extra()).registry_unref_list) {
@@ -563,9 +579,12 @@ impl Lua {
     /// Removes a value from the Lua registry.
     ///
     /// You may call this function to manually remove a value placed in the registry with
-    /// `create_registry_value`. In addition to manual `RegistryKey` removal, you can also call
-    /// `expire_registry_values` to automatically remove values from the registry whose
+    /// [`create_registry_value`]. In addition to manual `RegistryKey` removal, you can also call
+    /// [`expire_registry_values`] to automatically remove values from the registry whose
     /// `RegistryKey`s have been dropped.
+    ///
+    /// [`create_registry_value`]: #method.create_registry_value
+    /// [`expire_registry_values`]: #method.expire_registry_values
     pub fn remove_registry_value(&self, mut key: RegistryKey) -> Result<()> {
         unsafe {
             if !Arc::ptr_eq(&key.unref_list, &(*self.extra()).registry_unref_list) {
@@ -588,9 +607,10 @@ impl Lua {
         unsafe { Arc::ptr_eq(&key.unref_list, &(*self.extra()).registry_unref_list) }
     }
 
-    /// Remove any registry values whose `RegistryKey`s have all been dropped.  Unlike normal handle
-    /// values, `RegistryKey`s cannot automatically clean up their registry entries on Drop, but you
-    /// can call this method to remove any unreachable registry values.
+    /// Remove any registry values whose `RegistryKey`s have all been dropped.
+    ///
+    /// Unlike normal handle values, `RegistryKey`s cannot automatically clean up their registry
+    /// entries on Drop, but you can call this method to remove any unreachable registry values.
     pub fn expire_registry_values(&self) {
         unsafe {
             let unref_list = mem::replace(
@@ -1060,6 +1080,13 @@ impl Lua {
 }
 
 impl<'lua, 'scope> Scope<'lua, 'scope> {
+    /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
+    ///
+    /// This is a version of [`Lua::create_function`] that creates a callback which expires on scope
+    /// drop.  See [`Lua::scope`] for more details.
+    ///
+    /// [`Lua::create_function`]: struct.Lua.html#method.create_function
+    /// [`Lua::scope`]: struct.Lua.html#method.scope
     pub fn create_function<'callback, A, R, F>(&self, func: F) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'callback>,
@@ -1098,6 +1125,13 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
         }
     }
 
+    /// Wraps a Rust mutable closure, creating a callable Lua function handle to it.
+    ///
+    /// This is a version of [`Lua::create_function_mut`] that creates a callback which expires on scope
+    /// drop.  See [`Lua::scope`] for more details.
+    ///
+    /// [`Lua::create_function_mut`]: struct.Lua.html#method.create_function_mut
+    /// [`Lua::scope`]: struct.Lua.html#method.scope
     pub fn create_function_mut<'callback, A, R, F>(&self, func: F) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'callback>,
@@ -1111,6 +1145,13 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
         })
     }
 
+    /// Create a Lua userdata object from a custom userdata type.
+    ///
+    /// This is a version of [`Lua::create_userdata`] that creates a callback which expires on scope
+    /// drop.  See [`Lua::scope`] for more details.
+    ///
+    /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
+    /// [`Lua::scope`]: struct.Lua.html#method.scope
     pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: UserData,
