@@ -127,6 +127,22 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
             .insert(name.to_owned(), Self::box_function(function));
     }
 
+    /// Add a regular method as a mutable function which accepts generic arguments, the first
+    /// argument will always be a `UserData` of type T.
+    ///
+    /// This is a version of [`add_function`] that accepts a FnMut argument.
+    ///
+    /// [`add_function`]: #method.add_function
+    pub fn add_function_mut<A, R, F>(&mut self, name: &str, function: F)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+    {
+        self.methods
+            .insert(name.to_owned(), Self::box_function_mut(function));
+    }
+
     /// Add a metamethod which accepts a `&T` as the first parameter.
     ///
     /// # Note
@@ -175,6 +191,21 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         self.meta_methods.insert(meta, Self::box_function(function));
     }
 
+    /// Add a metamethod as a mutable function which accepts generic arguments.
+    ///
+    /// This is a version of [`add_meta_function`] that accepts a FnMut argument.
+    ///
+    /// [`add_meta_function`]: #method.add_meta_function
+    pub fn add_meta_function_mut<A, R, F>(&mut self, meta: MetaMethod, function: F)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+    {
+        self.meta_methods
+            .insert(meta, Self::box_function_mut(function));
+    }
+
     fn box_function<A, R, F>(function: F) -> Callback<'lua, 'static>
     where
         A: FromLuaMulti<'lua>,
@@ -182,6 +213,21 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
         F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
     {
         Box::new(move |lua, args| function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua))
+    }
+
+    fn box_function_mut<A, R, F>(function: F) -> Callback<'lua, 'static>
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+    {
+        let function = RefCell::new(function);
+        Box::new(move |lua, args| {
+            let function = &mut *function
+                .try_borrow_mut()
+                .map_err(|_| Error::RecursiveMutCallback)?;
+            function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+        })
     }
 
     fn box_method<A, R, M>(method: M) -> Callback<'lua, 'static>
