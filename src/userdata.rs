@@ -470,7 +470,7 @@ impl<'lua> AnyUserData<'lua> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
-                check_stack(lua.state, 2);
+                check_stack(lua.state, 3);
                 lua.push_ref(lua.state, &self.0);
                 ffi::lua_getuservalue(lua.state, -1);
                 let res = V::from_lua(lua.pop_value(lua.state), lua)?;

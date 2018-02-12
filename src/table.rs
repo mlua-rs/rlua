@@ -347,7 +347,7 @@ where
 
             unsafe {
                 stack_guard(lua.state, 0, || {
-                    check_stack(lua.state, 5);
+                    check_stack(lua.state, 6);
 
                     lua.push_ref(lua.state, &self.table);
                     lua.push_ref(lua.state, &next_key);
@@ -409,7 +409,7 @@ where
 
             unsafe {
                 stack_guard(lua.state, 0, || {
-                    check_stack(lua.state, 4);
+                    check_stack(lua.state, 5);
 
                     lua.push_ref(lua.state, &self.table);
                     match protect_lua_call(lua.state, 1, 1, |state| ffi::lua_geti(state, -1, index))

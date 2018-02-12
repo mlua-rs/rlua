@@ -80,7 +80,7 @@ impl<'lua> Function<'lua> {
                 }
                 let nresults = ffi::lua_gettop(lua.state) - stack_start;
                 let mut results = MultiValue::new();
-                check_stack(lua.state, 1);
+                check_stack(lua.state, 2);
                 for _ in 0..nresults {
                     results.push_front(lua.pop_value(lua.state));
                 }

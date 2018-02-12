@@ -72,7 +72,11 @@ impl<'lua> String<'lua> {
             stack_guard(lua.state, 0, || {
                 check_stack(lua.state, 1);
                 lua.push_ref(lua.state, &self.0);
-                assert_eq!(ffi::lua_type(lua.state, -1), ffi::LUA_TSTRING);
+                lua_internal_assert!(
+                    lua.state,
+                    ffi::lua_type(lua.state, -1) == ffi::LUA_TSTRING,
+                    "string ref is not string type"
+                );
 
                 let mut size = 0;
                 // This will not trigger a 'm' error, because the reference is guaranteed to be of

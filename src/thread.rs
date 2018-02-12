@@ -107,7 +107,7 @@ impl<'lua> Thread<'lua> {
 
                 let nresults = ffi::lua_gettop(thread_state);
                 let mut results = MultiValue::new();
-                check_stack(thread_state, 1);
+                check_stack(thread_state, 2);
                 for _ in 0..nresults {
                     results.push_front(lua.pop_value(thread_state));
                 }

@@ -565,7 +565,7 @@ impl Lua {
             }
 
             stack_err_guard(self.state, 0, || {
-                check_stack(self.state, 1);
+                check_stack(self.state, 2);
                 ffi::lua_rawgeti(
                     self.state,
                     ffi::LUA_REGISTRYINDEX,
@@ -672,7 +672,7 @@ impl Lua {
         }
     }
 
-    // Uses 1 stack space, does not call checkstack
+    // Uses 2 stack spaces, does not call checkstack
     pub(crate) unsafe fn pop_value(&self, state: *mut ffi::lua_State) -> Value {
         match ffi::lua_type(state, -1) {
             ffi::LUA_TNIL => {
@@ -709,10 +709,9 @@ impl Lua {
             ffi::LUA_TFUNCTION => Value::Function(Function(self.pop_ref(state))),
 
             ffi::LUA_TUSERDATA => {
-                // It should not be possible to interact with userdata types
-                // other than custom UserData types OR a WrappedError.
-                // WrappedPanic should never be able to be caught in lua, so it
-                // should never be here.
+                // It should not be possible to interact with userdata types other than custom
+                // UserData types OR a WrappedError.  WrappedPanic should never be able to be caught
+                // in lua, so it should never be here.
                 if let Some(err) = pop_wrapped_error(state) {
                     Value::Error(err)
                 } else {
@@ -1011,7 +1010,7 @@ impl Lua {
 
                 let nargs = ffi::lua_gettop(state);
                 let mut args = MultiValue::new();
-                check_stack(state, 1);
+                check_stack(state, 2);
                 for _ in 0..nargs {
                     args.push_front(lua.pop_value(state));
                 }

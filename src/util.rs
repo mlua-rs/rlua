@@ -179,6 +179,7 @@ where
 // Pops an error off of the stack and returns it. If the error is actually a WrappedPanic, clears
 // the current lua stack and continues the panic.  If the error on the top of the stack is actually
 // a WrappedError, just returns it.  Otherwise, interprets the error as the appropriate lua error.
+// Uses 2 stack spaces, does not call lua_checkstack.
 pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
     lua_internal_assert!(
         state,
@@ -334,6 +335,8 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
 
 // A variant of pcall that does not allow lua to catch panic errors from callback_error
 pub unsafe extern "C" fn safe_pcall(state: *mut ffi::lua_State) -> c_int {
+    ffi::luaL_checkstack(state, 2, ptr::null());
+
     let top = ffi::lua_gettop(state);
     if top == 0 {
         ffi::lua_pushstring(state, cstr!("not enough arguments to pcall"));
@@ -355,6 +358,8 @@ pub unsafe extern "C" fn safe_pcall(state: *mut ffi::lua_State) -> c_int {
 // A variant of xpcall that does not allow lua to catch panic errors from callback_error
 pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
     unsafe extern "C" fn xpcall_msgh(state: *mut ffi::lua_State) -> c_int {
+        ffi::luaL_checkstack(state, 2, ptr::null());
+
         if is_wrapped_panic(state, -1) {
             1
         } else {
@@ -364,6 +369,8 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
             ffi::lua_gettop(state)
         }
     }
+
+    ffi::luaL_checkstack(state, 2, ptr::null());
 
     let top = ffi::lua_gettop(state);
     if top < 2 {
@@ -411,10 +418,11 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
     ffi::lua_setmetatable(state, -2);
 }
 
-// Pops a WrappedError off of the top of the stack, if it is a WrappedError.  If
-// it is not a WrappedError, returns None and does not pop anything.
+// Pops a WrappedError off of the top of the stack, if it is a WrappedError.  If it is not a
+// WrappedError, returns None and does not pop anything.  Uses 2 stack spaces and does not call
+// lua_checkstack
 pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<Error> {
-    if ffi::lua_gettop(state) == 0 || !is_wrapped_error(state, -1) {
+    if !is_wrapped_error(state, -1) {
         None
     } else {
         let err = &*get_userdata::<WrappedError>(state, -1);
@@ -456,16 +464,9 @@ unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>)
     ffi::lua_setmetatable(state, -2);
 }
 
-// Checks if the value at the given index is a WrappedError
+// Checks if the value at the given index is a WrappedError, uses 2 stack spaces and does not call
+// lua_checkstack.
 unsafe fn is_wrapped_error(state: *mut ffi::lua_State, index: c_int) -> bool {
-    assert_ne!(
-        ffi::lua_checkstack(state, 2),
-        0,
-        "somehow not enough stack space to check if a value is a WrappedError"
-    );
-
-    let index = ffi::lua_absindex(state, index);
-
     let userdata = ffi::lua_touserdata(state, index);
     if userdata.is_null() {
         return false;
@@ -481,16 +482,9 @@ unsafe fn is_wrapped_error(state: *mut ffi::lua_State, index: c_int) -> bool {
     res
 }
 
-// Checks if the value at the given index is a WrappedPanic
+// Checks if the value at the given index is a WrappedPanic.  Uses 2 stack spaces and does not call
+// lua_checkstack.
 unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool {
-    assert_ne!(
-        ffi::lua_checkstack(state, 2),
-        0,
-        "somehow not enough stack space to check if a value is a wrapped panic"
-    );
-
-    let index = ffi::lua_absindex(state, index);
-
     let userdata = ffi::lua_touserdata(state, index);
     if userdata.is_null() {
         return false;
@@ -510,6 +504,8 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
     static ERROR_METATABLE_REGISTRY_KEY: u8 = 0;
 
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
+        ffi::luaL_checkstack(state, 2, ptr::null());
+
         callback_error(state, || {
             if is_wrapped_error(state, -1) {
                 let error = get_userdata::<WrappedError>(state, -1);

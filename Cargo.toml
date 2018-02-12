@@ -33,4 +33,3 @@ gcc = { version = "0.3.52", optional = true }
 
 [dev-dependencies]
 rustyline = "1.0.0"
-
