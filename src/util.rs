@@ -398,7 +398,7 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
     }
 }
 
-// Does not call checkstack, uses 1 stack space
+// Does not call lua_checkstack, uses 1 stack space.
 pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
     ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_MAINTHREAD);
     let main_state = ffi::lua_tothread(state, -1);
@@ -420,12 +420,13 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
 
 // Pops a WrappedError off of the top of the stack, if it is a WrappedError.  If it is not a
 // WrappedError, returns None and does not pop anything.  Uses 2 stack spaces and does not call
-// lua_checkstack
+// lua_checkstack.
 pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<Error> {
     if !is_wrapped_error(state, -1) {
         None
     } else {
         let err = &*get_userdata::<WrappedError>(state, -1);
+        // We are assuming here that Error::clone() cannot panic.
         let err = err.0.clone();
         ffi::lua_pop(state, 1);
         Some(err)
