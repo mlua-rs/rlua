@@ -1,3 +1,8 @@
+## [0.12.2]
+- Some minor documentation fixes.
+- Fix for some rare panics which might result in an abort from panicking across
+  a C API boundary.
+
 ## [0.12.1]
 - Fix a stupid bug where `AnyUserData::set_user_value` /
   `AnyUserData::get_user_value` could panic if the `ToLua` / `FromLua` type
