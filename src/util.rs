@@ -105,7 +105,7 @@ where
 // limited lua stack.  `nargs` and `nresults` are similar to the parameters of `lua_pcall`, but the
 // given function return type is not the return value count, instead the inner function return
 // values are assumed to match the `nresults` param.  Internally uses 3 extra stack spaces, and does
-// not call checkstack.
+// not call checkstack.  Provided function must *not* panic.
 pub unsafe fn protect_lua_call<F, R>(
     state: *mut ffi::lua_State,
     nargs: c_int,
@@ -121,6 +121,7 @@ where
         nresults: c_int,
     }
 
+    #[cfg_attr(feature = "unwind", unwind)]
     unsafe extern "C" fn do_call<F, R>(state: *mut ffi::lua_State) -> c_int
     where
         F: FnOnce(*mut ffi::lua_State) -> R,
@@ -271,6 +272,7 @@ pub unsafe fn take_userdata<T>(state: *mut ffi::lua_State) -> T {
     ptr::read(ud)
 }
 
+#[cfg_attr(feature = "unwind", unwind)]
 pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
     callback_error(state, || {
         take_userdata::<T>(state);
@@ -291,11 +293,13 @@ where
         Ok(Err(err)) => {
             ffi::luaL_checkstack(state, 2, ptr::null());
             push_wrapped_error(state, err);
+            println!("erroring...");
             ffi::lua_error(state)
         }
         Err(p) => {
             ffi::luaL_checkstack(state, 2, ptr::null());
             push_wrapped_panic(state, p);
+            println!("erroring...");
             ffi::lua_error(state)
         }
     }
@@ -304,6 +308,7 @@ where
 // Takes an error at the top of the stack, and if it is a WrappedError, converts it to an
 // Error::CallbackError with a traceback, if it is some lua type, prints the error along with a
 // traceback, and if it is a WrappedPanic, does not modify it.
+#[cfg_attr(feature = "unwind", unwind)]
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     ffi::luaL_checkstack(state, 2, ptr::null());
 
@@ -334,6 +339,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
 }
 
 // A variant of pcall that does not allow lua to catch panic errors from callback_error
+#[cfg_attr(feature = "unwind", unwind)]
 pub unsafe extern "C" fn safe_pcall(state: *mut ffi::lua_State) -> c_int {
     ffi::luaL_checkstack(state, 2, ptr::null());
 
@@ -356,7 +362,9 @@ pub unsafe extern "C" fn safe_pcall(state: *mut ffi::lua_State) -> c_int {
 }
 
 // A variant of xpcall that does not allow lua to catch panic errors from callback_error
+#[cfg_attr(feature = "unwind", unwind)]
 pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
+    #[cfg_attr(feature = "unwind", unwind)]
     unsafe extern "C" fn xpcall_msgh(state: *mut ffi::lua_State) -> c_int {
         ffi::luaL_checkstack(state, 2, ptr::null());
 
@@ -504,6 +512,7 @@ unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool {
 unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
     static ERROR_METATABLE_REGISTRY_KEY: u8 = 0;
 
+    #[cfg_attr(feature = "unwind", unwind)]
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
         ffi::luaL_checkstack(state, 2, ptr::null());
 
@@ -605,6 +614,7 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
 unsafe fn get_destructed_userdata_metatable(state: *mut ffi::lua_State) -> c_int {
     static DESTRUCTED_USERDATA_METATABLE: u8 = 0;
 
+    #[cfg_attr(feature = "unwind", unwind)]
     unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
         ffi::luaL_checkstack(state, 2, ptr::null());
         push_wrapped_error(state, Error::CallbackDestructed);

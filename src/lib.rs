@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "unwind", feature(unwind_attributes))]
+
 //! # High-level bindings to Lua
 //!
 //! The `rlua` crate provides safe high-level bindings to the [Lua programming language].
