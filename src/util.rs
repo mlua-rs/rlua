@@ -293,13 +293,11 @@ where
         Ok(Err(err)) => {
             ffi::luaL_checkstack(state, 2, ptr::null());
             push_wrapped_error(state, err);
-            println!("erroring...");
             ffi::lua_error(state)
         }
         Err(p) => {
             ffi::luaL_checkstack(state, 2, ptr::null());
             push_wrapped_panic(state, p);
-            println!("erroring...");
             ffi::lua_error(state)
         }
     }

@@ -59,8 +59,8 @@ pub const LUA_GCISRUNNING: c_int = 9;
 #[link(name = "lua5.3")]
 extern "C" {
     pub fn lua_newstate(alloc: lua_Alloc, ud: *mut c_void) -> *mut lua_State;
-
     pub fn lua_close(state: *mut lua_State);
+
     pub fn lua_callk(
         state: *mut lua_State,
         nargs: c_int,
