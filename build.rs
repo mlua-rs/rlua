@@ -1,13 +1,15 @@
 #[cfg(feature = "builtin-lua")]
 extern crate gcc;
+extern crate rustc_version;
 
 use std::env;
 
 fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS");
     let target_family = env::var("CARGO_CFG_TARGET_FAMILY");
-
-    if target_family == Ok("windows".to_string()) {
+    if target_family == Ok("windows".to_string())
+        && rustc_version::version().unwrap() == rustc_version::Version::parse("1.24.0").unwrap()
+    {
         // Error handling is completely broken on windows with
         // https://github.com/rust-lang/rust/pull/46833 merged, and this includes stable rustc
         // 1.24.0+.  `#[unwind]` fixes error handling on windows, but requires nightly!  This
