@@ -122,7 +122,7 @@ impl<'lua> Function<'lua> {
     /// # }
     /// ```
     pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> Result<Function<'lua>> {
-        #[cfg_attr(feature = "unwind", unwind)]
+        #[cfg_attr(unwind, unwind)]
         unsafe extern "C" fn bind_call_impl(state: *mut ffi::lua_State) -> c_int {
             let nargs = ffi::lua_gettop(state);
             let nbinds = ffi::lua_tointeger(state, ffi::lua_upvalueindex(2)) as c_int;

@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "unwind", feature(unwind_attributes))]
+#![cfg_attr(unwind, feature(unwind_attributes))]
 
 //! # High-level bindings to Lua
 //!
