@@ -314,11 +314,14 @@ where
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     ffi::luaL_checkstack(state, 2, ptr::null());
 
-    if let Some(error) = pop_wrapped_error(state) {
+    if is_wrapped_error(state, 1) {
         ffi::luaL_traceback(state, state, ptr::null(), 0);
         let traceback = CStr::from_ptr(ffi::lua_tostring(state, -1))
             .to_string_lossy()
             .into_owned();
+        ffi::lua_pop(state, 1);
+
+        let error = pop_wrapped_error(state).unwrap();
         push_wrapped_error(
             state,
             Error::CallbackError {
@@ -326,7 +329,6 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
                 cause: Arc::new(error),
             },
         );
-        ffi::lua_remove(state, -2);
     } else if !is_wrapped_panic(state, 1) {
         let s = ffi::lua_tostring(state, 1);
         let s = if s.is_null() {
