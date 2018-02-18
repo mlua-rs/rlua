@@ -151,7 +151,7 @@ impl<'lua> Function<'lua> {
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
 
-                if nargs > MAX_LUA_UPVALUES {
+                if nargs + 2 > MAX_LUA_UPVALUES {
                     return Err(Error::BindError);
                 }
 

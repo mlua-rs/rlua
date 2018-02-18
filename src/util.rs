@@ -291,12 +291,16 @@ where
     match catch_unwind(f) {
         Ok(Ok(r)) => r,
         Ok(Err(err)) => {
+            ffi::lua_settop(state, 0);
             ffi::luaL_checkstack(state, 2, ptr::null());
             push_wrapped_error(state, err);
             ffi::lua_error(state)
         }
         Err(p) => {
-            ffi::luaL_checkstack(state, 2, ptr::null());
+            ffi::lua_settop(state, 0);
+            if ffi::lua_checkstack(state, 2) == 0 {
+                lua_internal_abort!("not enough stack space to propagate panic");
+            }
             push_wrapped_panic(state, p);
             ffi::lua_error(state)
         }
@@ -456,6 +460,124 @@ pub unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) ->
     }
 }
 
+// Initialize the error, panic, and destructed userdata metatables.
+pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
+    check_stack(state, 8);
+
+    // Create error metatable
+
+    #[cfg_attr(unwind, unwind)]
+    unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
+        ffi::luaL_checkstack(state, 2, ptr::null());
+
+        callback_error(state, || {
+            if is_wrapped_error(state, -1) {
+                let error = get_userdata::<WrappedError>(state, -1);
+                let error_str = (*error).0.to_string();
+                gc_guard(state, || {
+                    ffi::lua_pushlstring(
+                        state,
+                        error_str.as_ptr() as *const c_char,
+                        error_str.len(),
+                    )
+                });
+                ffi::lua_remove(state, -2);
+
+                Ok(1)
+            } else {
+                panic!("userdata mismatch in Error metamethod");
+            }
+        })
+    }
+
+    ffi::lua_pushlightuserdata(
+        state,
+        &ERROR_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+    );
+    ffi::lua_newtable(state);
+
+    ffi::lua_pushstring(state, cstr!("__gc"));
+    ffi::lua_pushcfunction(state, userdata_destructor::<WrappedError>);
+    ffi::lua_rawset(state, -3);
+
+    ffi::lua_pushstring(state, cstr!("__tostring"));
+    ffi::lua_pushcfunction(state, error_tostring);
+    ffi::lua_rawset(state, -3);
+
+    ffi::lua_pushstring(state, cstr!("__metatable"));
+    ffi::lua_pushboolean(state, 0);
+    ffi::lua_rawset(state, -3);
+
+    ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+
+    // Create panic metatable
+
+    ffi::lua_pushlightuserdata(
+        state,
+        &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+    );
+    ffi::lua_newtable(state);
+
+    ffi::lua_pushstring(state, cstr!("__gc"));
+    ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
+    ffi::lua_rawset(state, -3);
+
+    ffi::lua_pushstring(state, cstr!("__metatable"));
+    ffi::lua_pushboolean(state, 0);
+    ffi::lua_rawset(state, -3);
+
+    ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+
+    // Create destructed userdata metatable
+
+    #[cfg_attr(unwind, unwind)]
+    unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
+        ffi::luaL_checkstack(state, 2, ptr::null());
+        push_wrapped_error(state, Error::CallbackDestructed);
+        ffi::lua_error(state)
+    }
+
+    ffi::lua_pushlightuserdata(
+        state,
+        &DESTRUCTED_USERDATA_METATABLE as *const u8 as *mut c_void,
+    );
+    ffi::lua_newtable(state);
+
+    for &method in &[
+        cstr!("__add"),
+        cstr!("__sub"),
+        cstr!("__mul"),
+        cstr!("__div"),
+        cstr!("__mod"),
+        cstr!("__pow"),
+        cstr!("__unm"),
+        cstr!("__idiv"),
+        cstr!("__band"),
+        cstr!("__bor"),
+        cstr!("__bxor"),
+        cstr!("__bnot"),
+        cstr!("__shl"),
+        cstr!("__shr"),
+        cstr!("__concat"),
+        cstr!("__len"),
+        cstr!("__eq"),
+        cstr!("__lt"),
+        cstr!("__le"),
+        cstr!("__index"),
+        cstr!("__newindex"),
+        cstr!("__call"),
+        cstr!("__tostring"),
+        cstr!("__pairs"),
+        cstr!("__ipairs"),
+    ] {
+        ffi::lua_pushstring(state, method);
+        ffi::lua_pushcfunction(state, destructed_error);
+        ffi::lua_rawset(state, -3);
+    }
+
+    ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+}
+
 struct WrappedError(pub Error);
 struct WrappedPanic(pub Option<Box<Any + Send>>);
 
@@ -507,172 +629,30 @@ unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool {
     res
 }
 
-unsafe fn get_error_metatable(state: *mut ffi::lua_State) -> c_int {
-    static ERROR_METATABLE_REGISTRY_KEY: u8 = 0;
-
-    #[cfg_attr(unwind, unwind)]
-    unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
-        ffi::luaL_checkstack(state, 2, ptr::null());
-
-        callback_error(state, || {
-            if is_wrapped_error(state, -1) {
-                let error = get_userdata::<WrappedError>(state, -1);
-                let error_str = (*error).0.to_string();
-                gc_guard(state, || {
-                    ffi::lua_pushlstring(
-                        state,
-                        error_str.as_ptr() as *const c_char,
-                        error_str.len(),
-                    )
-                });
-                ffi::lua_remove(state, -2);
-
-                Ok(1)
-            } else {
-                panic!("userdata mismatch in Error metamethod");
-            }
-        })
-    }
-
+unsafe fn get_error_metatable(state: *mut ffi::lua_State) {
     ffi::lua_pushlightuserdata(
         state,
         &ERROR_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
     );
-    let t = ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
-
-    if t != ffi::LUA_TTABLE {
-        ffi::lua_pop(state, 1);
-
-        ffi::luaL_checkstack(state, 8, ptr::null());
-
-        gc_guard(state, || {
-            ffi::lua_newtable(state);
-            ffi::lua_pushlightuserdata(
-                state,
-                &ERROR_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-            );
-            ffi::lua_pushvalue(state, -2);
-
-            ffi::lua_pushstring(state, cstr!("__gc"));
-            ffi::lua_pushcfunction(state, userdata_destructor::<WrappedError>);
-            ffi::lua_rawset(state, -3);
-
-            ffi::lua_pushstring(state, cstr!("__tostring"));
-            ffi::lua_pushcfunction(state, error_tostring);
-            ffi::lua_rawset(state, -3);
-
-            ffi::lua_pushstring(state, cstr!("__metatable"));
-            ffi::lua_pushboolean(state, 0);
-            ffi::lua_rawset(state, -3);
-
-            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
-        })
-    }
-
-    ffi::LUA_TTABLE
+    ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
 }
 
-unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> c_int {
-    static PANIC_METATABLE_REGISTRY_KEY: u8 = 0;
-
+unsafe fn get_panic_metatable(state: *mut ffi::lua_State) {
     ffi::lua_pushlightuserdata(
         state,
         &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
     );
-    let t = ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
-
-    if t != ffi::LUA_TTABLE {
-        ffi::lua_pop(state, 1);
-
-        ffi::luaL_checkstack(state, 8, ptr::null());
-
-        gc_guard(state, || {
-            ffi::lua_newtable(state);
-            ffi::lua_pushlightuserdata(
-                state,
-                &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-            );
-            ffi::lua_pushvalue(state, -2);
-
-            ffi::lua_pushstring(state, cstr!("__gc"));
-            ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
-            ffi::lua_rawset(state, -3);
-
-            ffi::lua_pushstring(state, cstr!("__metatable"));
-            ffi::lua_pushboolean(state, 0);
-            ffi::lua_rawset(state, -3);
-
-            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
-        });
-    }
-
-    ffi::LUA_TTABLE
+    ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
 }
 
-unsafe fn get_destructed_userdata_metatable(state: *mut ffi::lua_State) -> c_int {
-    static DESTRUCTED_USERDATA_METATABLE: u8 = 0;
-
-    #[cfg_attr(unwind, unwind)]
-    unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
-        ffi::luaL_checkstack(state, 2, ptr::null());
-        push_wrapped_error(state, Error::CallbackDestructed);
-        ffi::lua_error(state)
-    }
-
+unsafe fn get_destructed_userdata_metatable(state: *mut ffi::lua_State) {
     ffi::lua_pushlightuserdata(
         state,
         &DESTRUCTED_USERDATA_METATABLE as *const u8 as *mut c_void,
     );
-    let t = ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
-
-    if t != ffi::LUA_TTABLE {
-        ffi::lua_pop(state, 1);
-
-        ffi::luaL_checkstack(state, 8, ptr::null());
-
-        gc_guard(state, || {
-            ffi::lua_newtable(state);
-            ffi::lua_pushlightuserdata(
-                state,
-                &DESTRUCTED_USERDATA_METATABLE as *const u8 as *mut c_void,
-            );
-            ffi::lua_pushvalue(state, -2);
-
-            for &method in &[
-                cstr!("__add"),
-                cstr!("__sub"),
-                cstr!("__mul"),
-                cstr!("__div"),
-                cstr!("__mod"),
-                cstr!("__pow"),
-                cstr!("__unm"),
-                cstr!("__idiv"),
-                cstr!("__band"),
-                cstr!("__bor"),
-                cstr!("__bxor"),
-                cstr!("__bnot"),
-                cstr!("__shl"),
-                cstr!("__shr"),
-                cstr!("__concat"),
-                cstr!("__len"),
-                cstr!("__eq"),
-                cstr!("__lt"),
-                cstr!("__le"),
-                cstr!("__index"),
-                cstr!("__newindex"),
-                cstr!("__call"),
-                cstr!("__tostring"),
-                cstr!("__pairs"),
-                cstr!("__ipairs"),
-            ] {
-                ffi::lua_pushstring(state, method);
-                ffi::lua_pushcfunction(state, destructed_error);
-                ffi::lua_rawset(state, -3);
-            }
-
-            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
-        });
-    }
-
-    ffi::LUA_TTABLE
+    ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
 }
+
+static ERROR_METATABLE_REGISTRY_KEY: u8 = 0;
+static PANIC_METATABLE_REGISTRY_KEY: u8 = 0;
+static DESTRUCTED_USERDATA_METATABLE: u8 = 0;

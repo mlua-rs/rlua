@@ -937,6 +937,8 @@ impl Lua {
             ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
             ffi::lua_pop(state, 9);
 
+            init_error_metatables(state);
+
             if load_debug {
                 ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
                 ffi::lua_pop(state, 1);
