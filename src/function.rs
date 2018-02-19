@@ -146,12 +146,10 @@ impl<'lua> Function<'lua> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
-                const MAX_LUA_UPVALUES: c_int = 255;
-
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
 
-                if nargs + 2 > MAX_LUA_UPVALUES {
+                if nargs + 2 > ffi::LUA_MAX_UPVALUES {
                     return Err(Error::BindError);
                 }
 

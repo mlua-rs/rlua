@@ -21,6 +21,7 @@ default = ["builtin-lua"]
 #   * LUA_INTEGER is long long
 #   * LUA_NUMBER as double
 #   * LUA_EXTRASPACE is sizeof(void*)
+#   * LUAI_MAXSTACK is 1000000
 builtin-lua = ["gcc"]
 
 [dependencies]
