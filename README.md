@@ -115,13 +115,6 @@ If you encounter them, a bug report would be very welcome:
     *absolutely* a bug, particularly because without `LUA_USE_APICHECK` it would
     generally be unsafe.
   * Lua C API errors are handled by lonjmp.  *ALL* instances where the Lua C API
-    would longjmp should be protected from Rust, except in a few cases of
-    internal callbacks where there are only Copy types on the stack.  If you
-    detect that `rlua` is triggering a longjmp over Rust stack frames (other
-    than the internal ones where this is intentional), this is a bug!  (NOTE: I
-    believe it is still an open question whether technically Rust allows longjmp
-    over Rust stack frames *at all*, even if there are only Copy types on the
-    stack.  Currently `rlua` uses this to avoid having to write a lot of messy C
-    shims.  It *currently* works fine, and it is difficult to imagine how it
-    would ever NOT work, but what is and isn't UB in unsafe Rust is not
-    precisely specified.)
+    would longjmp should be protected from Rust, except in internal callbacks
+    where this is intentional.  If you detect that `rlua` is triggering a
+    longjmp over your Rust stack frames, this is a bug!
