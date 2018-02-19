@@ -312,14 +312,21 @@ where
 // traceback, and if it is a WrappedPanic, does not modify it.
 #[cfg_attr(unwind, unwind)]
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
-    ffi::luaL_checkstack(state, 2, ptr::null());
-
-    if is_wrapped_error(state, 1) {
-        ffi::luaL_traceback(state, state, ptr::null(), 0);
-        let traceback = CStr::from_ptr(ffi::lua_tostring(state, -1))
-            .to_string_lossy()
-            .into_owned();
-        ffi::lua_pop(state, 1);
+    if ffi::lua_checkstack(state, 2) == 0 {
+        // If we don't have enough stack space to even check the error type, do nothing
+    } else if is_wrapped_error(state, 1) {
+        let traceback = if ffi::lua_checkstack(state, 11) != 0 {
+            gc_guard(state, || {
+                ffi::luaL_traceback(state, state, ptr::null(), 0);
+            });
+            let traceback = CStr::from_ptr(ffi::lua_tostring(state, -1))
+                .to_string_lossy()
+                .into_owned();
+            ffi::lua_pop(state, 1);
+            traceback
+        } else {
+            "not enough stack space for traceback".to_owned()
+        };
 
         let error = pop_wrapped_error(state).unwrap();
         push_wrapped_error(
@@ -330,14 +337,18 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
             },
         );
     } else if !is_wrapped_panic(state, 1) {
-        let s = ffi::lua_tostring(state, 1);
-        let s = if s.is_null() {
-            cstr!("<unprintable Rust panic>")
-        } else {
-            s
-        };
-        ffi::luaL_traceback(state, state, s, 0);
-        ffi::lua_remove(state, -2);
+        if ffi::lua_checkstack(state, 11) != 0 {
+            gc_guard(state, || {
+                let s = ffi::lua_tostring(state, 1);
+                let s = if s.is_null() {
+                    cstr!("<unprintable lua error>")
+                } else {
+                    s
+                };
+                ffi::luaL_traceback(state, state, s, 0);
+                ffi::lua_remove(state, -2);
+            });
+        }
     }
     1
 }
