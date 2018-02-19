@@ -31,7 +31,6 @@ compiletest_rs = { version = "0.3", optional = true }
 
 [build-dependencies]
 gcc = { version = "0.3.52", optional = true }
-rustc_version = { version = "0.2" }
 
 [dev-dependencies]
 rustyline = "1.0.0"

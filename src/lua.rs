@@ -759,7 +759,6 @@ impl Lua {
     pub(crate) unsafe fn userdata_metatable<T: UserData>(&self) -> Result<c_int> {
         // Used if both an __index metamethod is set and regular methods, checks methods table
         // first, then __index metamethod.
-        #[cfg_attr(unwind, unwind)]
         unsafe extern "C" fn meta_index_impl(state: *mut ffi::lua_State) -> c_int {
             ffi::luaL_checkstack(state, 2, ptr::null());
 
@@ -997,7 +996,6 @@ impl Lua {
         &'lua self,
         func: Callback<'callback, 'static>,
     ) -> Result<Function<'lua>> {
-        #[cfg_attr(unwind, unwind)]
         unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, || {
                 let lua = Lua {

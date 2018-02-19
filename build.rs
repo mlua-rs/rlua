@@ -1,29 +1,14 @@
 #[cfg(feature = "builtin-lua")]
 extern crate gcc;
-extern crate rustc_version;
-
-use std::env;
 
 fn main() {
-    let target_os = env::var("CARGO_CFG_TARGET_OS");
-    let target_family = env::var("CARGO_CFG_TARGET_FAMILY");
-    if target_family == Ok("windows".to_string())
-        && rustc_version::version().unwrap() == rustc_version::Version::parse("1.24.0").unwrap()
-    {
-        // Error handling is completely broken on windows with
-        // https://github.com/rust-lang/rust/pull/46833 merged, and this includes stable rustc
-        // 1.24.0+.  `#[unwind]` fixes error handling on windows, but requires nightly!  This
-        // HORRIBLE HACK enables `#[unwind]` on stable rust by setting RUSTC_BOOTSTRAP=1 during
-        // build.  This is very evil, don't do this kids.
-        //
-        // See https://github.com/rust-lang/rust/issues/48251 and
-        // https://github.com/chucklefish/rlua/issues/71 for more details.
-        println!("cargo:rustc-env=RUSTC_BOOTSTRAP=1");
-        println!("cargo:rustc-cfg=unwind");
-    }
-
     #[cfg(feature = "builtin-lua")]
     {
+        use std::env;
+
+        let target_os = env::var("CARGO_CFG_TARGET_OS");
+        let target_family = env::var("CARGO_CFG_TARGET_FAMILY");
+
         let mut config = gcc::Build::new();
 
         if target_os == Ok("linux".to_string()) {
