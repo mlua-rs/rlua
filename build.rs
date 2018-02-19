@@ -1,15 +1,12 @@
-#[cfg(feature = "builtin-lua")]
 extern crate gcc;
-extern crate rustc_version;
 
 use std::env;
 
 fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS");
     let target_family = env::var("CARGO_CFG_TARGET_FAMILY");
-    if target_family == Ok("windows".to_string())
-        && rustc_version::version().unwrap() == rustc_version::Version::parse("1.24.0").unwrap()
-    {
+
+    if target_family == Ok("windows".to_string()) {
         // Error handling is completely broken on windows with
         // https://github.com/rust-lang/rust/pull/46833 merged, and this includes stable rustc
         // 1.24.0+.  `#[unwind]` fixes error handling on windows, but requires nightly!  This
@@ -22,23 +19,25 @@ fn main() {
         println!("cargo:rustc-cfg=unwind");
     }
 
+    let mut config = gcc::Build::new();
+
+    if target_os == Ok("linux".to_string()) {
+        config.define("LUA_USE_LINUX", None);
+    } else if target_os == Ok("macos".to_string()) {
+        config.define("LUA_USE_MACOSX", None);
+    } else if target_family == Ok("unix".to_string()) {
+        config.define("LUA_USE_POSIX", None);
+    } else if target_family == Ok("windows".to_string()) {
+        config.define("LUA_USE_WINDOWS", None);
+    }
+
+    if cfg!(debug_assertions) {
+        config.define("LUA_USE_APICHECK", None);
+    }
+
     #[cfg(feature = "builtin-lua")]
     {
-        let mut config = gcc::Build::new();
-
-        if target_os == Ok("linux".to_string()) {
-            config.define("LUA_USE_LINUX", None);
-        } else if target_os == Ok("macos".to_string()) {
-            config.define("LUA_USE_MACOSX", None);
-        } else if target_family == Ok("unix".to_string()) {
-            config.define("LUA_USE_POSIX", None);
-        } else if target_family == Ok("windows".to_string()) {
-            config.define("LUA_USE_WINDOWS", None);
-        }
-
-        if cfg!(debug_assertions) {
-            config.define("LUA_USE_APICHECK", None);
-        }
+        let mut config = config.clone();
 
         config
             .include("lua")
@@ -77,4 +76,11 @@ fn main() {
             .file("lua/lzio.c")
             .compile("liblua5.3.a");
     }
+
+    config
+        .include("lua")
+        .include("cbits")
+        .file("cbits/macros.c")
+        .file("cbits/safe.c")
+        .compile("librlua_cbits.a");
 }

@@ -51,6 +51,7 @@ mod error;
 #[macro_use]
 mod macros;
 mod util;
+mod safe;
 mod value;
 mod types;
 mod lua;

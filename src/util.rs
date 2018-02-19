@@ -7,6 +7,7 @@ use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
 
 use ffi;
 use error::{Error, Result};
+use safe;
 
 // Checks that Lua has enough free stack space for future stack operations.  On failure, this will
 // clear the stack and panic.
@@ -100,83 +101,6 @@ where
     res
 }
 
-// Call a function that calls into the Lua API and may trigger a Lua error (longjmp) in a safe way.
-// Wraps the inner function in a call to `lua_pcall`, so the inner function only has access to a
-// limited lua stack.  `nargs` and `nresults` are similar to the parameters of `lua_pcall`, but the
-// given function return type is not the return value count, instead the inner function return
-// values are assumed to match the `nresults` param.  Internally uses 3 extra stack spaces, and does
-// not call checkstack.  Provided function must *not* panic.
-pub unsafe fn protect_lua_call<F, R>(
-    state: *mut ffi::lua_State,
-    nargs: c_int,
-    nresults: c_int,
-    f: F,
-) -> Result<R>
-where
-    F: FnOnce(*mut ffi::lua_State) -> R,
-{
-    struct Params<F, R> {
-        function: F,
-        result: R,
-        nresults: c_int,
-    }
-
-    #[cfg_attr(unwind, unwind)]
-    unsafe extern "C" fn do_call<F, R>(state: *mut ffi::lua_State) -> c_int
-    where
-        F: FnOnce(*mut ffi::lua_State) -> R,
-    {
-        let params = ffi::lua_touserdata(state, -1) as *mut Params<F, R>;
-        ffi::lua_pop(state, 1);
-
-        let function = mem::replace(&mut (*params).function, mem::uninitialized());
-        ptr::write(&mut (*params).result, function(state));
-        // params now has function uninitialied and result initialized
-
-        if (*params).nresults == ffi::LUA_MULTRET {
-            ffi::lua_gettop(state)
-        } else {
-            (*params).nresults
-        }
-    }
-
-    let stack_start = ffi::lua_gettop(state) - nargs;
-
-    ffi::lua_pushcfunction(state, error_traceback);
-    ffi::lua_pushcfunction(state, do_call::<F, R>);
-    ffi::lua_rotate(state, stack_start + 1, 2);
-
-    // We are about to do some really scary stuff with the Params structure, both because
-    // protect_lua_call is very hot, and becuase we would like to allow the function type to be
-    // FnOnce rather than FnMut.  We are using Params here both to pass data to the callback and
-    // return data from the callback.
-    //
-    // params starts out with function initialized and result uninitialized, nresults is Copy so we
-    // don't care about it.
-    let mut params = Params {
-        function: f,
-        result: mem::uninitialized(),
-        nresults,
-    };
-
-    ffi::lua_pushlightuserdata(state, &mut params as *mut Params<F, R> as *mut c_void);
-
-    let ret = ffi::lua_pcall(state, nargs + 1, nresults, stack_start + 1);
-    let result = mem::replace(&mut params.result, mem::uninitialized());
-
-    // params now has both function and result uninitialized, so we need to forget it so Drop isn't
-    // run.
-    mem::forget(params);
-
-    ffi::lua_remove(state, stack_start + 1);
-
-    if ret == ffi::LUA_OK {
-        Ok(result)
-    } else {
-        Err(pop_error(state, ret))
-    }
-}
-
 // Pops an error off of the stack and returns it. If the error is actually a WrappedPanic, clears
 // the current lua stack and continues the panic.  If the error on the top of the stack is actually
 // a WrappedError, just returns it.  Otherwise, interprets the error as the appropriate lua error.
@@ -236,19 +160,16 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
     }
 }
 
-// Internally uses 4 stack spaces, does not call checkstack
+// Internally uses 2 stack spaces, does not call checkstack
 pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) -> Result<()> {
-    protect_lua_call(state, 0, 1, |state| {
-        ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
-    })
+    safe::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len())
 }
 
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
-    protect_lua_call(state, 0, 1, move |state| {
-        let ud = ffi::lua_newuserdata(state, mem::size_of::<T>()) as *mut T;
-        ptr::write(ud, t);
-    })
+    let ud = safe::lua_newuserdata(state, mem::size_of::<T>())? as *mut T;
+    ptr::write(ud, t);
+    Ok(())
 }
 
 pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
@@ -307,10 +228,40 @@ where
     }
 }
 
+/// Wraps a function conforming to the Lua CFunction protocol, with the addition of being able to
+/// panic or return Err, into one conforming to the "Rust Function Protocol", usable with
+/// lua_pushrclosure.
+pub unsafe fn rust_callback_error<F: FnOnce() -> Result<c_int> + UnwindSafe>(
+    state: *mut ffi::lua_State,
+    f: F,
+) -> c_int {
+    match catch_unwind(f) {
+        Ok(Ok(r)) => r,
+        Ok(Err(Error::StackError)) => ffi::RCALL_STACK_ERR,
+        Ok(Err(e)) => {
+            ffi::lua_settop(state, 0);
+            if ffi::lua_checkstack(state, 2) == 0 {
+                ffi::RCALL_STACK_ERR
+            } else {
+                push_wrapped_error(state, e);
+                ffi::RCALL_ERR
+            }
+        }
+        Err(e) => {
+            ffi::lua_settop(state, 0);
+            if ffi::lua_checkstack(state, 2) == 0 {
+                lua_internal_abort!("not enough stack space to throw rust panic");
+            } else {
+                push_wrapped_panic(state, e);
+                ffi::RCALL_ERR
+            }
+        }
+    }
+}
+
 // Takes an error at the top of the stack, and if it is a WrappedError, converts it to an
 // Error::CallbackError with a traceback, if it is some lua type, prints the error along with a
 // traceback, and if it is a WrappedPanic, does not modify it.
-#[cfg_attr(unwind, unwind)]
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     if ffi::lua_checkstack(state, 2) == 0 {
         // If we don't have enough stack space to even check the error type, do nothing
@@ -479,11 +430,9 @@ pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
 
     // Create error metatable
 
-    #[cfg_attr(unwind, unwind)]
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
-        ffi::luaL_checkstack(state, 2, ptr::null());
-
-        callback_error(state, || {
+        rust_callback_error(state, || {
+            check_stack_err(state, 2)?;
             if is_wrapped_error(state, -1) {
                 let error = get_userdata::<WrappedError>(state, -1);
                 let error_str = (*error).0.to_string();
@@ -514,7 +463,7 @@ pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
     ffi::lua_rawset(state, -3);
 
     ffi::lua_pushstring(state, cstr!("__tostring"));
-    ffi::lua_pushcfunction(state, error_tostring);
+    safe::lua_pushrfunction(state, error_tostring).unwrap();
     ffi::lua_rawset(state, -3);
 
     ffi::lua_pushstring(state, cstr!("__metatable"));
@@ -543,11 +492,8 @@ pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
 
     // Create destructed userdata metatable
 
-    #[cfg_attr(unwind, unwind)]
     unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
-        ffi::luaL_checkstack(state, 2, ptr::null());
-        push_wrapped_error(state, Error::CallbackDestructed);
-        ffi::lua_error(state)
+        rust_callback_error(state, || Err(Error::CallbackDestructed))
     }
 
     ffi::lua_pushlightuserdata(
@@ -555,6 +501,7 @@ pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
         &DESTRUCTED_USERDATA_METATABLE as *const u8 as *mut c_void,
     );
     ffi::lua_newtable(state);
+    safe::lua_pushrfunction(state, destructed_error).unwrap();
 
     for &method in &[
         cstr!("__add"),
@@ -584,10 +531,11 @@ pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
         cstr!("__ipairs"),
     ] {
         ffi::lua_pushstring(state, method);
-        ffi::lua_pushcfunction(state, destructed_error);
-        ffi::lua_rawset(state, -3);
+        ffi::lua_pushvalue(state, -2);
+        ffi::lua_rawset(state, -4);
     }
 
+    ffi::lua_pop(state, 1);
     ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
 }
 

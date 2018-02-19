@@ -4,6 +4,7 @@ use std::os::raw::c_int;
 use ffi;
 use error::*;
 use util::*;
+use safe;
 use types::LuaRef;
 use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
@@ -146,12 +147,10 @@ impl<'lua> Function<'lua> {
         let lua = self.0.lua;
         unsafe {
             stack_err_guard(lua.state, 0, || {
-                const MAX_LUA_UPVALUES: c_int = 255;
-
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
 
-                if nargs + 2 > MAX_LUA_UPVALUES {
+                if nargs + 2 > ffi::LUA_MAX_UPVALUES {
                     return Err(Error::BindError);
                 }
 
@@ -162,9 +161,7 @@ impl<'lua> Function<'lua> {
                     lua.push_value(lua.state, arg);
                 }
 
-                protect_lua_call(lua.state, nargs + 2, 1, |state| {
-                    ffi::lua_pushcclosure(state, bind_call_impl, nargs + 2);
-                })?;
+                safe::lua_pushcclosure(lua.state, bind_call_impl, nargs + 2)?;
 
                 Ok(Function(lua.pop_ref(lua.state)))
             })
