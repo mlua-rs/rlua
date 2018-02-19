@@ -55,15 +55,13 @@ where
     res
 }
 
-// Run an operation on a lua_State and automatically clean up the stack before
-// returning.  Takes the lua_State, the expected stack size change, and an
-// operation to run.  If the operation results in success, then the stack is
-// inspected to make sure the change in stack size matches the expected change
-// and otherwise this is a logic error and will panic.  If the operation results
-// in an error, the stack is shrunk to the value before the call.  If the
-// operation results in an error and the stack is smaller than the value before
-// the call, then this is unrecoverable and this will panic.  If this function
-// panics, it will clear the stack before panicking.
+// Run an operation on a lua_State and automatically clean up the stack before returning.  Takes the
+// lua_State, the expected stack size change, and an operation to run.  If the operation results in
+// success, then the stack is inspected to make sure the change in stack size matches the expected
+// change and otherwise this is a logic error and will panic.  If the operation results in an error,
+// the stack is shrunk to the value before the call.  If the operation results in an error and the
+// stack is smaller than the value before the call, then this is unrecoverable and this will panic.
+// If this function panics, it will clear the stack before panicking.
 pub unsafe fn stack_err_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F) -> Result<R>
 where
     F: FnOnce() -> Result<R>,
@@ -312,10 +310,13 @@ where
 // traceback, and if it is a WrappedPanic, does not modify it.
 #[cfg_attr(unwind, unwind)]
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
+    // I believe luaL_traceback requires this much free stack to not error.
+    const LUA_TRACEBACK_STACK: c_int = 11;
+
     if ffi::lua_checkstack(state, 2) == 0 {
         // If we don't have enough stack space to even check the error type, do nothing
     } else if is_wrapped_error(state, 1) {
-        let traceback = if ffi::lua_checkstack(state, 11) != 0 {
+        let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             gc_guard(state, || {
                 ffi::luaL_traceback(state, state, ptr::null(), 0);
             });
@@ -337,7 +338,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
             },
         );
     } else if !is_wrapped_panic(state, 1) {
-        if ffi::lua_checkstack(state, 11) != 0 {
+        if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             gc_guard(state, || {
                 let s = ffi::lua_tostring(state, 1);
                 let s = if s.is_null() {
