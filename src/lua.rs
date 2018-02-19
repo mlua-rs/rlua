@@ -33,8 +33,8 @@ pub struct Lua {
 /// See [`Lua::scope`] for more details.
 ///
 /// [`Lua::scope`]: struct.Lua.html#method.scope
-pub struct Scope<'lua, 'scope> {
-    lua: &'lua Lua,
+pub struct Scope<'scope> {
+    lua: &'scope Lua,
     destructors: RefCell<Vec<Box<Fn(*mut ffi::lua_State) -> Box<Any>>>>,
     // 'scope lifetime must be invariant
     _scope: PhantomData<&'scope mut &'scope ()>,
@@ -347,15 +347,15 @@ impl Lua {
     /// thread while `Scope` is live, it is safe to allow !Send datatypes and functions whose
     /// lifetimes only outlive the scope lifetime.
     ///
-    /// To make the lifetimes work out, handles that `Lua::scope` produces have the `'lua` lifetime
-    /// of the parent `Lua` instance.  This allows the handles to scoped values to escape the
-    /// callback, but this was possible anyway by going through Lua itself.  This is safe to do, but
-    /// not useful, because after the scope is dropped, all references to scoped values, whether in
-    /// Lua or in rust, are invalidated.  `Function` types will error when called, and `AnyUserData`
-    /// types will be typeless.
-    pub fn scope<'lua, 'scope, F, R>(&'lua self, f: F) -> R
+    /// Handles that `Lua::scope` produces have a `'lua` lifetime of the scope parameter, to prevent
+    /// the handles from escaping the callback.  However, this is not the only way for values to
+    /// escape the callback, as they can be smuggled through Lua itself.  This is safe to do, but
+    /// not very useful, because after the scope is dropped, all references to scoped values,
+    /// whether in Lua or in rust, are invalidated.  `Function` types will error when called, and
+    /// `AnyUserData` types will be typeless.
+    pub fn scope<'scope, 'lua: 'scope, F, R>(&'lua self, f: F) -> R
     where
-        F: FnOnce(&Scope<'lua, 'scope>) -> R,
+        F: FnOnce(&Scope<'scope>) -> R,
     {
         let scope = Scope {
             lua: self,
@@ -1082,7 +1082,7 @@ impl Lua {
     }
 }
 
-impl<'lua, 'scope> Scope<'lua, 'scope> {
+impl<'scope> Scope<'scope> {
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
     ///
     /// This is a version of [`Lua::create_function`] that creates a callback which expires on scope
@@ -1090,7 +1090,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
     ///
     /// [`Lua::create_function`]: struct.Lua.html#method.create_function
     /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_function<'callback, A, R, F>(&self, func: F) -> Result<Function<'lua>>
+    pub fn create_function<'callback, 'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'callback>,
         R: ToLuaMulti<'callback>,
@@ -1107,22 +1107,25 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
             let mut destructors = self.destructors.borrow_mut();
             let registry_id = f.0.registry_id;
             destructors.push(Box::new(move |state| {
-                check_stack(state, 2);
-                ffi::lua_rawgeti(
-                    state,
-                    ffi::LUA_REGISTRYINDEX,
-                    registry_id as ffi::lua_Integer,
-                );
-                ffi::luaL_unref(state, ffi::LUA_REGISTRYINDEX, registry_id);
+                stack_guard(state, 0, || {
+                    check_stack(state, 2);
 
-                ffi::lua_getupvalue(state, -1, 1);
-                let ud = take_userdata::<Callback>(state);
+                    ffi::lua_rawgeti(
+                        state,
+                        ffi::LUA_REGISTRYINDEX,
+                        registry_id as ffi::lua_Integer,
+                    );
+                    ffi::luaL_unref(state, ffi::LUA_REGISTRYINDEX, registry_id);
 
-                ffi::lua_pushnil(state);
-                ffi::lua_setupvalue(state, -2, 1);
+                    ffi::lua_getupvalue(state, -1, 1);
+                    let ud = take_userdata::<Callback>(state);
 
-                ffi::lua_pop(state, 1);
-                Box::new(ud)
+                    ffi::lua_pushnil(state);
+                    ffi::lua_setupvalue(state, -2, 1);
+
+                    ffi::lua_pop(state, 1);
+                    Box::new(ud)
+                })
             }));
             Ok(f)
         }
@@ -1135,7 +1138,10 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
     ///
     /// [`Lua::create_function_mut`]: struct.Lua.html#method.create_function_mut
     /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_function_mut<'callback, A, R, F>(&self, func: F) -> Result<Function<'lua>>
+    pub fn create_function_mut<'callback, 'lua, A, R, F>(
+        &'lua self,
+        func: F,
+    ) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'callback>,
         R: ToLuaMulti<'callback>,
@@ -1155,7 +1161,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
     ///
     /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
     /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
+    pub fn create_userdata<'lua, T>(&'lua self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: UserData,
     {
@@ -1165,21 +1171,23 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
             let mut destructors = self.destructors.borrow_mut();
             let registry_id = u.0.registry_id;
             destructors.push(Box::new(move |state| {
-                check_stack(state, 1);
-                ffi::lua_rawgeti(
-                    state,
-                    ffi::LUA_REGISTRYINDEX,
-                    registry_id as ffi::lua_Integer,
-                );
-                ffi::luaL_unref(state, ffi::LUA_REGISTRYINDEX, registry_id);
-                Box::new(take_userdata::<RefCell<T>>(state))
+                stack_guard(state, 0, || {
+                    check_stack(state, 1);
+                    ffi::lua_rawgeti(
+                        state,
+                        ffi::LUA_REGISTRYINDEX,
+                        registry_id as ffi::lua_Integer,
+                    );
+                    ffi::luaL_unref(state, ffi::LUA_REGISTRYINDEX, registry_id);
+                    Box::new(take_userdata::<RefCell<T>>(state))
+                })
             }));
             Ok(u)
         }
     }
 }
 
-impl<'lua, 'scope> Drop for Scope<'lua, 'scope> {
+impl<'scope> Drop for Scope<'scope> {
     fn drop(&mut self) {
         // We separate the action of invalidating the userdata in Lua and actually dropping the
         // userdata type into two phases.  This is so that, in the event a userdata drop panics, we
