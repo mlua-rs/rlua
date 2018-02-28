@@ -1,3 +1,13 @@
+## [0.13.0]
+- Small API incompatible change which fixes unsafety: Scope and scope created
+  handle lifetimes have been changed to disallow them from escaping the scope
+  callback.  Otherwise, this could lead to dangling registry handles, which can
+  be used to cause UB.  This is the only API change for 0.13.
+- Small fixes for potential panics / longjmps around the embedded traceback
+  function.
+- Temporary fix for #71 that works on stable rust without dirty tricks, while
+  waiting for the larger fix for rust #48251 to make its way to stable.
+
 ## [0.12.2]
 - Some minor documentation fixes.
 - Fix for some rare panics which might result in an abort from panicking across
