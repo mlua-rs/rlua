@@ -4,7 +4,7 @@
 
 use std::ptr;
 use std::mem;
-use std::os::raw::{c_char, c_double, c_int, c_longlong, c_void};
+use std::os::raw::{c_char, c_double, c_int, c_longlong, c_uchar, c_void};
 
 pub type lua_Integer = c_longlong;
 pub type lua_Number = c_double;
@@ -17,6 +17,24 @@ pub type lua_KContext = *mut c_void;
 pub type lua_KFunction =
     unsafe extern "C" fn(state: *mut lua_State, status: c_int, ctx: lua_KContext) -> c_int;
 pub type lua_CFunction = unsafe extern "C" fn(state: *mut lua_State) -> c_int;
+
+#[repr(C)]
+pub struct lua_Debug {
+    pub event: c_int,
+    pub name: *const c_char,
+    pub namewhat: *const c_char,
+    pub what: *const c_char,
+    pub source: *const c_char,
+    pub currentline: c_int,
+    pub linedefined: c_int,
+    pub lastlinedefined: c_int,
+    pub nups: c_uchar,
+    pub nparams: c_uchar,
+    pub isvararg: c_char,
+    pub istailcall: c_char,
+    pub short_src: [c_char; LUA_IDSIZE as usize],
+    i_ci: *mut c_void,
+}
 
 pub const LUA_OK: c_int = 0;
 pub const LUA_YIELD: c_int = 1;
@@ -34,6 +52,7 @@ pub const LUAI_MAXSTACK: c_int = 1_000_000;
 pub const LUA_REGISTRYINDEX: c_int = -LUAI_MAXSTACK - 1000;
 pub const LUA_RIDX_MAINTHREAD: lua_Integer = 1;
 pub const LUA_RIDX_GLOBALS: lua_Integer = 2;
+pub const LUA_IDSIZE: c_int = 60;
 // Not actually defined in lua.h / luaconf.h
 pub const LUA_MAX_UPVALUES: c_int = 255;
 
@@ -141,6 +160,7 @@ extern "C" {
     pub fn lua_error(state: *mut lua_State) -> !;
     pub fn lua_atpanic(state: *mut lua_State, panic: lua_CFunction) -> lua_CFunction;
     pub fn lua_gc(state: *mut lua_State, what: c_int, data: c_int) -> c_int;
+    pub fn lua_getinfo(state: *mut lua_State, what: *const c_char, ar: *mut lua_Debug) -> c_int;
 
     pub fn luaopen_base(state: *mut lua_State) -> c_int;
     pub fn luaopen_coroutine(state: *mut lua_State) -> c_int;
