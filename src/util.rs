@@ -103,7 +103,8 @@ where
 // limited lua stack.  `nargs` and `nresults` are similar to the parameters of `lua_pcall`, but the
 // given function return type is not the return value count, instead the inner function return
 // values are assumed to match the `nresults` param.  Internally uses 3 extra stack spaces, and does
-// not call checkstack.  Provided function must *not* panic.
+// not call checkstack.  Provided function must *not* panic, and since it will generally be
+// lonjmping, should not contain any values that implement Drop.
 pub unsafe fn protect_lua_call<F, R>(
     state: *mut ffi::lua_State,
     nargs: c_int,
