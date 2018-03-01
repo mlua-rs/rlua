@@ -200,6 +200,8 @@ extern "C" {
     pub fn luaL_len(push_state: *mut lua_State, index: c_int) -> lua_Integer;
 }
 
+// The following are re-implementations of what are macros in the Lua C API
+
 pub unsafe fn lua_getextraspace(state: *mut lua_State) -> *mut c_void {
     (state as *mut c_void).offset(-(mem::size_of::<*mut c_void>() as isize))
 }

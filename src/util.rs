@@ -114,8 +114,8 @@ where
     F: FnOnce(*mut ffi::lua_State) -> R,
 {
     struct Params<F, R> {
-        function: F,
-        result: R,
+        function: Option<F>,
+        result: Option<R>,
         nresults: c_int,
     }
 
@@ -126,9 +126,8 @@ where
         let params = ffi::lua_touserdata(state, -1) as *mut Params<F, R>;
         ffi::lua_pop(state, 1);
 
-        let function = mem::replace(&mut (*params).function, mem::uninitialized());
-        ptr::write(&mut (*params).result, function(state));
-        // params now has function uninitialied and result initialized
+        let function = (*params).function.take().unwrap();
+        (*params).result = Some(function(state));
 
         if (*params).nresults == ffi::LUA_MULTRET {
             ffi::lua_gettop(state)
@@ -143,32 +142,18 @@ where
     ffi::lua_pushcfunction(state, do_call::<F, R>);
     ffi::lua_rotate(state, stack_start + 1, 2);
 
-    // We are about to do some really scary stuff with the Params structure, both because
-    // protect_lua_call is very hot, and becuase we would like to allow the function type to be
-    // FnOnce rather than FnMut.  We are using Params here both to pass data to the callback and
-    // return data from the callback.
-    //
-    // params starts out with function initialized and result uninitialized, nresults is Copy so we
-    // don't care about it.
     let mut params = Params {
-        function: f,
-        result: mem::uninitialized(),
+        function: Some(f),
+        result: None,
         nresults,
     };
 
     ffi::lua_pushlightuserdata(state, &mut params as *mut Params<F, R> as *mut c_void);
-
     let ret = ffi::lua_pcall(state, nargs + 1, nresults, stack_start + 1);
-    let result = mem::replace(&mut params.result, mem::uninitialized());
-
-    // params now has both function and result uninitialized, so we need to forget it so Drop isn't
-    // run.
-    mem::forget(params);
-
     ffi::lua_remove(state, stack_start + 1);
 
     if ret == ffi::LUA_OK {
-        Ok(result)
+        Ok(params.result.take().unwrap())
     } else {
         Err(pop_error(state, ret))
     }
