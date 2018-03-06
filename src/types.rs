@@ -24,10 +24,11 @@ pub struct LightUserData(pub *mut c_void);
 /// difficult to use than the normal handle types, it is Send + Sync + 'static, which means that it
 /// can be used in many situations where it would be impossible to store a regular handle value.
 ///
-/// Be warned, If you place this into Lua via a `UserData` type, it is *very easy* to accidentally
-/// cause reference cycles that the Lua garbage collector cannot resolve.  Instead of placing a
-/// `RegistryKey` into a `UserData` type, prefer instead to use `UserData::set_user_value` /
-/// `UserData::get_user_value`.
+/// Be warned, If you place this into Lua via a `UserData` type or a rust callback, it is *very
+/// easy* to accidentally cause reference cycles that the Lua garbage collector cannot resolve.
+/// Instead of placing a `RegistryKey` into a `UserData` type, prefer instead to use
+/// `UserData::set_user_value` / `UserData::get_user_value`, and instead of moving a RegistryKey
+/// into a callback, prefer `Lua::scope`.
 pub struct RegistryKey {
     pub(crate) registry_id: c_int,
     pub(crate) unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
