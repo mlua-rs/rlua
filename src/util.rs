@@ -112,23 +112,23 @@ pub unsafe fn protect_lua_call<F, R>(
     f: F,
 ) -> Result<R>
 where
-    F: FnOnce(*mut ffi::lua_State) -> R,
+    F: Fn(*mut ffi::lua_State) -> R,
+    R: Copy,
 {
     struct Params<F, R> {
-        function: Option<F>,
-        result: Option<R>,
+        function: *const F,
+        result: R,
         nresults: c_int,
     }
 
     unsafe extern "C" fn do_call<F, R>(state: *mut ffi::lua_State) -> c_int
     where
-        F: FnOnce(*mut ffi::lua_State) -> R,
+        F: Fn(*mut ffi::lua_State) -> R,
     {
         let params = ffi::lua_touserdata(state, -1) as *mut Params<F, R>;
         ffi::lua_pop(state, 1);
 
-        let function = (*params).function.take().unwrap();
-        (*params).result = Some(function(state));
+        (*params).result = (*(*params).function)(state);
 
         if (*params).nresults == ffi::LUA_MULTRET {
             ffi::lua_gettop(state)
@@ -144,8 +144,8 @@ where
     ffi::lua_rotate(state, stack_start + 1, 2);
 
     let mut params = Params {
-        function: Some(f),
-        result: None,
+        function: &f,
+        result: mem::uninitialized(),
         nresults,
     };
 
@@ -154,7 +154,9 @@ where
     ffi::lua_remove(state, stack_start + 1);
 
     if ret == ffi::LUA_OK {
-        Ok(params.result.take().unwrap())
+        // LUA_OK is only returned when the do_call function has completed successfully, so
+        // params.result is definitely initialized.
+        Ok(params.result)
     } else {
         Err(pop_error(state, ret))
     }
@@ -228,10 +230,11 @@ pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) -> Result<()> {
 
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
-    protect_lua_call(state, 0, 1, move |state| {
-        let ud = ffi::lua_newuserdata(state, mem::size_of::<T>()) as *mut T;
-        ptr::write(ud, t);
-    })
+    let ud = protect_lua_call(state, 0, 1, move |state| {
+        ffi::lua_newuserdata(state, mem::size_of::<T>()) as *mut T
+    })?;
+    ptr::write(ud, t);
+    Ok(())
 }
 
 pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
