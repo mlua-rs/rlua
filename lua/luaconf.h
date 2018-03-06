@@ -775,15 +775,9 @@
 ** without modifying the main part of the file.
 */
 
-/*
-** rlua modification - fix for #71, temporary until the fix for
-** https://github.com/rust-lang/rust/issues/48251 is in stable rust
-*/
-#if defined(LUA_USE_WINDOWS)
-    #define LUAI_THROW(L,c)		longjmp((c)->b, 1)
-    #define LUAI_TRY(L,c,a)		if (__intrinsic_setjmp((c)->b, NULL) == 0) { a }
-    #define luai_jmpbuf		jmp_buf
-#endif
+
+
+
 
 #endif
 

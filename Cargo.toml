@@ -18,21 +18,10 @@ default = ["builtin-lua"]
 # specialized version of lua into your binary, you can disable this feature to
 # do that, but care must be taken.  `rlua` makes at least the following
 # assumptions about the linked lua library:
-# * LUA_INTEGER is long long
-# * LUA_NUMBER as double
-# * LUA_EXTRASPACE is sizeof(void*)
-# * LUAI_MAXSTACK is 1000000
-# * LUAI_THROW / LUAI_TRY are defined so that they are compatible with jumping
-#   over Rust stack frames.  Rust is, as of the discussion around
-#   https://github.com/rust-lang/rust/issues/48251, intended to be compatible in
-#   at least a limited way with C libraries that use setjmp / longjmp error
-#   handling, but there are some caveats.  The linked bug prevents calling into
-#   C APIs which use setjmp / longjmp handling *at all* on windows with at least
-#   the 1.24.0 version of the rust compiler, and it remains to be seen but
-#   potentially the 1.24.1 and 1.25 versions as well.  Eventually the fix for
-#   this will make it into stable rust, but until then there is a fix in the
-#   bundled version of Lua to use __intrinsic_setjmp on windows instead of
-#   setjmp to avoid unwinding and triggering rust issue #48251.
+#   * LUA_INTEGER is long long
+#   * LUA_NUMBER as double
+#   * LUA_EXTRASPACE is sizeof(void*)
+#   * LUAI_MAXSTACK is 1000000
 builtin-lua = ["gcc"]
 
 [dependencies]
