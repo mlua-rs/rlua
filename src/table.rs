@@ -51,7 +51,7 @@ impl<'lua> Table<'lua> {
     pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, || {
                 check_stack(lua.state, 6);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
@@ -94,7 +94,7 @@ impl<'lua> Table<'lua> {
     pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, || {
                 check_stack(lua.state, 5);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
@@ -108,7 +108,7 @@ impl<'lua> Table<'lua> {
     pub fn contains_key<K: ToLua<'lua>>(&self, key: K) -> Result<bool> {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, || {
                 check_stack(lua.state, 5);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
@@ -124,7 +124,7 @@ impl<'lua> Table<'lua> {
     pub fn raw_set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, || {
                 check_stack(lua.state, 6);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
@@ -141,7 +141,7 @@ impl<'lua> Table<'lua> {
     pub fn raw_get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, || {
                 check_stack(lua.state, 3);
                 lua.push_ref(lua.state, &self.0);
                 lua.push_value(lua.state, key.to_lua(lua)?);
@@ -161,7 +161,7 @@ impl<'lua> Table<'lua> {
     pub fn len(&self) -> Result<Integer> {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, || {
                 check_stack(lua.state, 4);
                 lua.push_ref(lua.state, &self.0);
                 protect_lua_call(lua.state, 1, 0, |state| ffi::luaL_len(state, -1))
@@ -173,7 +173,7 @@ impl<'lua> Table<'lua> {
     pub fn raw_len(&self) -> Integer {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, 0, || {
+            stack_guard(lua.state, || {
                 check_stack(lua.state, 1);
                 lua.push_ref(lua.state, &self.0);
                 let len = ffi::lua_rawlen(lua.state, -1);
@@ -189,7 +189,7 @@ impl<'lua> Table<'lua> {
     pub fn get_metatable(&self) -> Option<Table<'lua>> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, 0, || {
+            stack_guard(lua.state, || {
                 check_stack(lua.state, 1);
                 lua.push_ref(lua.state, &self.0);
                 if ffi::lua_getmetatable(lua.state, -1) == 0 {
@@ -211,7 +211,7 @@ impl<'lua> Table<'lua> {
     pub fn set_metatable(&self, metatable: Option<Table<'lua>>) {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, 0, move || {
+            stack_guard(lua.state, move || {
                 check_stack(lua.state, 1);
                 lua.push_ref(lua.state, &self.0);
                 if let Some(metatable) = metatable {
@@ -346,7 +346,7 @@ where
             let lua = self.table.lua;
 
             unsafe {
-                stack_guard(lua.state, 0, || {
+                stack_guard(lua.state, || {
                     check_stack(lua.state, 6);
 
                     lua.push_ref(lua.state, &self.table);
@@ -408,7 +408,7 @@ where
             let lua = self.table.lua;
 
             unsafe {
-                stack_guard(lua.state, 0, || {
+                stack_guard(lua.state, || {
                     check_stack(lua.state, 5);
 
                     lua.push_ref(lua.state, &self.table);

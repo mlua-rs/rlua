@@ -27,16 +27,13 @@ pub unsafe fn check_stack_err(state: *mut ffi::lua_State, amount: c_int) -> Resu
     }
 }
 
-// Run an operation on a lua_State and check that the stack change is what is expected.  If the
-// stack change does not match, resets the stack and panics.  If the given operation panics, tries
-// to restore the stack to its previous state before resuming the panic.
-pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F) -> R
+// Run an operation on a lua_State and ensure that there are no stack leaks and the stack is
+// restored on panic.
+pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, op: F) -> R
 where
     F: FnOnce() -> R,
 {
     let begin = ffi::lua_gettop(state);
-    let expected = begin + change;
-    rlua_assert!(expected >= 0, "too many stack values would be popped");
 
     let res = match catch_unwind(AssertUnwindSafe(op)) {
         Ok(r) => r,
@@ -50,30 +47,26 @@ where
     };
 
     let top = ffi::lua_gettop(state);
-    if top != expected {
-        if top > begin {
-            ffi::lua_settop(state, begin);
-        }
-        rlua_panic!("expected stack to be {}, got {}", expected, top);
+    if top > begin {
+        ffi::lua_settop(state, begin);
+        rlua_panic!("expected stack to be {}, got {}", begin, top);
+    } else if top < begin {
+        rlua_abort!("{} too many stack values popped", begin - top);
     }
 
     res
 }
 
-// Run an operation on a lua_State and automatically clean up the stack before returning.  Takes the
-// lua_State, the expected stack size change, and an operation to run.  If the operation results in
-// success, then the stack is inspected to make sure the change in stack size matches the expected
-// change and otherwise this is a logic error and will panic.  If the operation results in an error,
-// the stack is shrunk to the value before the call.  If the operation results in an error and the
-// stack is smaller than the value before the call, then this is unrecoverable and this will panic.
-// If this function panics, it will clear the stack before panicking.
-pub unsafe fn stack_err_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F) -> Result<R>
+// Run an operation on a lua_State and automatically clean up the stack on error.  Takes the
+// lua_State and an operation to run.  If the operation results in success, then the stack is
+// inspected to make sure there is not a stack leak, and otherwise this is a logic error and will
+// panic.  If the operation results in an error, or if the operation panics, the stack is shrunk to
+// the value before the call.
+pub unsafe fn stack_err_guard<F, R>(state: *mut ffi::lua_State, op: F) -> Result<R>
 where
     F: FnOnce() -> Result<R>,
 {
     let begin = ffi::lua_gettop(state);
-    let expected = begin + change;
-    rlua_assert!(expected >= 0, "too many stack values would be popped");
 
     let res = match catch_unwind(AssertUnwindSafe(op)) {
         Ok(r) => r,
@@ -88,17 +81,17 @@ where
 
     let top = ffi::lua_gettop(state);
     if res.is_ok() {
-        if top != expected {
-            if top > begin {
-                ffi::lua_settop(state, begin);
-            }
-            rlua_panic!("expected stack to be {}, got {}", expected, top);
+        if top > begin {
+            ffi::lua_settop(state, begin);
+            rlua_panic!("expected stack to be {}, got {}", begin, top);
+        } else if top < begin {
+            rlua_abort!("{} too many stack values popped", begin - top);
         }
     } else {
-        if top > expected {
-            ffi::lua_settop(state, expected);
-        } else if top < expected {
-            rlua_panic!("{} too many stack values popped", top - begin - change);
+        if top > begin {
+            ffi::lua_settop(state, begin);
+        } else if top < begin {
+            rlua_abort!("{} too many stack values popped", begin - top);
         }
     }
     res

@@ -63,7 +63,7 @@ impl<'lua> Function<'lua> {
     pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, || {
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
                 check_stack_err(lua.state, nargs + 3)?;
@@ -144,7 +144,7 @@ impl<'lua> Function<'lua> {
 
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, || {
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
 

@@ -78,7 +78,7 @@ impl<'lua> Thread<'lua> {
     {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, 0, || {
+            stack_err_guard(lua.state, || {
                 check_stack(lua.state, 1);
 
                 lua.push_ref(lua.state, &self.0);
@@ -120,7 +120,7 @@ impl<'lua> Thread<'lua> {
     pub fn status(&self) -> ThreadStatus {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, 0, || {
+            stack_guard(lua.state, || {
                 check_stack(lua.state, 1);
 
                 lua.push_ref(lua.state, &self.0);
