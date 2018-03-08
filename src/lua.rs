@@ -52,12 +52,8 @@ impl Drop for Lua {
     fn drop(&mut self) {
         unsafe {
             if !self.ephemeral {
-                if cfg!(test) {
-                    let top = ffi::lua_gettop(self.state);
-                    if top != 0 {
-                        rlua_abort!("Lua stack leak detected, stack top is {}", top);
-                    }
-                }
+                let top = ffi::lua_gettop(self.state);
+                rlua_assert!(top == 0, "stack leak detected, stack top is {}", top);
 
                 let extra_data = *(ffi::lua_getextraspace(self.state) as *mut *mut ExtraData);
                 *(*extra_data).registry_unref_list.lock().unwrap() = None;
