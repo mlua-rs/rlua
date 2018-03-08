@@ -3,16 +3,15 @@ use std::sync::Arc;
 use std::ffi::CStr;
 use std::any::Any;
 use std::os::raw::{c_char, c_int, c_void};
-use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
+use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 
 use ffi;
 use error::{Error, Result};
 
 // Checks that Lua has enough free stack space for future stack operations.  On failure, this will
-// clear the stack and panic.
+// panic.
 pub unsafe fn check_stack(state: *mut ffi::lua_State, amount: c_int) {
-    lua_internal_assert!(
-        state,
+    rlua_assert!(
         ffi::lua_checkstack(state, amount) != 0,
         "out of stack space"
     );
@@ -28,29 +27,35 @@ pub unsafe fn check_stack_err(state: *mut ffi::lua_State, amount: c_int) -> Resu
     }
 }
 
-// Run an operation on a lua_State and check that the stack change is what is
-// expected.  If the stack change does not match, clears the stack and panics.
+// Run an operation on a lua_State and check that the stack change is what is expected.  If the
+// stack change does not match, resets the stack and panics.  If the given operation panics, tries
+// to restore the stack to its previous state before resuming the panic.
 pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, change: c_int, op: F) -> R
 where
     F: FnOnce() -> R,
 {
-    let expected = ffi::lua_gettop(state) + change;
-    lua_internal_assert!(
-        state,
-        expected >= 0,
-        "too many stack values would be popped"
-    );
+    let begin = ffi::lua_gettop(state);
+    let expected = begin + change;
+    rlua_assert!(expected >= 0, "too many stack values would be popped");
 
-    let res = op();
+    let res = match catch_unwind(AssertUnwindSafe(op)) {
+        Ok(r) => r,
+        Err(p) => {
+            let top = ffi::lua_gettop(state);
+            if top > begin {
+                ffi::lua_settop(state, begin);
+            }
+            resume_unwind(p);
+        }
+    };
 
     let top = ffi::lua_gettop(state);
-    lua_internal_assert!(
-        state,
-        ffi::lua_gettop(state) == expected,
-        "expected stack to be {}, got {}",
-        expected,
-        top
-    );
+    if top != expected {
+        if top > begin {
+            ffi::lua_settop(state, begin);
+        }
+        rlua_panic!("expected stack to be {}, got {}", expected, top);
+    }
 
     res
 }
@@ -66,33 +71,34 @@ pub unsafe fn stack_err_guard<F, R>(state: *mut ffi::lua_State, change: c_int, o
 where
     F: FnOnce() -> Result<R>,
 {
-    let expected = ffi::lua_gettop(state) + change;
-    lua_internal_assert!(
-        state,
-        expected >= 0,
-        "too many stack values would be popped"
-    );
+    let begin = ffi::lua_gettop(state);
+    let expected = begin + change;
+    rlua_assert!(expected >= 0, "too many stack values would be popped");
 
-    let res = op();
+    let res = match catch_unwind(AssertUnwindSafe(op)) {
+        Ok(r) => r,
+        Err(p) => {
+            let top = ffi::lua_gettop(state);
+            if top > begin {
+                ffi::lua_settop(state, begin);
+            }
+            resume_unwind(p);
+        }
+    };
 
     let top = ffi::lua_gettop(state);
     if res.is_ok() {
-        lua_internal_assert!(
-            state,
-            ffi::lua_gettop(state) == expected,
-            "expected stack to be {}, got {}",
-            expected,
-            top
-        );
+        if top != expected {
+            if top > begin {
+                ffi::lua_settop(state, begin);
+            }
+            rlua_panic!("expected stack to be {}, got {}", expected, top);
+        }
     } else {
-        lua_internal_assert!(
-            state,
-            top >= expected,
-            "{} too many stack values popped",
-            top - expected
-        );
         if top > expected {
             ffi::lua_settop(state, expected);
+        } else if top < expected {
+            rlua_panic!("{} too many stack values popped", top - begin - change);
         }
     }
     res
@@ -162,13 +168,14 @@ where
     }
 }
 
-// Pops an error off of the stack and returns it. If the error is actually a WrappedPanic, clears
-// the current lua stack and continues the panic.  If the error on the top of the stack is actually
-// a WrappedError, just returns it.  Otherwise, interprets the error as the appropriate lua error.
+// Pops an error off of the stack and returns it.  The specific behavior depends on the type of the
+// error at the top of the stack:
+//   1) If the error is actually a WrappedPanic, this will continue the panic.
+//   2) If the error on the top of the stack is actually a WrappedError, just returns it.
+//   3) Otherwise, interprets the error as the appropriate lua error.
 // Uses 2 stack spaces, does not call lua_checkstack.
 pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
-    lua_internal_assert!(
-        state,
+    rlua_assert!(
         err_code != ffi::LUA_OK && err_code != ffi::LUA_YIELD,
         "pop_error called with non-error return code"
     );
@@ -178,10 +185,9 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
     } else if is_wrapped_panic(state, -1) {
         let panic = get_userdata::<WrappedPanic>(state, -1);
         if let Some(p) = (*panic).0.take() {
-            ffi::lua_settop(state, 0);
             resume_unwind(p);
         } else {
-            lua_internal_panic!(state, "panic was resumed twice")
+            rlua_panic!("panic was resumed twice")
         }
     } else {
         let err_string = gc_guard(state, || {
@@ -213,10 +219,10 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
             ffi::LUA_ERRMEM => {
                 // This should be impossible, as we set the lua allocator to one that aborts
                 // instead of failing.
-                lua_internal_abort!("impossible Lua allocation error, aborting!")
+                rlua_abort!("impossible Lua allocation error, aborting!")
             }
             ffi::LUA_ERRGCMM => Error::GarbageCollectorError(err_string),
-            _ => lua_internal_panic!(state, "unrecognized lua error code"),
+            _ => rlua_panic!("unrecognized lua error code"),
         }
     }
 }
@@ -239,7 +245,7 @@ pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
 
 pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
     let ud = ffi::lua_touserdata(state, index) as *mut T;
-    lua_internal_assert!(state, !ud.is_null(), "userdata pointer is null");
+    rlua_assert!(!ud.is_null(), "userdata pointer is null");
     ud
 }
 
@@ -253,7 +259,7 @@ pub unsafe fn take_userdata<T>(state: *mut ffi::lua_State) -> T {
     get_destructed_userdata_metatable(state);
     ffi::lua_setmetatable(state, -2);
     let ud = ffi::lua_touserdata(state, -1) as *mut T;
-    lua_internal_assert!(state, !ud.is_null(), "userdata pointer is null");
+    rlua_assert!(!ud.is_null(), "userdata pointer is null");
     ffi::lua_pop(state, 1);
     ptr::read(ud)
 }
@@ -271,9 +277,9 @@ pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c
 // the rust side, it will resume the panic.
 pub unsafe fn callback_error<R, F>(state: *mut ffi::lua_State, f: F) -> R
 where
-    F: FnOnce() -> Result<R> + UnwindSafe,
+    F: FnOnce() -> Result<R>,
 {
-    match catch_unwind(f) {
+    match catch_unwind(AssertUnwindSafe(f)) {
         Ok(Ok(r)) => r,
         Ok(Err(err)) => {
             ffi::lua_settop(state, 0);
@@ -284,7 +290,7 @@ where
         Err(p) => {
             ffi::lua_settop(state, 0);
             if ffi::lua_checkstack(state, 2) == 0 {
-                lua_internal_abort!("not enough stack space to propagate panic");
+                rlua_abort!("not enough stack space to propagate panic");
             }
             push_wrapped_panic(state, p);
             ffi::lua_error(state)

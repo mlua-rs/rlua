@@ -55,7 +55,7 @@ impl Drop for Lua {
                 if cfg!(test) {
                     let top = ffi::lua_gettop(self.state);
                     if top != 0 {
-                        lua_internal_abort!("Lua stack leak detected, stack top is {}", top);
+                        rlua_abort!("Lua stack leak detected, stack top is {}", top);
                     }
                 }
 
@@ -727,8 +727,7 @@ impl Lua {
 
     // Used 1 stack space, does not call checkstack
     pub(crate) unsafe fn push_ref(&self, state: *mut ffi::lua_State, lref: &LuaRef) {
-        lua_assert!(
-            state,
+        rlua_assert!(
             lref.lua.main_state == self.main_state,
             "Lua instance passed Value created from a different Lua"
         );
@@ -912,7 +911,7 @@ impl Lua {
                     // not really a huge loss.  Importantly, this allows us to turn off the gc, and
                     // then know that calling Lua API functions marked as 'm' will not result in a
                     // 'longjmp' error while the gc is off.
-                    lua_abort!("out of memory in Lua allocation, aborting!");
+                    abort!("out of memory in Lua allocation, aborting!");
                 } else {
                     p as *mut c_void
                 }

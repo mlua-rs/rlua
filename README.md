@@ -97,6 +97,12 @@ This is done by overriding the normal Lua 'pcall' and 'xpcall' with custom
 versions that cannot catch errors that are actually from Rust panics, and by
 handling panic errors on the receiving Rust side by resuming the panic.
 
+`rlua` should also be panic safe in another way as well, which is that any `Lua`
+instances or handles should remain usable after a user triggered panic, and such
+panics should not break internal invariants or leak Lua stack space.  This is
+mostly important to safely use `rlua` types in Drop impls, as you should not be
+using panics for general error handling.
+
 In summary, here is a list of `rlua` behaviors that should be considered a bug.
 If you encounter them, a bug report would be very welcome:
 
@@ -124,3 +130,9 @@ If you encounter them, a bug report would be very welcome:
     longjmp over your Rust stack frames, this is a bug!
   * If you can somehow handle a panic in a Rust callback from Lua, this is a
     bug.
+  * If you detect that, after catching a panic, a `Lua` or handle method is
+    triggering other bugs or there is a Lua stack space leak, this is a bug.
+    `rlua` instances are supposed to remain fully usable in the face of user
+    triggered panics.  This guarantee does NOT extend to panics marked with
+    "rlua internal error" simply because that is already indicative of a
+    separate bug, but it may be true in many cases anyway.

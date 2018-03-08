@@ -4,41 +4,7 @@ macro_rules! cstr {
   );
 }
 
-// A panic that clears the given lua stack before panicking
-macro_rules! lua_panic {
-    ($state:expr, $msg:expr) => {
-        {
-            $crate::ffi::lua_settop($state, 0);
-            panic!($msg);
-        }
-    };
-
-    ($state:expr, $msg:expr, $($arg:tt)+) => {
-        {
-            $crate::ffi::lua_settop($state, 0);
-            panic!($msg, $($arg)+);
-        }
-    };
-}
-
-// An assert that clears the given lua stack before panicking
-macro_rules! lua_assert {
-    ($state:expr, $cond:expr, $msg:expr) => {
-        if !$cond {
-            $crate::ffi::lua_settop($state, 0);
-            panic!($msg);
-        }
-    };
-
-    ($state:expr, $cond:expr, $msg:expr, $($arg:tt)+) => {
-        if !$cond {
-            $crate::ffi::lua_settop($state, 0);
-            panic!($msg, $($arg)+);
-        }
-    };
-}
-
-macro_rules! lua_abort {
+macro_rules! abort {
     ($msg:expr) => {
         {
             eprintln!($msg);
@@ -54,36 +20,36 @@ macro_rules! lua_abort {
     };
 }
 
-macro_rules! lua_internal_panic {
-    ($state:expr, $msg:expr) => {
-        lua_panic!($state, concat!("rlua internal error: ", $msg));
+macro_rules! rlua_panic {
+    ($msg:expr) => {
+        panic!(concat!("rlua internal error: ", $msg));
     };
 
-    ($state:expr, $msg:expr, $($arg:tt)+) => {
-        lua_panic!($state, concat!("rlua internal error: ", $msg), $($arg)+);
-    };
-}
-
-macro_rules! lua_internal_assert {
-    ($state:expr, $cond:expr, $msg:expr) => {
-        lua_assert!($state, $cond, concat!("rlua internal error: ", $msg));
-    };
-
-    ($state:expr, $cond:expr, $msg:expr, $($arg:tt)+) => {
-        lua_assert!($state, $cond, concat!("rlua internal error: ", $msg), $($arg)+);
+    ($msg:expr, $($arg:tt)+) => {
+        panic!(concat!("rlua internal error: ", $msg), $($arg)+);
     };
 }
 
-macro_rules! lua_internal_abort {
+macro_rules! rlua_assert {
+    ($cond:expr, $msg:expr) => {
+        assert!($cond, concat!("rlua internal error: ", $msg));
+    };
+
+    ($cond:expr, $msg:expr, $($arg:tt)+) => {
+        assert!($cond, concat!("rlua internal error: ", $msg), $($arg)+);
+    };
+}
+
+macro_rules! rlua_abort {
     ($msg:expr) => {
         {
-            lua_abort!(concat!("rlua internal error: ", $msg));
+            abort!(concat!("rlua internal error: ", $msg));
         }
     };
 
     ($msg:expr, $($arg:tt)+) => {
         {
-            lua_abort!(concat!("rlua internal error, aborting!: ", $msg), $($arg)+);
+            abort!(concat!("rlua internal error, aborting!: ", $msg), $($arg)+);
         }
     };
 }
