@@ -727,7 +727,7 @@ impl Lua {
 
     // Used 1 stack space, does not call checkstack
     pub(crate) unsafe fn push_ref(&self, state: *mut ffi::lua_State, lref: &LuaRef) {
-        rlua_assert!(
+        assert!(
             lref.lua.main_state == self.main_state,
             "Lua instance passed Value created from a different Lua"
         );
