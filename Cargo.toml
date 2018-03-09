@@ -28,6 +28,7 @@ builtin-lua = ["cc"]
 libc = { version = "0.2" }
 failure = { git = "https://github.com/rust-lang-nursery/failure", version = "1.0" }
 compiletest_rs = { version = "0.3", optional = true }
+rlua-derive = { version = "0.0.1", path = "./rlua-derive", optional = true }
 
 [build-dependencies]
 cc = { version = "1.0", optional = true }

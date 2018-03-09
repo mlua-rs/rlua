@@ -451,3 +451,16 @@ where
         }
     }
 }
+
+/// Experimental API for #[derive(IntoTable)]
+#[cfg(feature = "rlua-derive")]
+#[doc(hidden)]
+pub trait IntoTable<'lua> {
+    fn into_table(self, lua: &'lua ::lua::Lua) -> Result<Table<'lua>>;
+}
+
+#[cfg(feature = "rlua-derive")]
+#[doc(hidden)]
+pub trait FromTable<'lua>: Sized {
+    fn from_table(table: Table<'lua>, lua: &'lua ::lua::Lua) -> Result<Self>;
+}

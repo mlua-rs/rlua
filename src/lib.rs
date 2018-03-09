@@ -77,3 +77,16 @@ pub use lua::Lua;
 pub use scope::Scope;
 
 pub mod prelude;
+
+#[cfg(feature = "rlua-derive")]
+#[doc(hidden)]
+pub use table::{FromTable, IntoTable};
+
+#[cfg(feature = "rlua-derive")]
+#[allow(unused_imports)]
+#[macro_use]
+extern crate rlua_derive;
+
+#[cfg(feature = "rlua-derive")]
+#[doc(hidden)]
+pub use rlua_derive::*;

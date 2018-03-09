@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate quote;
 #[macro_use]
 extern crate syn;
@@ -6,7 +5,7 @@ extern crate syn;
 extern crate synstructure;
 
 use std::slice;
-use syn::{Data, DeriveInput, Fields, Ident};
+use syn::{Data, DeriveInput, Fields};
 use synstructure::{BindingInfo, Structure};
 
 decl_derive!([LuaTable] => derive_lua_table);
