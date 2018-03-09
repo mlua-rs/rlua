@@ -1,0 +1,12 @@
+[package]
+name = "rlua-derive"
+version = "0.0.1"
+authors = ["kyren <catherine@chucklefish.org>", "kngwyu <yuji.kngw.80s.revive@gmail.com>"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "0.12"
+quote = "0.4"
+synstructure = {git = "https://github.com/nrxus/synstructure.git"}
