@@ -83,8 +83,8 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     /// Regular methods are implemented by overriding the `__index` metamethod and returning the
     /// accessed method. This allows them to be used with the expected `userdata:method()` syntax.
     ///
-    /// If `add_meta_method` is used to override the `__index` metamethod, this approach will fall
-    /// back to the user-provided metamethod if no regular method was found.
+    /// If `add_meta_method` is used to set the `__index` metamethod, the `__index` metamethod will
+    /// be used as a fall-back if no regular method is found.
     pub fn add_method<A, R, M>(&mut self, name: &str, method: M)
     where
         A: FromLuaMulti<'lua>,
