@@ -153,6 +153,22 @@ fn call_append_callback(c: &mut Criterion) {
         );
     });
 }
+
+fn create_registry_values(c: &mut Criterion) {
+    c.bench_function("create registry 10", |b| {
+        b.iter_with_setup(
+            || Lua::new(),
+            |lua| -> Lua {
+                for _ in 0..10 {
+                    lua.create_registry_value(lua.pack(true).unwrap()).unwrap();
+                }
+                lua.expire_registry_values();
+                lua
+            },
+        );
+    });
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default()
@@ -164,7 +180,8 @@ criterion_group! {
         create_string_table,
         call_add_function,
         call_add_callback,
-        call_append_callback
+        call_append_callback,
+        create_registry_values
 }
 
 criterion_main!(benches);
