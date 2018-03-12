@@ -744,3 +744,38 @@ fn too_many_binds() {
             .is_err()
     );
 }
+
+#[test]
+fn large_args() {
+    let lua = Lua::new();
+    let globals = lua.globals();
+
+    globals
+        .set(
+            "c",
+            lua.create_function(|_, args: Variadic<usize>| {
+                let mut s = 0;
+                for i in 0..args.len() {
+                    s += i;
+                    assert_eq!(i, args[i]);
+                }
+                Ok(s)
+            }).unwrap(),
+        )
+        .unwrap();
+
+    let f: Function = lua.eval(
+        r#"
+            return function(...)
+                return c(...)
+            end
+        "#,
+        None,
+    ).unwrap();
+
+    assert_eq!(
+        f.call::<_, usize>((0..100).collect::<Variadic<usize>>())
+            .unwrap(),
+        4950
+    );
+}

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, mem, ptr};
 use std::os::raw::{c_int, c_void};
 use std::sync::{Arc, Mutex};
 
@@ -16,6 +16,9 @@ pub type Number = ffi::lua_Number;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LightUserData(pub *mut c_void);
 
+pub(crate) type Callback<'lua, 'a> =
+    Box<Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'a>;
+
 /// An auto generated key into the Lua registry.
 ///
 /// This is a handle into a value stored inside the Lua registry, similar to the normal handle types
@@ -32,57 +35,54 @@ pub struct LightUserData(pub *mut c_void);
 pub struct RegistryKey {
     pub(crate) registry_id: c_int,
     pub(crate) unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
-    pub(crate) drop_unref: bool,
 }
 
 impl Drop for RegistryKey {
     fn drop(&mut self) {
-        if self.drop_unref {
-            if let Some(list) = self.unref_list.lock().unwrap().as_mut() {
-                list.push(self.registry_id);
-            }
+        if let Some(list) = self.unref_list.lock().unwrap().as_mut() {
+            list.push(self.registry_id);
         }
     }
 }
 
-pub(crate) type Callback<'lua, 'a> =
-    Box<Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'a>;
+impl RegistryKey {
+    // Destroys the RegistryKey without adding to the drop list
+    pub(crate) fn take(self) -> c_int {
+        let registry_id = self.registry_id;
+        unsafe {
+            ptr::read(&self.unref_list);
+            mem::forget(self);
+        }
+        registry_id
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum RefType {
+    Nil,
+    Stack { stack_slot: c_int },
+    Registry { registry_id: c_int },
+}
 
 pub(crate) struct LuaRef<'lua> {
-    pub lua: &'lua Lua,
-    pub registry_id: c_int,
-    pub drop_unref: bool,
+    pub(crate) lua: &'lua Lua,
+    pub(crate) ref_type: RefType,
 }
 
 impl<'lua> fmt::Debug for LuaRef<'lua> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LuaRef({})", self.registry_id)
+        write!(f, "{:?}", self.ref_type)
     }
 }
 
 impl<'lua> Clone for LuaRef<'lua> {
     fn clone(&self) -> Self {
-        if self.drop_unref {
-            unsafe {
-                self.lua.push_ref(self.lua.state, self);
-                self.lua.pop_ref(self.lua.state)
-            }
-        } else {
-            LuaRef {
-                lua: self.lua,
-                registry_id: self.registry_id,
-                drop_unref: self.drop_unref,
-            }
-        }
+        self.lua.clone_ref(self)
     }
 }
 
 impl<'lua> Drop for LuaRef<'lua> {
     fn drop(&mut self) {
-        if self.drop_unref {
-            unsafe {
-                ffi::luaL_unref(self.lua.state, ffi::LUA_REGISTRYINDEX, self.registry_id);
-            }
-        }
+        self.lua.drop_ref(self)
     }
 }

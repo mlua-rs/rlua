@@ -71,7 +71,7 @@ impl<'lua> String<'lua> {
         unsafe {
             stack_guard(lua.state, || {
                 check_stack(lua.state, 1);
-                lua.push_ref(lua.state, &self.0);
+                lua.push_ref(&self.0);
                 rlua_assert!(
                     ffi::lua_type(lua.state, -1) == ffi::LUA_TSTRING,
                     "string ref is not string type"
@@ -82,7 +82,6 @@ impl<'lua> String<'lua> {
                 // string type
                 let data = ffi::lua_tolstring(lua.state, -1, &mut size);
 
-                ffi::lua_pop(lua.state, 1);
                 slice::from_raw_parts(data as *const u8, size + 1)
             })
         }
