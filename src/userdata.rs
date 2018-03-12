@@ -420,22 +420,20 @@ impl<'lua> AnyUserData<'lua> {
 
             lua.push_ref(&self.0);
 
-            rlua_debug_assert!(
-                ffi::lua_getmetatable(lua.state, -1) != 0,
-                "AnyUserData missing metatable"
-            );
-
-            ffi::lua_rawgeti(
-                lua.state,
-                ffi::LUA_REGISTRYINDEX,
-                lua.userdata_metatable::<T>()? as ffi::lua_Integer,
-            );
-
-            if ffi::lua_rawequal(lua.state, -1, -2) == 0 {
+            if ffi::lua_getmetatable(lua.state, -1) == 0 {
                 Err(Error::UserDataTypeMismatch)
             } else {
-                let res = func(&*get_userdata::<RefCell<T>>(lua.state, -3));
-                res
+                ffi::lua_rawgeti(
+                    lua.state,
+                    ffi::LUA_REGISTRYINDEX,
+                    lua.userdata_metatable::<T>()? as ffi::lua_Integer,
+                );
+
+                if ffi::lua_rawequal(lua.state, -1, -2) == 0 {
+                    Err(Error::UserDataTypeMismatch)
+                } else {
+                    func(&*get_userdata::<RefCell<T>>(lua.state, -3))
+                }
             }
         }
     }
