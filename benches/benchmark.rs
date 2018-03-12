@@ -170,9 +170,7 @@ fn create_registry_values(c: &mut Criterion) {
 }
 
 fn create_userdata(c: &mut Criterion) {
-    struct UserData {
-        i: i64,
-    }
+    struct UserData(i64);
     impl LuaUserData for UserData {}
 
     c.bench_function("create userdata 10", |b| {
@@ -182,7 +180,7 @@ fn create_userdata(c: &mut Criterion) {
                 {
                     let table: LuaTable = lua.create_table().unwrap();
                     for i in 1..11 {
-                        table.set(i, UserData { i }).unwrap();
+                        table.set(i, UserData(i)).unwrap();
                     }
                 }
                 lua

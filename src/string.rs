@@ -2,7 +2,7 @@ use std::{slice, str};
 
 use ffi;
 use error::{Error, Result};
-use util::{check_stack, stack_guard};
+use util::{check_stack, StackGuard};
 use types::LuaRef;
 
 /// Handle to an internal Lua string.
@@ -69,21 +69,21 @@ impl<'lua> String<'lua> {
     pub fn as_bytes_with_nul(&self) -> &[u8] {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, || {
-                check_stack(lua.state, 1);
-                lua.push_ref(&self.0);
-                rlua_assert!(
-                    ffi::lua_type(lua.state, -1) == ffi::LUA_TSTRING,
-                    "string ref is not string type"
-                );
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 1);
 
-                let mut size = 0;
-                // This will not trigger a 'm' error, because the reference is guaranteed to be of
-                // string type
-                let data = ffi::lua_tolstring(lua.state, -1, &mut size);
+            lua.push_ref(&self.0);
+            rlua_assert!(
+                ffi::lua_type(lua.state, -1) == ffi::LUA_TSTRING,
+                "string ref is not string type"
+            );
 
-                slice::from_raw_parts(data as *const u8, size + 1)
-            })
+            let mut size = 0;
+            // This will not trigger a 'm' error, because the reference is guaranteed to be of
+            // string type
+            let data = ffi::lua_tolstring(lua.state, -1, &mut size);
+
+            slice::from_raw_parts(data as *const u8, size + 1)
         }
     }
 }

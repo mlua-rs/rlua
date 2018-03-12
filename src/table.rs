@@ -3,7 +3,7 @@ use std::os::raw::c_int;
 
 use ffi;
 use error::Result;
-use util::{check_stack, protect_lua, protect_lua_closure, stack_guard};
+use util::{check_stack, protect_lua, protect_lua_closure, StackGuard};
 use types::{Integer, LuaRef, RefType};
 use value::{FromLua, ToLua};
 
@@ -52,18 +52,18 @@ impl<'lua> Table<'lua> {
     pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, || {
-                check_stack(lua.state, 6);
-                lua.push_ref(&self.0);
-                lua.push_value(key.to_lua(lua)?);
-                lua.push_value(value.to_lua(lua)?);
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 6);
 
-                unsafe extern "C" fn set_table(state: *mut ffi::lua_State) -> c_int {
-                    ffi::lua_settable(state, -3);
-                    1
-                }
-                protect_lua(lua.state, 3, set_table)
-            })
+            lua.push_ref(&self.0);
+            lua.push_value(key.to_lua(lua)?);
+            lua.push_value(value.to_lua(lua)?);
+
+            unsafe extern "C" fn set_table(state: *mut ffi::lua_State) -> c_int {
+                ffi::lua_settable(state, -3);
+                1
+            }
+            protect_lua(lua.state, 3, set_table)
         }
     }
 
@@ -98,19 +98,19 @@ impl<'lua> Table<'lua> {
     pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, || {
-                check_stack(lua.state, 5);
-                lua.push_ref(&self.0);
-                lua.push_value(key.to_lua(lua)?);
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 5);
 
-                unsafe extern "C" fn get_table(state: *mut ffi::lua_State) -> c_int {
-                    ffi::lua_gettable(state, -2);
-                    1
-                }
-                protect_lua(lua.state, 2, get_table)?;
+            lua.push_ref(&self.0);
+            lua.push_value(key.to_lua(lua)?);
 
-                V::from_lua(lua.pop_value(), lua)
-            })
+            unsafe extern "C" fn get_table(state: *mut ffi::lua_State) -> c_int {
+                ffi::lua_gettable(state, -2);
+                1
+            }
+            protect_lua(lua.state, 2, get_table)?;
+
+            V::from_lua(lua.pop_value(), lua)
         }
     }
 
@@ -118,20 +118,20 @@ impl<'lua> Table<'lua> {
     pub fn contains_key<K: ToLua<'lua>>(&self, key: K) -> Result<bool> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, || {
-                check_stack(lua.state, 5);
-                lua.push_ref(&self.0);
-                lua.push_value(key.to_lua(lua)?);
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 5);
 
-                unsafe extern "C" fn get_table(state: *mut ffi::lua_State) -> c_int {
-                    ffi::lua_gettable(state, -2);
-                    1
-                }
-                protect_lua(lua.state, 2, get_table)?;
+            lua.push_ref(&self.0);
+            lua.push_value(key.to_lua(lua)?);
 
-                let has = ffi::lua_isnil(lua.state, -1) == 0;
-                Ok(has)
-            })
+            unsafe extern "C" fn get_table(state: *mut ffi::lua_State) -> c_int {
+                ffi::lua_gettable(state, -2);
+                1
+            }
+            protect_lua(lua.state, 2, get_table)?;
+
+            let has = ffi::lua_isnil(lua.state, -1) == 0;
+            Ok(has)
         }
     }
 
@@ -139,20 +139,20 @@ impl<'lua> Table<'lua> {
     pub fn raw_set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, || {
-                check_stack(lua.state, 6);
-                lua.push_ref(&self.0);
-                lua.push_value(key.to_lua(lua)?);
-                lua.push_value(value.to_lua(lua)?);
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 6);
 
-                unsafe extern "C" fn raw_set(state: *mut ffi::lua_State) -> c_int {
-                    ffi::lua_rawset(state, -3);
-                    0
-                }
-                protect_lua(lua.state, 3, raw_set)?;
+            lua.push_ref(&self.0);
+            lua.push_value(key.to_lua(lua)?);
+            lua.push_value(value.to_lua(lua)?);
 
-                Ok(())
-            })
+            unsafe extern "C" fn raw_set(state: *mut ffi::lua_State) -> c_int {
+                ffi::lua_rawset(state, -3);
+                0
+            }
+            protect_lua(lua.state, 3, raw_set)?;
+
+            Ok(())
         }
     }
 
@@ -160,14 +160,14 @@ impl<'lua> Table<'lua> {
     pub fn raw_get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, || {
-                check_stack(lua.state, 3);
-                lua.push_ref(&self.0);
-                lua.push_value(key.to_lua(lua)?);
-                ffi::lua_rawget(lua.state, -2);
-                let res = V::from_lua(lua.pop_value(), lua)?;
-                Ok(res)
-            })
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 3);
+
+            lua.push_ref(&self.0);
+            lua.push_value(key.to_lua(lua)?);
+            ffi::lua_rawget(lua.state, -2);
+            let res = V::from_lua(lua.pop_value(), lua)?;
+            Ok(res)
         }
     }
 
@@ -179,11 +179,10 @@ impl<'lua> Table<'lua> {
     pub fn len(&self) -> Result<Integer> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, || {
-                check_stack(lua.state, 4);
-                lua.push_ref(&self.0);
-                protect_lua_closure(lua.state, 1, 0, |state| ffi::luaL_len(state, -1))
-            })
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 4);
+            lua.push_ref(&self.0);
+            protect_lua_closure(lua.state, 1, 0, |state| ffi::luaL_len(state, -1))
         }
     }
 
@@ -191,12 +190,11 @@ impl<'lua> Table<'lua> {
     pub fn raw_len(&self) -> Integer {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, || {
-                check_stack(lua.state, 1);
-                lua.push_ref(&self.0);
-                let len = ffi::lua_rawlen(lua.state, -1);
-                len as Integer
-            })
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 1);
+            lua.push_ref(&self.0);
+            let len = ffi::lua_rawlen(lua.state, -1);
+            len as Integer
         }
     }
 
@@ -206,16 +204,15 @@ impl<'lua> Table<'lua> {
     pub fn get_metatable(&self) -> Option<Table<'lua>> {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, || {
-                check_stack(lua.state, 1);
-                lua.push_ref(&self.0);
-                if ffi::lua_getmetatable(lua.state, -1) == 0 {
-                    None
-                } else {
-                    let table = Table(lua.pop_ref());
-                    Some(table)
-                }
-            })
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 1);
+            lua.push_ref(&self.0);
+            if ffi::lua_getmetatable(lua.state, -1) == 0 {
+                None
+            } else {
+                let table = Table(lua.pop_ref());
+                Some(table)
+            }
         }
     }
 
@@ -226,16 +223,15 @@ impl<'lua> Table<'lua> {
     pub fn set_metatable(&self, metatable: Option<Table<'lua>>) {
         let lua = self.0.lua;
         unsafe {
-            stack_guard(lua.state, move || {
-                check_stack(lua.state, 1);
-                lua.push_ref(&self.0);
-                if let Some(metatable) = metatable {
-                    lua.push_ref(&metatable.0);
-                } else {
-                    ffi::lua_pushnil(lua.state);
-                }
-                ffi::lua_setmetatable(lua.state, -2);
-            })
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 1);
+            lua.push_ref(&self.0);
+            if let Some(metatable) = metatable {
+                lua.push_ref(&metatable.0);
+            } else {
+                ffi::lua_pushnil(lua.state);
+            }
+            ffi::lua_setmetatable(lua.state, -2);
         }
     }
 
@@ -359,31 +355,30 @@ where
             let lua = self.table.lua;
 
             unsafe {
-                stack_guard(lua.state, || {
-                    check_stack(lua.state, 6);
+                let _sg = StackGuard::new(lua.state);
+                check_stack(lua.state, 6);
 
-                    lua.push_ref(&self.table);
-                    lua.push_ref(&next_key);
+                lua.push_ref(&self.table);
+                lua.push_ref(&next_key);
 
-                    match protect_lua_closure(lua.state, 2, ffi::LUA_MULTRET, |state| {
-                        ffi::lua_next(state, -2) != 0
-                    }) {
-                        Ok(false) => None,
-                        Ok(true) => {
-                            ffi::lua_pushvalue(lua.state, -2);
-                            let key = lua.pop_value();
-                            let value = lua.pop_value();
-                            self.next_key = Some(lua.pop_ref());
+                match protect_lua_closure(lua.state, 2, ffi::LUA_MULTRET, |state| {
+                    ffi::lua_next(state, -2) != 0
+                }) {
+                    Ok(false) => None,
+                    Ok(true) => {
+                        ffi::lua_pushvalue(lua.state, -2);
+                        let key = lua.pop_value();
+                        let value = lua.pop_value();
+                        self.next_key = Some(lua.pop_ref());
 
-                            Some((|| {
-                                let key = K::from_lua(key, lua)?;
-                                let value = V::from_lua(value, lua)?;
-                                Ok((key, value))
-                            })())
-                        }
-                        Err(e) => Some(Err(e)),
+                        Some((|| {
+                            let key = K::from_lua(key, lua)?;
+                            let value = V::from_lua(value, lua)?;
+                            Ok((key, value))
+                        })())
                     }
-                })
+                    Err(e) => Some(Err(e)),
+                }
             }
         } else {
             None
@@ -413,22 +408,20 @@ where
             let lua = self.table.lua;
 
             unsafe {
-                stack_guard(lua.state, || {
-                    check_stack(lua.state, 5);
+                let _sg = StackGuard::new(lua.state);
+                check_stack(lua.state, 5);
 
-                    lua.push_ref(&self.table);
-                    match protect_lua_closure(lua.state, 1, 1, |state| {
-                        ffi::lua_geti(state, -1, index)
-                    }) {
-                        Ok(ffi::LUA_TNIL) => None,
-                        Ok(_) => {
-                            let value = lua.pop_value();
-                            self.index = Some(index + 1);
-                            Some(V::from_lua(value, lua))
-                        }
-                        Err(err) => Some(Err(err)),
+                lua.push_ref(&self.table);
+                match protect_lua_closure(lua.state, 1, 1, |state| ffi::lua_geti(state, -1, index))
+                {
+                    Ok(ffi::LUA_TNIL) => None,
+                    Ok(_) => {
+                        let value = lua.pop_value();
+                        self.index = Some(index + 1);
+                        Some(V::from_lua(value, lua))
                     }
-                })
+                    Err(err) => Some(Err(err)),
+                }
             }
         } else {
             None

@@ -4,7 +4,7 @@ use std::os::raw::c_int;
 use ffi;
 use error::{Error, Result};
 use util::{check_stack, check_stack_err, error_traceback, pop_error, protect_lua_closure,
-           stack_guard};
+           StackGuard};
 use types::LuaRef;
 use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
@@ -63,31 +63,32 @@ impl<'lua> Function<'lua> {
     /// ```
     pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
         let lua = self.0.lua;
-        unsafe {
-            stack_guard(lua.state, || {
-                let args = args.to_lua_multi(lua)?;
-                let nargs = args.len() as c_int;
-                check_stack_err(lua.state, nargs + 3)?;
 
-                ffi::lua_pushcfunction(lua.state, error_traceback);
-                let stack_start = ffi::lua_gettop(lua.state);
-                lua.push_ref(&self.0);
-                for arg in args {
-                    lua.push_value(arg);
-                }
-                let ret = ffi::lua_pcall(lua.state, nargs, ffi::LUA_MULTRET, stack_start);
-                if ret != ffi::LUA_OK {
-                    return Err(pop_error(lua.state, ret));
-                }
-                let nresults = ffi::lua_gettop(lua.state) - stack_start;
-                let mut results = MultiValue::new();
-                check_stack(lua.state, 2);
-                for _ in 0..nresults {
-                    results.push_front(lua.pop_value());
-                }
-                ffi::lua_pop(lua.state, 1);
-                R::from_lua_multi(results, lua)
-            })
+        let args = args.to_lua_multi(lua)?;
+        let nargs = args.len() as c_int;
+
+        unsafe {
+            let _sg = StackGuard::new(lua.state);
+            check_stack_err(lua.state, nargs + 3)?;
+
+            ffi::lua_pushcfunction(lua.state, error_traceback);
+            let stack_start = ffi::lua_gettop(lua.state);
+            lua.push_ref(&self.0);
+            for arg in args {
+                lua.push_value(arg);
+            }
+            let ret = ffi::lua_pcall(lua.state, nargs, ffi::LUA_MULTRET, stack_start);
+            if ret != ffi::LUA_OK {
+                return Err(pop_error(lua.state, ret));
+            }
+            let nresults = ffi::lua_gettop(lua.state) - stack_start;
+            let mut results = MultiValue::new();
+            check_stack(lua.state, 2);
+            for _ in 0..nresults {
+                results.push_front(lua.pop_value());
+            }
+            ffi::lua_pop(lua.state, 1);
+            R::from_lua_multi(results, lua)
         }
     }
 
@@ -144,28 +145,28 @@ impl<'lua> Function<'lua> {
         }
 
         let lua = self.0.lua;
+
+        let args = args.to_lua_multi(lua)?;
+        let nargs = args.len() as c_int;
+
+        if nargs + 2 > ffi::LUA_MAX_UPVALUES {
+            return Err(Error::BindError);
+        }
+
         unsafe {
-            stack_guard(lua.state, || {
-                let args = args.to_lua_multi(lua)?;
-                let nargs = args.len() as c_int;
+            let _sg = StackGuard::new(lua.state);
+            check_stack_err(lua.state, nargs + 5)?;
+            lua.push_ref(&self.0);
+            ffi::lua_pushinteger(lua.state, nargs as ffi::lua_Integer);
+            for arg in args {
+                lua.push_value(arg);
+            }
 
-                if nargs + 2 > ffi::LUA_MAX_UPVALUES {
-                    return Err(Error::BindError);
-                }
+            protect_lua_closure(lua.state, nargs + 2, 1, |state| {
+                ffi::lua_pushcclosure(state, bind_call_impl, nargs + 2);
+            })?;
 
-                check_stack_err(lua.state, nargs + 5)?;
-                lua.push_ref(&self.0);
-                ffi::lua_pushinteger(lua.state, nargs as ffi::lua_Integer);
-                for arg in args {
-                    lua.push_value(arg);
-                }
-
-                protect_lua_closure(lua.state, nargs + 2, 1, |state| {
-                    ffi::lua_pushcclosure(state, bind_call_impl, nargs + 2);
-                })?;
-
-                Ok(Function(lua.pop_ref()))
-            })
+            Ok(Function(lua.pop_ref()))
         }
     }
 }

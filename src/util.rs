@@ -57,15 +57,6 @@ impl Drop for StackGuard {
     }
 }
 
-// Run an operation on a lua_State and restores the stack state at the end, using `StackGuard`.
-pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, op: F) -> R
-where
-    F: FnOnce() -> R,
-{
-    let _stack_guard = StackGuard::new(state);
-    op()
-}
-
 // Call a function that calls into the Lua API and may trigger a Lua error (longjmp) in a safe way.
 // Wraps the inner function in a call to `lua_pcall`, so the inner function only has access to a
 // limited lua stack.  `nargs` is the same as the the parameter to `lua_pcall`, and `nresults` is
