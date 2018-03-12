@@ -1,5 +1,5 @@
 #[cfg(feature = "builtin-lua")]
-extern crate gcc;
+extern crate cc;
 
 fn main() {
     #[cfg(feature = "builtin-lua")]
@@ -9,7 +9,7 @@ fn main() {
         let target_os = env::var("CARGO_CFG_TARGET_OS");
         let target_family = env::var("CARGO_CFG_TARGET_FAMILY");
 
-        let mut config = gcc::Build::new();
+        let mut config = cc::Build::new();
 
         if target_os == Ok("linux".to_string()) {
             config.define("LUA_USE_LINUX", None);

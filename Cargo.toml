@@ -22,7 +22,7 @@ default = ["builtin-lua"]
 #   * LUA_NUMBER as double
 #   * LUA_EXTRASPACE is sizeof(void*)
 #   * LUAI_MAXSTACK is 1000000
-builtin-lua = ["gcc"]
+builtin-lua = ["cc"]
 
 [dependencies]
 libc = { version = "0.2" }
@@ -30,7 +30,12 @@ failure = { version = "0.1.1" }
 compiletest_rs = { version = "0.3", optional = true }
 
 [build-dependencies]
-gcc = { version = "0.3.52", optional = true }
+cc = { version = "1.0", optional = true }
 
 [dev-dependencies]
 rustyline = "1.0.0"
+criterion = "0.2.0"
+
+[[bench]]
+name = "benchmark"
+harness = false

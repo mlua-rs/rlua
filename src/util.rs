@@ -27,74 +27,71 @@ pub unsafe fn check_stack_err(state: *mut ffi::lua_State, amount: c_int) -> Resu
     }
 }
 
-// Run an operation on a lua_State and ensure that there are no stack leaks and the stack is
-// restored on panic.
+pub struct StackGuard {
+    state: *mut ffi::lua_State,
+    top: c_int,
+}
+
+impl StackGuard {
+    // Creates a StackGuard instance with wa record of the stack size, and on Drop will check the
+    // stack size and drop any extra elements.  If the stack size at the end is *smaller* than at
+    // the beginning, this is considered a fatal logic error and will result in an abort.
+    pub unsafe fn new(state: *mut ffi::lua_State) -> StackGuard {
+        StackGuard {
+            state,
+            top: ffi::lua_gettop(state),
+        }
+    }
+}
+
+impl Drop for StackGuard {
+    fn drop(&mut self) {
+        unsafe {
+            let top = ffi::lua_gettop(self.state);
+            if top > self.top {
+                ffi::lua_settop(self.state, self.top);
+            } else if top < self.top {
+                rlua_panic!("{} too many stack values popped", self.top - top);
+            }
+        }
+    }
+}
+
+// Run an operation on a lua_State and restores the stack state at the end, using `StackGuard`.
 pub unsafe fn stack_guard<F, R>(state: *mut ffi::lua_State, op: F) -> R
 where
     F: FnOnce() -> R,
 {
-    let begin = ffi::lua_gettop(state);
-
-    let res = match catch_unwind(AssertUnwindSafe(op)) {
-        Ok(r) => r,
-        Err(p) => {
-            let top = ffi::lua_gettop(state);
-            if top > begin {
-                ffi::lua_settop(state, begin);
-            }
-            resume_unwind(p);
-        }
-    };
-
-    let top = ffi::lua_gettop(state);
-    if top > begin {
-        ffi::lua_settop(state, begin);
-        rlua_panic!("expected stack to be {}, got {}", begin, top);
-    } else if top < begin {
-        rlua_abort!("{} too many stack values popped", begin - top);
-    }
-
-    res
+    let _stack_guard = StackGuard::new(state);
+    op()
 }
 
-// Run an operation on a lua_State and automatically clean up the stack on error.  Takes the
-// lua_State and an operation to run.  If the operation results in success, then the stack is
-// inspected to make sure there is not a stack leak, and otherwise this is a logic error and will
-// panic.  If the operation results in an error, or if the operation panics, the stack is shrunk to
-// the value before the call.
-pub unsafe fn stack_err_guard<F, R>(state: *mut ffi::lua_State, op: F) -> Result<R>
-where
-    F: FnOnce() -> Result<R>,
-{
-    let begin = ffi::lua_gettop(state);
+// Call a function that calls into the Lua API and may trigger a Lua error (longjmp) in a safe way.
+// Wraps the inner function in a call to `lua_pcall`, so the inner function only has access to a
+// limited lua stack.  `nargs` is the same as the the parameter to `lua_pcall`, and `nresults` is
+// always LUA_MULTRET.  Internally uses 2 extra stack spaces, and does not call checkstack.
+// Provided function must *never* panic.
+pub unsafe fn protect_lua(
+    state: *mut ffi::lua_State,
+    nargs: c_int,
+    f: unsafe extern "C" fn(*mut ffi::lua_State) -> c_int,
+) -> Result<()> {
+    let stack_start = ffi::lua_gettop(state) - nargs;
 
-    let res = match catch_unwind(AssertUnwindSafe(op)) {
-        Ok(r) => r,
-        Err(p) => {
-            let top = ffi::lua_gettop(state);
-            if top > begin {
-                ffi::lua_settop(state, begin);
-            }
-            resume_unwind(p);
-        }
-    };
-
-    let top = ffi::lua_gettop(state);
-    if res.is_ok() {
-        if top > begin {
-            ffi::lua_settop(state, begin);
-            rlua_panic!("expected stack to be {}, got {}", begin, top);
-        } else if top < begin {
-            rlua_abort!("{} too many stack values popped", begin - top);
-        }
-    } else {
-        if top > begin {
-            ffi::lua_settop(state, begin);
-        } else if top < begin {
-            rlua_abort!("{} too many stack values popped", begin - top);
-        }
+    ffi::lua_pushcfunction(state, error_traceback);
+    ffi::lua_pushcfunction(state, f);
+    if nargs > 0 {
+        ffi::lua_rotate(state, stack_start + 1, 2);
     }
-    res
+
+    let ret = ffi::lua_pcall(state, nargs, ffi::LUA_MULTRET, stack_start + 1);
+    ffi::lua_remove(state, stack_start + 1);
+
+    if ret == ffi::LUA_OK {
+        Ok(())
+    } else {
+        Err(pop_error(state, ret))
+    }
 }
 
 // Call a function that calls into the Lua API and may trigger a Lua error (longjmp) in a safe way.
@@ -104,7 +101,7 @@ where
 // values are assumed to match the `nresults` param.  Internally uses 3 extra stack spaces, and does
 // not call checkstack.  Provided function must *not* panic, and since it will generally be
 // lonjmping, should not contain any values that implement Drop.
-pub unsafe fn protect_lua_call<F, R>(
+pub unsafe fn protect_lua_closure<F, R>(
     state: *mut ffi::lua_State,
     nargs: c_int,
     nresults: c_int,
@@ -115,7 +112,7 @@ where
     R: Copy,
 {
     struct Params<F, R> {
-        function: *const F,
+        function: F,
         result: R,
         nresults: c_int,
     }
@@ -127,7 +124,7 @@ where
         let params = ffi::lua_touserdata(state, -1) as *mut Params<F, R>;
         ffi::lua_pop(state, 1);
 
-        (*params).result = (*(*params).function)(state);
+        (*params).result = ((*params).function)(state);
 
         if (*params).nresults == ffi::LUA_MULTRET {
             ffi::lua_gettop(state)
@@ -140,10 +137,12 @@ where
 
     ffi::lua_pushcfunction(state, error_traceback);
     ffi::lua_pushcfunction(state, do_call::<F, R>);
-    ffi::lua_rotate(state, stack_start + 1, 2);
+    if nargs > 0 {
+        ffi::lua_rotate(state, stack_start + 1, 2);
+    }
 
     let mut params = Params {
-        function: &f,
+        function: f,
         result: mem::uninitialized(),
         nresults,
     };
@@ -173,8 +172,9 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
         "pop_error called with non-error return code"
     );
 
-    if let Some(err) = pop_wrapped_error(state) {
-        err
+    if let Some(err) = get_wrapped_error(state, -1).as_ref() {
+        ffi::lua_pop(state, 1);
+        err.clone()
     } else if is_wrapped_panic(state, -1) {
         let panic = get_userdata::<WrappedPanic>(state, -1);
         if let Some(p) = (*panic).0.take() {
@@ -212,7 +212,7 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
             ffi::LUA_ERRMEM => {
                 // This should be impossible, as we set the lua allocator to one that aborts
                 // instead of failing.
-                rlua_abort!("impossible Lua allocation error, aborting!")
+                rlua_abort!("impossible Lua allocation error")
             }
             ffi::LUA_ERRGCMM => Error::GarbageCollectorError(err_string),
             _ => rlua_panic!("unrecognized lua error code"),
@@ -222,14 +222,14 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
 
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) -> Result<()> {
-    protect_lua_call(state, 0, 1, |state| {
+    protect_lua_closure(state, 0, 1, |state| {
         ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
     })
 }
 
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
-    let ud = protect_lua_call(state, 0, 1, move |state| {
+    let ud = protect_lua_closure(state, 0, 1, move |state| {
         ffi::lua_newuserdata(state, mem::size_of::<T>()) as *mut T
     })?;
     ptr::write(ud, t);
@@ -300,7 +300,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
 
     if ffi::lua_checkstack(state, 2) == 0 {
         // If we don't have enough stack space to even check the error type, do nothing
-    } else if is_wrapped_error(state, 1) {
+    } else if let Some(error) = get_wrapped_error(state, 1).as_ref() {
         let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             gc_guard(state, || {
                 ffi::luaL_traceback(state, state, ptr::null(), 0);
@@ -314,7 +314,9 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
             "not enough stack space for traceback".to_owned()
         };
 
-        let error = pop_wrapped_error(state).unwrap();
+        let error = error.clone();
+        ffi::lua_pop(state, 1);
+
         push_wrapped_error(
             state,
             Error::CallbackError {
@@ -404,14 +406,6 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
     }
 }
 
-// Does not call lua_checkstack, uses 1 stack space.
-pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
-    ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_MAINTHREAD);
-    let main_state = ffi::lua_tothread(state, -1);
-    ffi::lua_pop(state, 1);
-    main_state
-}
-
 // Pushes a WrappedError::Error to the top of the stack.  Uses two stack spaces and does not call
 // lua_checkstack.
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
@@ -424,18 +418,26 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
     ffi::lua_setmetatable(state, -2);
 }
 
-// Pops a WrappedError off of the top of the stack, if it is a WrappedError.  If it is not a
-// WrappedError, returns None and does not pop anything.  Uses 2 stack spaces and does not call
-// lua_checkstack.
-pub unsafe fn pop_wrapped_error(state: *mut ffi::lua_State) -> Option<Error> {
-    if !is_wrapped_error(state, -1) {
-        None
+// Checks if the value at the given index is a WrappedError, and if it is returns a pointer to it,
+// otherwise returns null.  Uses 2 stack spaces and does not call lua_checkstack.
+pub unsafe fn get_wrapped_error(state: *mut ffi::lua_State, index: c_int) -> *const Error {
+    let userdata = ffi::lua_touserdata(state, index);
+    if userdata.is_null() {
+        return ptr::null();
+    }
+
+    if ffi::lua_getmetatable(state, index) == 0 {
+        return ptr::null();
+    }
+
+    get_error_metatable(state);
+    let res = ffi::lua_rawequal(state, -1, -2) != 0;
+    ffi::lua_pop(state, 2);
+
+    if res {
+        &(*get_userdata::<WrappedError>(state, -1)).0
     } else {
-        let err = &*get_userdata::<WrappedError>(state, -1);
-        // We are assuming here that Error::clone() cannot panic.
-        let err = err.0.clone();
-        ffi::lua_pop(state, 1);
-        Some(err)
+        ptr::null()
     }
 }
 
@@ -466,9 +468,8 @@ pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
         ffi::luaL_checkstack(state, 2, ptr::null());
 
         callback_error(state, || {
-            if is_wrapped_error(state, -1) {
-                let error = get_userdata::<WrappedError>(state, -1);
-                let error_str = (*error).0.to_string();
+            if let Some(error) = get_wrapped_error(state, -1).as_ref() {
+                let error_str = error.to_string();
                 gc_guard(state, || {
                     ffi::lua_pushlstring(
                         state,
@@ -585,24 +586,6 @@ unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>)
 
     get_panic_metatable(state);
     ffi::lua_setmetatable(state, -2);
-}
-
-// Checks if the value at the given index is a WrappedError, uses 2 stack spaces and does not call
-// lua_checkstack.
-unsafe fn is_wrapped_error(state: *mut ffi::lua_State, index: c_int) -> bool {
-    let userdata = ffi::lua_touserdata(state, index);
-    if userdata.is_null() {
-        return false;
-    }
-
-    if ffi::lua_getmetatable(state, index) == 0 {
-        return false;
-    }
-
-    get_error_metatable(state);
-    let res = ffi::lua_rawequal(state, -1, -2) != 0;
-    ffi::lua_pop(state, 2);
-    res
 }
 
 // Checks if the value at the given index is a WrappedPanic.  Uses 2 stack spaces and does not call

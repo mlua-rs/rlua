@@ -1,8 +1,8 @@
 use std::os::raw::c_int;
 
 use ffi;
-use error::*;
-use util::*;
+use error::{Error, Result};
+use util::{check_stack, check_stack_err, error_traceback, pop_error, stack_guard};
 use types::LuaRef;
 use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
@@ -78,10 +78,10 @@ impl<'lua> Thread<'lua> {
     {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, || {
+            stack_guard(lua.state, || {
                 check_stack(lua.state, 1);
 
-                lua.push_ref(lua.state, &self.0);
+                lua.push_ref(&self.0);
                 let thread_state = ffi::lua_tothread(lua.state, -1);
 
                 let status = ffi::lua_status(thread_state);
@@ -93,11 +93,13 @@ impl<'lua> Thread<'lua> {
 
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
+                check_stack_err(lua.state, nargs)?;
                 check_stack_err(thread_state, nargs + 1)?;
 
                 for arg in args {
-                    lua.push_value(thread_state, arg);
+                    lua.push_value(arg);
                 }
+                ffi::lua_xmove(lua.state, thread_state, nargs);
 
                 let ret = ffi::lua_resume(thread_state, lua.state, nargs);
                 if ret != ffi::LUA_OK && ret != ffi::LUA_YIELD {
@@ -107,9 +109,11 @@ impl<'lua> Thread<'lua> {
 
                 let nresults = ffi::lua_gettop(thread_state);
                 let mut results = MultiValue::new();
-                check_stack(thread_state, 2);
+                ffi::lua_xmove(thread_state, lua.state, nresults);
+
+                check_stack(lua.state, 2);
                 for _ in 0..nresults {
-                    results.push_front(lua.pop_value(thread_state));
+                    results.push_front(lua.pop_value());
                 }
                 R::from_lua_multi(results, lua)
             })
@@ -123,7 +127,7 @@ impl<'lua> Thread<'lua> {
             stack_guard(lua.state, || {
                 check_stack(lua.state, 1);
 
-                lua.push_ref(lua.state, &self.0);
+                lua.push_ref(&self.0);
                 let thread_state = ffi::lua_tothread(lua.state, -1);
                 ffi::lua_pop(lua.state, 1);
 

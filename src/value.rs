@@ -1,9 +1,7 @@
-use std::str;
-use std::ops::{Deref, DerefMut};
-use std::iter::FromIterator;
-use std::collections::VecDeque;
+use std::{slice, str, vec};
+use std::iter::{self, FromIterator};
 
-use error::*;
+use error::{Error, Result};
 use types::{Integer, LightUserData, Number};
 use string::String;
 use table::Table;
@@ -76,41 +74,77 @@ pub trait FromLua<'lua>: Sized {
 
 /// Multiple Lua values used for both argument passing and also for multiple return values.
 #[derive(Debug, Clone)]
-pub struct MultiValue<'lua>(VecDeque<Value<'lua>>);
+pub struct MultiValue<'lua>(Vec<Value<'lua>>);
 
 impl<'lua> MultiValue<'lua> {
     /// Creates an empty `MultiValue` containing no values.
     pub fn new() -> MultiValue<'lua> {
-        MultiValue(VecDeque::new())
+        MultiValue(Vec::new())
     }
 }
 
 impl<'lua> FromIterator<Value<'lua>> for MultiValue<'lua> {
     fn from_iter<I: IntoIterator<Item = Value<'lua>>>(iter: I) -> Self {
-        MultiValue(VecDeque::from_iter(iter))
+        MultiValue::from_vec(Vec::from_iter(iter))
     }
 }
 
 impl<'lua> IntoIterator for MultiValue<'lua> {
     type Item = Value<'lua>;
-    type IntoIter = <VecDeque<Value<'lua>> as IntoIterator>::IntoIter;
+    type IntoIter = iter::Rev<vec::IntoIter<Value<'lua>>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.0.into_iter().rev()
     }
 }
 
-impl<'lua> Deref for MultiValue<'lua> {
-    type Target = VecDeque<Value<'lua>>;
+impl<'a, 'lua> IntoIterator for &'a MultiValue<'lua> {
+    type Item = &'a Value<'lua>;
+    type IntoIter = iter::Rev<slice::Iter<'a, Value<'lua>>>;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter().rev()
     }
 }
 
-impl<'lua> DerefMut for MultiValue<'lua> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl<'lua> MultiValue<'lua> {
+    pub fn from_vec(mut v: Vec<Value<'lua>>) -> MultiValue<'lua> {
+        v.reverse();
+        MultiValue(v)
+    }
+
+    pub fn into_vec(self) -> Vec<Value<'lua>> {
+        let mut v = self.0;
+        v.reverse();
+        v
+    }
+
+    pub fn from_vec_rev(v: Vec<Value<'lua>>) -> MultiValue<'lua> {
+        MultiValue(v)
+    }
+
+    pub fn into_vec_rev(self) -> Vec<Value<'lua>> {
+        self.0
+    }
+
+    pub fn reserve(&mut self, size: usize) {
+        self.0.reserve(size);
+    }
+
+    pub fn push_front(&mut self, value: Value<'lua>) {
+        self.0.push(value);
+    }
+
+    pub fn pop_front(&mut self) -> Option<Value<'lua>> {
+        self.0.pop()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn iter(&self) -> iter::Rev<slice::Iter<Value<'lua>>> {
+        self.0.iter().rev()
     }
 }
 

@@ -2,8 +2,9 @@ use std::ptr;
 use std::os::raw::c_int;
 
 use ffi;
-use error::*;
-use util::*;
+use error::{Error, Result};
+use util::{check_stack, check_stack_err, error_traceback, pop_error, protect_lua_closure,
+           stack_guard};
 use types::LuaRef;
 use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
@@ -63,16 +64,16 @@ impl<'lua> Function<'lua> {
     pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, || {
+            stack_guard(lua.state, || {
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
                 check_stack_err(lua.state, nargs + 3)?;
 
                 ffi::lua_pushcfunction(lua.state, error_traceback);
                 let stack_start = ffi::lua_gettop(lua.state);
-                lua.push_ref(lua.state, &self.0);
+                lua.push_ref(&self.0);
                 for arg in args {
-                    lua.push_value(lua.state, arg);
+                    lua.push_value(arg);
                 }
                 let ret = ffi::lua_pcall(lua.state, nargs, ffi::LUA_MULTRET, stack_start);
                 if ret != ffi::LUA_OK {
@@ -82,7 +83,7 @@ impl<'lua> Function<'lua> {
                 let mut results = MultiValue::new();
                 check_stack(lua.state, 2);
                 for _ in 0..nresults {
-                    results.push_front(lua.pop_value(lua.state));
+                    results.push_front(lua.pop_value());
                 }
                 ffi::lua_pop(lua.state, 1);
                 R::from_lua_multi(results, lua)
@@ -144,7 +145,7 @@ impl<'lua> Function<'lua> {
 
         let lua = self.0.lua;
         unsafe {
-            stack_err_guard(lua.state, || {
+            stack_guard(lua.state, || {
                 let args = args.to_lua_multi(lua)?;
                 let nargs = args.len() as c_int;
 
@@ -152,18 +153,18 @@ impl<'lua> Function<'lua> {
                     return Err(Error::BindError);
                 }
 
-                check_stack_err(lua.state, nargs + 3)?;
-                lua.push_ref(lua.state, &self.0);
+                check_stack_err(lua.state, nargs + 5)?;
+                lua.push_ref(&self.0);
                 ffi::lua_pushinteger(lua.state, nargs as ffi::lua_Integer);
                 for arg in args {
-                    lua.push_value(lua.state, arg);
+                    lua.push_value(arg);
                 }
 
-                protect_lua_call(lua.state, nargs + 2, 1, |state| {
+                protect_lua_closure(lua.state, nargs + 2, 1, |state| {
                     ffi::lua_pushcclosure(state, bind_call_impl, nargs + 2);
                 })?;
 
-                Ok(Function(lua.pop_ref(lua.state)))
+                Ok(Function(lua.pop_ref()))
             })
         }
     }

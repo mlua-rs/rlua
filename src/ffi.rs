@@ -123,6 +123,7 @@ extern "C" {
     pub fn lua_rotate(state: *mut lua_State, index: c_int, n: c_int);
     pub fn lua_copy(state: *mut lua_State, from: c_int, to: c_int);
     pub fn lua_absindex(state: *mut lua_State, index: c_int) -> c_int;
+    pub fn lua_xmove(from: *mut lua_State, to: *mut lua_State, n: c_int);
 
     pub fn lua_isinteger(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_isnumber(state: *mut lua_State, index: c_int) -> c_int;

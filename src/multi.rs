@@ -2,9 +2,9 @@ use std::ops::{Deref, DerefMut};
 use std::iter::FromIterator;
 use std::result::Result as StdResult;
 
-use error::*;
-use value::*;
-use lua::*;
+use error::Result;
+use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti};
+use lua::Lua;
 
 /// Result is convertible to `MultiValue` following the common Lua idiom of returning the result
 /// on success, or in the case of an error, returning `nil` and an error message.
@@ -13,10 +13,10 @@ impl<'lua, T: ToLua<'lua>, E: ToLua<'lua>> ToLuaMulti<'lua> for StdResult<T, E> 
         let mut result = MultiValue::new();
 
         match self {
-            Ok(v) => result.push_back(v.to_lua(lua)?),
+            Ok(v) => result.push_front(v.to_lua(lua)?),
             Err(e) => {
-                result.push_back(Nil);
-                result.push_back(e.to_lua(lua)?);
+                result.push_front(e.to_lua(lua)?);
+                result.push_front(Nil);
             }
         }
 
@@ -27,7 +27,7 @@ impl<'lua, T: ToLua<'lua>, E: ToLua<'lua>> ToLuaMulti<'lua> for StdResult<T, E> 
 impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for T {
     fn to_lua_multi(self, lua: &'lua Lua) -> Result<MultiValue<'lua>> {
         let mut v = MultiValue::new();
-        v.push_back(self.to_lua(lua)?);
+        v.push_front(self.to_lua(lua)?);
         Ok(v)
     }
 }

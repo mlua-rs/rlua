@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::hash::{BuildHasher, Hash};
 use std::string::String as StdString;
 
-use error::*;
+use error::{Error, Result};
 use types::{Integer, LightUserData, Number};
 use string::String;
 use table::Table;
