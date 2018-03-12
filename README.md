@@ -64,8 +64,8 @@ considered a bug.
 Caveats to the panic / abort guarantee:
 
   * `rlua` reserves the right to panic on API usage errors.  Currently, the only
-    time this will happen is when passed a registry handle type from a different
-    Lua state.
+    time this will happen is when passed a handle type from a mismatched `Lua`
+    instance.
   * Currently, there are no memory or execution limits on scripts, so untrusted
     scripts can always at minimum infinite loop or allocate arbitrary amounts of
     memory.
