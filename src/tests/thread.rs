@@ -100,7 +100,7 @@ fn coroutine_panic() {
     match catch_unwind(|| -> Result<()> {
         // check that coroutines propagate panics correctly
         let lua = Lua::new();
-        let thrd_main = lua.create_function(|lua, ()| -> Result<()> {
+        let thrd_main = lua.create_function(|_, ()| -> Result<()> {
             panic!("test_panic");
         })?;
         lua.globals().set("main", thrd_main.clone())?;

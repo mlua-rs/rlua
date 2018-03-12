@@ -158,7 +158,7 @@ where
 //   3) Otherwise, interprets the error as the appropriate lua error.
 // Uses 2 stack spaces, does not call lua_checkstack.
 pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
-    rlua_assert!(
+    rlua_debug_assert!(
         err_code != ffi::LUA_OK && err_code != ffi::LUA_YIELD,
         "pop_error called with non-error return code"
     );
@@ -229,7 +229,7 @@ pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
 
 pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
     let ud = ffi::lua_touserdata(state, index) as *mut T;
-    rlua_assert!(!ud.is_null(), "userdata pointer is null");
+    rlua_debug_assert!(!ud.is_null(), "userdata pointer is null");
     ud
 }
 
@@ -243,7 +243,7 @@ pub unsafe fn take_userdata<T>(state: *mut ffi::lua_State) -> T {
     get_destructed_userdata_metatable(state);
     ffi::lua_setmetatable(state, -2);
     let ud = ffi::lua_touserdata(state, -1) as *mut T;
-    rlua_assert!(!ud.is_null(), "userdata pointer is null");
+    rlua_debug_assert!(!ud.is_null(), "userdata pointer is null");
     ffi::lua_pop(state, 1);
     ptr::read(ud)
 }

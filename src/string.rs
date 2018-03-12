@@ -73,7 +73,7 @@ impl<'lua> String<'lua> {
             check_stack(lua.state, 1);
 
             lua.push_ref(&self.0);
-            rlua_assert!(
+            rlua_debug_assert!(
                 ffi::lua_type(lua.state, -1) == ffi::LUA_TSTRING,
                 "string ref is not string type"
             );

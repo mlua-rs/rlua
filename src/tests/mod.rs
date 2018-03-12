@@ -781,9 +781,9 @@ fn large_args() {
     );
 }
 
+#[test]
 fn large_args_ref() {
     let lua = Lua::new();
-    let globals = lua.globals();
 
     let f = lua.create_function(|_, args: Variadic<String>| {
         for i in 0..args.len() {

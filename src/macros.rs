@@ -40,6 +40,16 @@ macro_rules! rlua_assert {
     };
 }
 
+macro_rules! rlua_debug_assert {
+    ($cond:expr, $msg:expr) => {
+        debug_assert!($cond, concat!("rlua internal error: ", $msg));
+    };
+
+    ($cond:expr, $msg:expr, $($arg:tt)+) => {
+        debug_assert!($cond, concat!("rlua internal error: ", $msg), $($arg)+);
+    };
+}
+
 macro_rules! rlua_abort {
     ($msg:expr) => {
         {

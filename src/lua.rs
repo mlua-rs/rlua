@@ -46,14 +46,22 @@ unsafe impl Send for Lua {}
 impl Drop for Lua {
     fn drop(&mut self) {
         unsafe {
-            if !self.ephemeral {
-                let top = ffi::lua_gettop(self.state);
-                rlua_assert!(
-                    top == REF_STACK_SIZE,
-                    "stack problem detected, stack top is {}",
-                    top - REF_STACK_SIZE
-                );
+            if cfg!(debug_assertions) {
+                for use_count in &self.ref_stack_slots {
+                    rlua_assert!(use_count.get() == 0, "live stack reference detected");
+                }
 
+                if !self.ephemeral {
+                    let top = ffi::lua_gettop(self.state);
+                    rlua_assert!(
+                        top == REF_STACK_SIZE,
+                        "stack problem detected, stack top is {}",
+                        top - REF_STACK_SIZE
+                    );
+                }
+            }
+
+            if !self.ephemeral {
                 let extra_data = *(ffi::lua_getextraspace(self.state) as *mut *mut ExtraData);
                 *(*extra_data).registry_unref_list.lock().unwrap() = None;
                 Box::from_raw(extra_data);
@@ -819,7 +827,7 @@ impl Lua {
                 RefType::Stack { stack_slot } => {
                     let ref_slot = &self.ref_stack_slots[(stack_slot - 1) as usize];
                     let ref_count = ref_slot.get();
-                    rlua_assert!(ref_count > 0, "ref slot use count has gone below zero");
+                    rlua_debug_assert!(ref_count > 0, "ref slot use count has gone below zero");
                     ref_slot.set(ref_count - 1);
                     if ref_count == 1 {
                         ffi::lua_pushnil(self.state);
@@ -1125,7 +1133,7 @@ impl Lua {
         }));
         *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra_data;
 
-        rlua_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
+        rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
         check_stack(state, REF_STACK_SIZE);
         ffi::lua_settop(state, REF_STACK_SIZE);
 
