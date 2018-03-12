@@ -1,6 +1,6 @@
 use std::panic::catch_unwind;
 
-use {Error, Function, Lua, Thread, ThreadStatus};
+use {Error, Function, Lua, Result, Thread, ThreadStatus};
 
 #[test]
 fn test_thread() {
@@ -97,18 +97,17 @@ fn coroutine_from_closure() {
 
 #[test]
 fn coroutine_panic() {
-    // check that coroutines propagate panics correctly
-    let lua = Lua::new();
-    let thrd_main = lua.create_function(|lua, ()| {
-        // whoops, 'main' has a wrong type
-        let _coro: u32 = lua.globals().get("main").unwrap();
-        Ok(())
-    }).unwrap();
-    lua.globals().set("main", thrd_main.clone()).unwrap();
-    let thrd: Thread = lua.create_thread(thrd_main).unwrap();
-
-    match catch_unwind(|| thrd.resume::<_, ()>(())) {
+    match catch_unwind(|| -> Result<()> {
+        // check that coroutines propagate panics correctly
+        let lua = Lua::new();
+        let thrd_main = lua.create_function(|lua, ()| -> Result<()> {
+            panic!("test_panic");
+        })?;
+        lua.globals().set("main", thrd_main.clone())?;
+        let thrd: Thread = lua.create_thread(thrd_main)?;
+        thrd.resume(())
+    }) {
         Ok(r) => panic!("coroutine panic not propagated, instead returned {:?}", r),
-        Err(_) => {}
+        Err(p) => assert!(*p.downcast::<&str>().unwrap() == "test_panic"),
     }
 }

@@ -2,11 +2,10 @@ use std::{cmp, mem, ptr, str};
 use std::sync::{Arc, Mutex};
 use std::cell::{Cell, RefCell};
 use std::ffi::CString;
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_int, c_void};
-use std::panic::{RefUnwindSafe, UnwindSafe};
 
 use libc;
 
@@ -14,7 +13,7 @@ use ffi;
 use error::{Error, Result};
 use util::{callback_error, check_stack, check_stack_err, gc_guard, get_userdata,
            get_wrapped_error, init_error_metatables, pop_error, protect_lua, protect_lua_closure,
-           push_string, push_userdata, push_wrapped_error, safe_pcall, safe_xpcall, take_userdata,
+           push_string, push_userdata, push_wrapped_error, safe_pcall, safe_xpcall,
            userdata_destructor, StackGuard};
 use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 use types::{Callback, Integer, LightUserData, LuaRef, Number, RefType, RegistryKey};
@@ -23,25 +22,13 @@ use table::Table;
 use function::Function;
 use thread::Thread;
 use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
+use scope::Scope;
 
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
     pub(crate) state: *mut ffi::lua_State,
     ephemeral: bool,
     ref_stack_slots: [Cell<usize>; REF_STACK_SIZE as usize],
-}
-
-/// Constructed by the [`Lua::scope`] method, allows temporarily passing to Lua userdata that is
-/// !Send, and callbacks that are !Send and not 'static.
-///
-/// See [`Lua::scope`] for more details.
-///
-/// [`Lua::scope`]: struct.Lua.html#method.scope
-pub struct Scope<'scope> {
-    lua: &'scope Lua,
-    destructors: RefCell<Vec<Box<Fn() -> Box<Any> + 'scope>>>,
-    // 'scope lifetime must be invariant
-    _scope: PhantomData<&'scope mut &'scope ()>,
 }
 
 // Data associated with the main lua_State via lua_getextraspace.
@@ -55,9 +42,6 @@ const REF_STACK_SIZE: c_int = 16;
 static FUNCTION_METATABLE_REGISTRY_KEY: u8 = 0;
 
 unsafe impl Send for Lua {}
-
-impl UnwindSafe for Lua {}
-impl RefUnwindSafe for Lua {}
 
 impl Drop for Lua {
     fn drop(&mut self) {
@@ -287,7 +271,7 @@ impl Lua {
         R: ToLuaMulti<'callback>,
         F: 'static + Send + Fn(&'callback Lua, A) -> Result<R>,
     {
-        self.create_callback_function(Box::new(move |lua, args| {
+        self.create_callback(Box::new(move |lua, args| {
             func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
         }))
     }
@@ -336,7 +320,7 @@ impl Lua {
     where
         T: Send + UserData,
     {
-        self.do_create_userdata(data)
+        unsafe { self.make_userdata(data) }
     }
 
     /// Returns a handle to the global environment.
@@ -370,11 +354,7 @@ impl Lua {
     where
         F: FnOnce(&Scope<'scope>) -> R,
     {
-        let scope = Scope {
-            lua: self,
-            destructors: RefCell::new(Vec::new()),
-            _scope: PhantomData,
-        };
+        let scope = Scope::new(self);
         let r = f(&scope);
         drop(scope);
         r
@@ -902,7 +882,7 @@ impl Lua {
 
             for (k, m) in methods.methods {
                 push_string(self.state, &k)?;
-                self.push_value(Value::Function(self.create_callback_function(m)?));
+                self.push_value(Value::Function(self.create_callback(m)?));
                 protect_lua_closure(self.state, 3, 1, |state| {
                     ffi::lua_rawset(state, -3);
                 })?;
@@ -918,7 +898,7 @@ impl Lua {
                 push_string(self.state, "__index")?;
                 ffi::lua_pushvalue(self.state, -1);
                 ffi::lua_gettable(self.state, -3);
-                self.push_value(Value::Function(self.create_callback_function(m)?));
+                self.push_value(Value::Function(self.create_callback(m)?));
                 protect_lua_closure(self.state, 2, 1, |state| {
                     ffi::lua_pushcclosure(state, meta_index_impl, 2);
                 })?;
@@ -953,7 +933,7 @@ impl Lua {
                     MetaMethod::ToString => "__tostring",
                 };
                 push_string(self.state, name)?;
-                self.push_value(Value::Function(self.create_callback_function(m)?));
+                self.push_value(Value::Function(self.create_callback(m)?));
                 protect_lua_closure(self.state, 3, 1, |state| {
                     ffi::lua_rawset(state, -3);
                 })?;
@@ -979,6 +959,80 @@ impl Lua {
             .registered_userdata
             .insert(TypeId::of::<T>(), id);
         Ok(id)
+    }
+
+    pub(crate) fn create_callback<'lua, 'callback>(
+        &'lua self,
+        func: Callback<'callback, 'static>,
+    ) -> Result<Function<'lua>> {
+        unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
+            callback_error(state, || {
+                if ffi::lua_type(state, ffi::lua_upvalueindex(1)) == ffi::LUA_TNIL {
+                    return Err(Error::CallbackDestructed);
+                }
+
+                let lua = Lua {
+                    state: state,
+                    ephemeral: true,
+                    ref_stack_slots: Default::default(),
+                };
+                let args = lua.setup_callback_stack_slots();
+
+                let func = get_userdata::<Callback>(state, ffi::lua_upvalueindex(1));
+
+                let results = (*func)(&lua, args)?;
+                let nresults = results.len() as c_int;
+
+                check_stack_err(state, nresults)?;
+
+                for r in results {
+                    lua.push_value(r);
+                }
+
+                Ok(nresults)
+            })
+        }
+
+        unsafe {
+            let _sg = StackGuard::new(self.state);
+            check_stack(self.state, 4);
+
+            push_userdata::<Callback>(self.state, func)?;
+
+            ffi::lua_pushlightuserdata(
+                self.state,
+                &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+            );
+            ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
+            ffi::lua_setmetatable(self.state, -2);
+
+            protect_lua_closure(self.state, 1, 1, |state| {
+                ffi::lua_pushcclosure(state, callback_call_impl, 1);
+            })?;
+
+            Ok(Function(self.pop_ref()))
+        }
+    }
+
+    // Does not require Send bounds, which can lead to unsafety.
+    pub(crate) unsafe fn make_userdata<T>(&self, data: T) -> Result<AnyUserData>
+    where
+        T: UserData,
+    {
+        let _sg = StackGuard::new(self.state);
+        check_stack(self.state, 4);
+
+        push_userdata::<RefCell<T>>(self.state, RefCell::new(data))?;
+
+        ffi::lua_rawgeti(
+            self.state,
+            ffi::LUA_REGISTRYINDEX,
+            self.userdata_metatable::<T>()? as ffi::lua_Integer,
+        );
+
+        ffi::lua_setmetatable(self.state, -2);
+
+        Ok(AnyUserData(self.pop_ref()))
     }
 
     unsafe fn create_lua(load_debug: bool) -> Lua {
@@ -1082,81 +1136,6 @@ impl Lua {
         }
     }
 
-    fn create_callback_function<'lua, 'callback>(
-        &'lua self,
-        func: Callback<'callback, 'static>,
-    ) -> Result<Function<'lua>> {
-        unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
-            callback_error(state, || {
-                if ffi::lua_type(state, ffi::lua_upvalueindex(1)) == ffi::LUA_TNIL {
-                    return Err(Error::CallbackDestructed);
-                }
-
-                let lua = Lua {
-                    state: state,
-                    ephemeral: true,
-                    ref_stack_slots: Default::default(),
-                };
-                let args = lua.setup_callback_stack_slots();
-
-                let func = get_userdata::<Callback>(state, ffi::lua_upvalueindex(1));
-
-                let results = (*func)(&lua, args)?;
-                let nresults = results.len() as c_int;
-
-                check_stack_err(state, nresults)?;
-
-                for r in results {
-                    lua.push_value(r);
-                }
-
-                Ok(nresults)
-            })
-        }
-
-        unsafe {
-            let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 4);
-
-            push_userdata::<Callback>(self.state, func)?;
-
-            ffi::lua_pushlightuserdata(
-                self.state,
-                &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-            );
-            ffi::lua_rawget(self.state, ffi::LUA_REGISTRYINDEX);
-            ffi::lua_setmetatable(self.state, -2);
-
-            protect_lua_closure(self.state, 1, 1, |state| {
-                ffi::lua_pushcclosure(state, callback_call_impl, 1);
-            })?;
-
-            Ok(Function(self.pop_ref()))
-        }
-    }
-
-    fn do_create_userdata<T>(&self, data: T) -> Result<AnyUserData>
-    where
-        T: UserData,
-    {
-        unsafe {
-            let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 4);
-
-            push_userdata::<RefCell<T>>(self.state, RefCell::new(data))?;
-
-            ffi::lua_rawgeti(
-                self.state,
-                ffi::LUA_REGISTRYINDEX,
-                self.userdata_metatable::<T>()? as ffi::lua_Integer,
-            );
-
-            ffi::lua_setmetatable(self.state, -2);
-
-            Ok(AnyUserData(self.pop_ref()))
-        }
-    }
-
     // Set up the stack slot area in a callback, returning all arguments on the stack as a
     // MultiValue
     fn setup_callback_stack_slots<'lua>(&'lua self) -> MultiValue<'lua> {
@@ -1169,6 +1148,8 @@ impl Lua {
             let mut args = MultiValue::new();
             args.reserve(stack_nargs as usize);
 
+            // First, convert all of the reference types in the ref stack area into LuaRef types
+            // in-place.
             for i in 0..stack_nargs {
                 let n = stack_nargs - i;
 
@@ -1234,6 +1215,8 @@ impl Lua {
                 ffi::lua_settop(self.state, REF_STACK_SIZE);
                 args
             } else if nargs > REF_STACK_SIZE {
+                // If the total number of arguments exceeds the ref stack area, pop off the rest of
+                // the arguments as normal.
                 let mut extra_args = Vec::new();
                 extra_args.reserve((nargs - REF_STACK_SIZE) as usize);
                 for _ in REF_STACK_SIZE..nargs {
@@ -1250,112 +1233,5 @@ impl Lua {
 
     unsafe fn extra(&self) -> *mut ExtraData {
         *(ffi::lua_getextraspace(self.state) as *mut *mut ExtraData)
-    }
-}
-
-impl<'scope> Scope<'scope> {
-    /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
-    ///
-    /// This is a version of [`Lua::create_function`] that creates a callback which expires on scope
-    /// drop.  See [`Lua::scope`] for more details.
-    ///
-    /// [`Lua::create_function`]: struct.Lua.html#method.create_function
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_function<'callback, 'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
-    where
-        A: FromLuaMulti<'callback>,
-        R: ToLuaMulti<'callback>,
-        F: 'scope + Fn(&'callback Lua, A) -> Result<R>,
-    {
-        unsafe {
-            let f = Box::new(move |lua, args| {
-                func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-            });
-            let f = mem::transmute::<Callback<'callback, 'scope>, Callback<'callback, 'static>>(f);
-            let f = self.lua.create_callback_function(f)?;
-
-            let mut destructors = self.destructors.borrow_mut();
-            let f_destruct = f.0.clone();
-            destructors.push(Box::new(move || {
-                let state = f_destruct.lua.state;
-                let _sg = StackGuard::new(state);
-                check_stack(state, 2);
-                f_destruct.lua.push_ref(&f_destruct);
-
-                ffi::lua_getupvalue(state, -1, 1);
-                let ud = take_userdata::<Callback>(state);
-
-                ffi::lua_pushnil(state);
-                ffi::lua_setupvalue(state, -2, 1);
-
-                ffi::lua_pop(state, 1);
-                Box::new(ud)
-            }));
-            Ok(f)
-        }
-    }
-
-    /// Wraps a Rust mutable closure, creating a callable Lua function handle to it.
-    ///
-    /// This is a version of [`Lua::create_function_mut`] that creates a callback which expires on
-    /// scope drop.  See [`Lua::scope`] for more details.
-    ///
-    /// [`Lua::create_function_mut`]: struct.Lua.html#method.create_function_mut
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_function_mut<'callback, 'lua, A, R, F>(
-        &'lua self,
-        func: F,
-    ) -> Result<Function<'lua>>
-    where
-        A: FromLuaMulti<'callback>,
-        R: ToLuaMulti<'callback>,
-        F: 'scope + FnMut(&'callback Lua, A) -> Result<R>,
-    {
-        let func = RefCell::new(func);
-        self.create_function(move |lua, args| {
-            (&mut *func.try_borrow_mut()
-                .map_err(|_| Error::RecursiveMutCallback)?)(lua, args)
-        })
-    }
-
-    /// Create a Lua userdata object from a custom userdata type.
-    ///
-    /// This is a version of [`Lua::create_userdata`] that creates a userdata which expires on scope
-    /// drop.  See [`Lua::scope`] for more details.
-    ///
-    /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_userdata<'lua, T>(&'lua self, data: T) -> Result<AnyUserData<'lua>>
-    where
-        T: UserData,
-    {
-        unsafe {
-            let u = self.lua.do_create_userdata(data)?;
-            let mut destructors = self.destructors.borrow_mut();
-            let u_destruct = u.0.clone();
-            destructors.push(Box::new(move || {
-                let state = u_destruct.lua.state;
-                let _sg = StackGuard::new(state);
-                check_stack(state, 1);
-                u_destruct.lua.push_ref(&u_destruct);
-                Box::new(take_userdata::<RefCell<T>>(state))
-            }));
-            Ok(u)
-        }
-    }
-}
-
-impl<'scope> Drop for Scope<'scope> {
-    fn drop(&mut self) {
-        // We separate the action of invalidating the userdata in Lua and actually dropping the
-        // userdata type into two phases.  This is so that, in the event a userdata drop panics, we
-        // can be sure that all of the userdata in Lua is actually invalidated.
-
-        let to_drop = self.destructors
-            .get_mut()
-            .drain(..)
-            .map(|destructor| destructor())
-            .collect::<Vec<_>>();
-        drop(to_drop);
     }
 }

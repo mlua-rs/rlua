@@ -284,7 +284,8 @@ where
 
 // Takes an error at the top of the stack, and if it is a WrappedError, converts it to an
 // Error::CallbackError with a traceback, if it is some lua type, prints the error along with a
-// traceback, and if it is a WrappedPanic, does not modify it.
+// traceback, and if it is a WrappedPanic, does not modify it.  This function should never panic or
+// trigger a error (longjmp).
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     // I believe luaL_traceback requires this much free stack to not error.
     const LUA_TRACEBACK_STACK: c_int = 11;

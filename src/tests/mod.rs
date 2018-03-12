@@ -12,8 +12,8 @@ use std::cell::Cell;
 use std::sync::Arc;
 use std::panic::catch_unwind;
 
-use {Error, ExternalError, Function, Lua, Nil, Result, Table, UserData, UserDataMethods, Value,
-     Variadic};
+use {Error, ExternalError, Function, Lua, Nil, Result, String, Table, UserData, UserDataMethods,
+     Value, Variadic};
 
 #[test]
 fn test_load() {
@@ -34,7 +34,7 @@ fn test_debug() {
     }
     let traceback_output = lua.eval::<String>("debug.traceback()", None).unwrap();
     assert_eq!(
-        traceback_output.split("\n").next(),
+        traceback_output.to_str().unwrap().split("\n").next(),
         "stack traceback:".into()
     );
 }
@@ -282,7 +282,7 @@ fn test_error() {
             None,
         )?;
         let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
-            panic!("expected panic, this panic should be caught in rust")
+            panic!("test_panic")
         }).unwrap();
         globals.set("rust_panic_function", rust_panic_function)?;
 
@@ -292,7 +292,7 @@ fn test_error() {
     }) {
         Ok(Ok(_)) => panic!("no panic was detected, pcall caught it!"),
         Ok(Err(e)) => panic!("error during panic test {:?}", e),
-        Err(_) => {}
+        Err(p) => assert!(*p.downcast::<&str>().unwrap() == "test_panic"),
     };
 
     match catch_unwind(|| -> Result<()> {
@@ -308,7 +308,7 @@ fn test_error() {
             None,
         )?;
         let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
-            panic!("expected panic, this panic should be caught in rust")
+            panic!("test_panic")
         }).unwrap();
         globals.set("rust_panic_function", rust_panic_function)?;
 
@@ -318,7 +318,7 @@ fn test_error() {
     }) {
         Ok(Ok(_)) => panic!("no panic was detected, xpcall caught it!"),
         Ok(Err(e)) => panic!("error during panic test {:?}", e),
-        Err(_) => {}
+        Err(p) => assert!(*p.downcast::<&str>().unwrap() == "test_panic"),
     };
 }
 
@@ -382,21 +382,22 @@ fn test_pcall_xpcall() {
     let globals = lua.globals();
 
     // make sure that we handle not enough arguments
+
     assert!(lua.exec::<()>("pcall()", None).is_err());
     assert!(lua.exec::<()>("xpcall()", None).is_err());
     assert!(lua.exec::<()>("xpcall(function() end)", None).is_err());
 
     // Make sure that the return values from are correct on success
-    assert_eq!(
-        lua.eval::<(bool, String)>("pcall(function(p) return p end, 'foo')", None)
-            .unwrap(),
-        (true, "foo".to_owned())
-    );
-    assert_eq!(
-        lua.eval::<(bool, String)>("xpcall(function(p) return p end, print, 'foo')", None)
-            .unwrap(),
-        (true, "foo".to_owned())
-    );
+
+    let (r, e) = lua.eval::<(bool, String)>("pcall(function(p) return p end, 'foo')", None)
+        .unwrap();
+    assert!(r);
+    assert_eq!(e, "foo");
+
+    let (r, e) = lua.eval::<(bool, String)>("xpcall(function(p) return p end, print, 'foo')", None)
+        .unwrap();
+    assert!(r);
+    assert_eq!(e, "foo");
 
     // Make sure that the return values are correct on errors, and that error handling works
 
@@ -778,4 +779,19 @@ fn large_args() {
             .unwrap(),
         4950
     );
+}
+
+fn large_args_ref() {
+    let lua = Lua::new();
+    let globals = lua.globals();
+
+    let f = lua.create_function(|_, args: Variadic<String>| {
+        for i in 0..args.len() {
+            assert_eq!(args[i], i.to_string());
+        }
+        Ok(())
+    }).unwrap();
+
+    f.call::<_, ()>((0..100).map(|i| i.to_string()).collect::<Variadic<_>>())
+        .unwrap();
 }

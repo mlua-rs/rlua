@@ -119,23 +119,23 @@ impl<'lua> MultiValue<'lua> {
         v
     }
 
-    pub fn from_vec_rev(v: Vec<Value<'lua>>) -> MultiValue<'lua> {
+    pub(crate) fn from_vec_rev(v: Vec<Value<'lua>>) -> MultiValue<'lua> {
         MultiValue(v)
     }
 
-    pub fn into_vec_rev(self) -> Vec<Value<'lua>> {
+    pub(crate) fn into_vec_rev(self) -> Vec<Value<'lua>> {
         self.0
     }
 
-    pub fn reserve(&mut self, size: usize) {
+    pub(crate) fn reserve(&mut self, size: usize) {
         self.0.reserve(size);
     }
 
-    pub fn push_front(&mut self, value: Value<'lua>) {
+    pub(crate) fn push_front(&mut self, value: Value<'lua>) {
         self.0.push(value);
     }
 
-    pub fn pop_front(&mut self) -> Option<Value<'lua>> {
+    pub(crate) fn pop_front(&mut self) -> Option<Value<'lua>> {
         self.0.pop()
     }
 
