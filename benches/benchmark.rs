@@ -169,6 +169,28 @@ fn create_registry_values(c: &mut Criterion) {
     });
 }
 
+fn create_userdata(c: &mut Criterion) {
+    struct UserData {
+        i: i64,
+    }
+    impl LuaUserData for UserData {}
+
+    c.bench_function("create userdata 10", |b| {
+        b.iter_with_setup(
+            || Lua::new(),
+            |lua| -> Lua {
+                {
+                    let table: LuaTable = lua.create_table().unwrap();
+                    for i in 1..11 {
+                        table.set(i, UserData { i }).unwrap();
+                    }
+                }
+                lua
+            },
+        );
+    });
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default()
@@ -181,7 +203,8 @@ criterion_group! {
         call_add_function,
         call_add_callback,
         call_append_callback,
-        create_registry_values
+        create_registry_values,
+        create_userdata
 }
 
 criterion_main!(benches);
