@@ -10,7 +10,10 @@ use thread::Thread;
 use userdata::AnyUserData;
 use lua::Lua;
 
-/// A dynamically typed Lua value.
+/// A dynamically typed Lua value.  The `String`, `Table`, `Function`, `Thread`, and `UserData`
+/// variants contain handle types into the internal Lua state.  It is a logic error to mix handle
+/// types between separate `Lua` instances, or between a parent `Lua` instance and one received as a
+/// parameter in a Rust callback, and doing so will result in a panic.
 #[derive(Debug, Clone)]
 pub enum Value<'lua> {
     /// The Lua value `nil`.

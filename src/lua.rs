@@ -558,7 +558,7 @@ impl Lua {
     /// [`create_registry_value`]: #method.create_registry_value
     pub fn registry_value<'lua, T: FromLua<'lua>>(&'lua self, key: &RegistryKey) -> Result<T> {
         unsafe {
-            if !Arc::ptr_eq(&key.unref_list, &(*self.extra()).registry_unref_list) {
+            if !self.owns_registry_value(key) {
                 return Err(Error::MismatchedRegistryKey);
             }
 
@@ -585,7 +585,7 @@ impl Lua {
     /// [`expire_registry_values`]: #method.expire_registry_values
     pub fn remove_registry_value(&self, key: RegistryKey) -> Result<()> {
         unsafe {
-            if !Arc::ptr_eq(&key.unref_list, &(*self.extra()).registry_unref_list) {
+            if !self.owns_registry_value(&key) {
                 return Err(Error::MismatchedRegistryKey);
             }
 
@@ -606,8 +606,9 @@ impl Lua {
 
     /// Remove any registry values whose `RegistryKey`s have all been dropped.
     ///
-    /// Unlike normal handle values, `RegistryKey`s cannot automatically clean up their registry
-    /// entries on Drop, but you can call this method to remove any unreachable registry values.
+    /// Unlike normal handle values, `RegistryKey`s do not automatically remove themselves on Drop,
+    /// but you can call this method to remove any unreachable registry values not manually removed
+    /// by `Lua::remove_registry_value`.
     pub fn expire_registry_values(&self) {
         unsafe {
             let unref_list = mem::replace(

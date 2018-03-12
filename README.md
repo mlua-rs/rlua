@@ -6,20 +6,19 @@
 
 [Guided Tour](examples/guided_tour.rs)
 
-This library is a high level interface between Rust and Lua.  Its major goal is
-to expose as easy to use, practical, and flexible of an API between Rust and Lua
-as possible, while also being completely safe.
+This library is a high level interface between Rust and Lua.  Its major goals
+are to expose as easy to use, practical, and flexible of an API between Rust and
+Lua as possible, while also being *completely* safe.
 
-`rlua` is designed around "registry handles" to values inside the Lua state.
-This means that when you get a type like `rlua::Table` or `rlua::Function` in
-Rust, what you actually hold is an integer key into the Lua registry.  This is
-different from the bare Lua C API, where you create tables / functions on the
-Lua stack and must be aware of their stack location.  This is also similar to
-how other Lua bindings systems like
-[Selene](https://github.com/jeremyong/Selene) for C++ work, but it means that
-using `rlua` may be slightly slower than what you could conceivably write using
-the C API.  The reasons for this design are safety and flexibility, and to
-prevent the user of `rlua` from having to be aware of the Lua stack at all.
+`rlua` is NOT designed to be a perfect zero cost wrapper over the Lua C API,
+because such a wrapper cannot maintain the safety guarantees that `rlua` is
+designed to have.  Every place where the Lua C API may trigger an error longjmp
+in any way is protected by `lua_pcall`, and the user of the library is protected
+from directly interacting with unsafe things like the Lua stack, and there is
+overhead associated with this safety.  However, performance *is* a focus of the
+library to the extent possible while maintaining safety, so if you encounter
+something that egregiously worse than using the Lua C API directly, or simply
+something you feel could perform better, feel free to file a bug report.
 
 There are currently a few missing pieces of this API:
 
@@ -30,8 +29,7 @@ There are currently a few missing pieces of this API:
   * "Context" or "Sandboxing" support.  There should be the ability to set the
     `_ENV` upvalue of a loaded chunk to a table other than `_G`, so that you can
     have different environments for different loaded chunks.
-  * Benchmarks, and quantifying performance differences with what you would
-    might write in C.
+  * Quantifying performance differences to direct use of the Lua C API.
 
 Additionally, there are ways I would like to change this API, once support lands
 in rustc.  For example:
@@ -39,11 +37,6 @@ in rustc.  For example:
   * Currently, variadics are handled entirely with tuples and traits implemented
     by macro for tuples up to size 12, it would be great if this was replaced
     with real variadic generics when this is available in Rust.
-
-It is also worth it to list some non-goals for the project:
-
-  * Be a perfect zero cost wrapper over the Lua C API
-  * Allow the user to do absolutely everything that the Lua C API might allow
 
 ## API stability
 
@@ -68,11 +61,11 @@ there ARE several internal panics and even aborts in `rlua` source, but they
 should not be possible to trigger, and if you trigger them this should be
 considered a bug.
 
-There are some caveats to the panic / abort guarantee, however:
+Caveats to the panic / abort guarantee:
 
   * `rlua` reserves the right to panic on API usage errors.  Currently, the only
     time this will happen is when passed a registry handle type from a different
-    main Lua state.
+    Lua state.
   * Currently, there are no memory or execution limits on scripts, so untrusted
     scripts can always at minimum infinite loop or allocate arbitrary amounts of
     memory.
