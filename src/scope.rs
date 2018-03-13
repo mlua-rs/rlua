@@ -39,8 +39,23 @@ impl<'scope> Scope<'scope> {
     /// This is a version of [`Lua::create_function`] that creates a callback which expires on scope
     /// drop.  See [`Lua::scope`] for more details.
     ///
+    /// Since the provided function does not have to be 'static, it is easy to capture outer
+    /// variables in the provided callback.  However, you must *not* use Lua handle values (`Table`,
+    /// `Function` etc) or a `Lua` instance that you have captured from an outer level inside such a
+    /// callback.  It is *always* a logic error to access a `Lua` instance or handle value from an
+    /// "outer" callback level inside an "inner" callback level, Lua does stack protection during
+    /// callbacks that makes the outer instances unusable until the callback returns.  This is true
+    /// regardless of the use of `Lua::scope`, but it is very difficult (though not impossible!) to
+    /// run into unless you can create callbacks that are non-'static.
+    ///
+    /// If you do access outer `Lua` instances or handles inside an inner callback, this will result
+    /// in a panic.  You can instead use either [`RegistryKey`] values or [`Function::bind`] to pass
+    /// values to callbacks without error.
+    ///
     /// [`Lua::create_function`]: struct.Lua.html#method.create_function
     /// [`Lua::scope`]: struct.Lua.html#method.scope
+    /// [`RegistryKey`]: struct.RegistryKey.html
+    /// [`Function::bind`]: struct.Function.html#method.bind
     pub fn create_function<'callback, 'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'callback>,
@@ -78,10 +93,11 @@ impl<'scope> Scope<'scope> {
     /// Wraps a Rust mutable closure, creating a callable Lua function handle to it.
     ///
     /// This is a version of [`Lua::create_function_mut`] that creates a callback which expires on
-    /// scope drop.  See [`Lua::scope`] for more details.
+    /// scope drop.  See [`Lua::scope`] and [`Scope::create_function`] for more details.
     ///
     /// [`Lua::create_function_mut`]: struct.Lua.html#method.create_function_mut
     /// [`Lua::scope`]: struct.Lua.html#method.scope
+    /// [`Scope::create_function`]: #method.create_function
     pub fn create_function_mut<'callback, 'lua, A, R, F>(
         &'lua self,
         func: F,
@@ -101,7 +117,8 @@ impl<'scope> Scope<'scope> {
     /// Create a Lua userdata object from a custom userdata type.
     ///
     /// This is a version of [`Lua::create_userdata`] that creates a userdata which expires on scope
-    /// drop.  See [`Lua::scope`] for more details.
+    /// drop, and does not require that the userdata type be Send.  See [`Lua::scope`] for more
+    /// details.
     ///
     /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
     /// [`Lua::scope`]: struct.Lua.html#method.scope

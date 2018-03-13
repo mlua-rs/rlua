@@ -27,19 +27,9 @@ use scope::Scope;
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
     pub(crate) state: *mut ffi::lua_State,
-    ephemeral: bool,
+    recursion_level: usize,
     ref_stack_slots: [Cell<usize>; REF_STACK_SIZE as usize],
 }
-
-// Data associated with the main lua_State via lua_getextraspace.
-struct ExtraData {
-    registered_userdata: HashMap<TypeId, c_int>,
-    registry_unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
-}
-
-const REF_STACK_SIZE: c_int = 16;
-
-static FUNCTION_METATABLE_REGISTRY_KEY: u8 = 0;
 
 unsafe impl Send for Lua {}
 
@@ -51,7 +41,7 @@ impl Drop for Lua {
                     rlua_assert!(use_count.get() == 0, "live stack reference detected");
                 }
 
-                if !self.ephemeral {
+                if self.recursion_level == 0 {
                     let top = ffi::lua_gettop(self.state);
                     rlua_assert!(
                         top == REF_STACK_SIZE,
@@ -61,8 +51,14 @@ impl Drop for Lua {
                 }
             }
 
-            if !self.ephemeral {
+            if self.recursion_level == 0 {
                 let extra_data = *(ffi::lua_getextraspace(self.state) as *mut *mut ExtraData);
+
+                rlua_debug_assert!(
+                    (*extra_data).recursion_level == 0,
+                    "Lua recursion level nonzero on Lua drop"
+                );
+
                 *(*extra_data).registry_unref_list.lock().unwrap() = None;
                 Box::from_raw(extra_data);
 
@@ -545,7 +541,7 @@ impl Lua {
 
             Ok(RegistryKey {
                 registry_id,
-                unref_list: (*self.extra()).registry_unref_list.clone(),
+                unref_list: (*ExtraData::get(self.state)).registry_unref_list.clone(),
             })
         }
     }
@@ -601,7 +597,12 @@ impl Lua {
     /// `Error::MismatchedRegistryKey` if passed a `RegistryKey` that was not created with a
     /// matching `Lua` state.
     pub fn owns_registry_value(&self, key: &RegistryKey) -> bool {
-        unsafe { Arc::ptr_eq(&key.unref_list, &(*self.extra()).registry_unref_list) }
+        unsafe {
+            Arc::ptr_eq(
+                &key.unref_list,
+                &(*ExtraData::get(self.state)).registry_unref_list,
+            )
+        }
     }
 
     /// Remove any registry values whose `RegistryKey`s have all been dropped.
@@ -612,7 +613,10 @@ impl Lua {
     pub fn expire_registry_values(&self) {
         unsafe {
             let unref_list = mem::replace(
-                &mut *(*self.extra()).registry_unref_list.lock().unwrap(),
+                &mut *(*ExtraData::get(self.state))
+                    .registry_unref_list
+                    .lock()
+                    .unwrap(),
                 Some(Vec::new()),
             );
             for id in unref_list.unwrap() {
@@ -728,6 +732,10 @@ impl Lua {
     // Used 1 stack space, does not call checkstack
     pub(crate) unsafe fn push_ref(&self, lref: &LuaRef) {
         assert!(
+            self.is_active(),
+            "parent Lua instance accessed inside callback"
+        );
+        assert!(
             lref.lua as *const Lua == self as *const Lua,
             "Lua instance passed Value created from a different Lua"
         );
@@ -755,6 +763,11 @@ impl Lua {
     //
     // pop_ref uses 1 extra stack space and does not call checkstack
     pub(crate) unsafe fn pop_ref(&self) -> LuaRef {
+        assert!(
+            self.is_active(),
+            "parent Lua instance accessed inside callback"
+        );
+
         for i in 0..REF_STACK_SIZE {
             let ref_slot = &self.ref_stack_slots[i as usize];
             if ref_slot.get() == 0 {
@@ -786,6 +799,11 @@ impl Lua {
     }
 
     pub(crate) fn clone_ref(&self, lref: &LuaRef) -> LuaRef {
+        assert!(
+            self.is_active(),
+            "parent Lua instance accessed inside callback"
+        );
+
         unsafe {
             match lref.ref_type {
                 RefType::Nil => LuaRef {
@@ -822,6 +840,11 @@ impl Lua {
     }
 
     pub(crate) fn drop_ref(&self, lref: &mut LuaRef) {
+        assert!(
+            self.is_active(),
+            "parent Lua instance accessed inside callback"
+        );
+
         unsafe {
             match lref.ref_type {
                 RefType::Nil => {}
@@ -863,7 +886,10 @@ impl Lua {
             }
         }
 
-        if let Some(table_id) = (*self.extra()).registered_userdata.get(&TypeId::of::<T>()) {
+        if let Some(table_id) = (*ExtraData::get(self.state))
+            .registered_userdata
+            .get(&TypeId::of::<T>())
+        {
             return Ok(*table_id);
         }
 
@@ -964,7 +990,7 @@ impl Lua {
         let id = gc_guard(self.state, || {
             ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX)
         });
-        (*self.extra())
+        (*ExtraData::get(self.state))
             .registered_userdata
             .insert(TypeId::of::<T>(), id);
         Ok(id)
@@ -974,17 +1000,19 @@ impl Lua {
         &'lua self,
         func: Callback<'callback, 'static>,
     ) -> Result<Function<'lua>> {
-        unsafe extern "C" fn callback_call_impl(state: *mut ffi::lua_State) -> c_int {
+        unsafe extern "C" fn call_callback(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, || {
                 if ffi::lua_type(state, ffi::lua_upvalueindex(1)) == ffi::LUA_TNIL {
                     return Err(Error::CallbackDestructed);
                 }
+                let recursion_guard = RecursionGuard::new(ExtraData::get(state));
 
                 let lua = Lua {
                     state: state,
-                    ephemeral: true,
+                    recursion_level: recursion_guard.recursion_level(),
                     ref_stack_slots: Default::default(),
                 };
+
                 let args = lua.setup_callback_stack_slots();
 
                 let func = get_userdata::<Callback>(state, ffi::lua_upvalueindex(1));
@@ -1016,7 +1044,7 @@ impl Lua {
             ffi::lua_setmetatable(self.state, -2);
 
             protect_lua_closure(self.state, 1, 1, |state| {
-                ffi::lua_pushcclosure(state, callback_call_impl, 1);
+                ffi::lua_pushcclosure(state, call_callback, 1);
             })?;
 
             Ok(Function(self.pop_ref()))
@@ -1129,6 +1157,7 @@ impl Lua {
         // Create ExtraData, and place it in the lua_State "extra space"
 
         let extra_data = Box::into_raw(Box::new(ExtraData {
+            recursion_level: 0,
             registered_userdata: HashMap::new(),
             registry_unref_list: Arc::new(Mutex::new(Some(Vec::new()))),
         }));
@@ -1140,7 +1169,7 @@ impl Lua {
 
         Lua {
             state,
-            ephemeral: false,
+            recursion_level: 0,
             ref_stack_slots: Default::default(),
         }
     }
@@ -1238,7 +1267,47 @@ impl Lua {
         }
     }
 
-    unsafe fn extra(&self) -> *mut ExtraData {
-        *(ffi::lua_getextraspace(self.state) as *mut *mut ExtraData)
+    // Returns true if this is the "top" Lua instance.  If this returns false, we are a level deeper
+    // into a callback and `ref_stack_slots` points to an area of the stack that is not currently
+    // accessible.
+    fn is_active(&self) -> bool {
+        unsafe { (*ExtraData::get(self.state)).recursion_level == self.recursion_level }
     }
 }
+
+// Data associated with the main lua_State via lua_getextraspace.
+struct ExtraData {
+    recursion_level: usize,
+    registered_userdata: HashMap<TypeId, c_int>,
+    registry_unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
+}
+
+impl ExtraData {
+    unsafe fn get(state: *mut ffi::lua_State) -> *mut ExtraData {
+        *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
+    }
+}
+
+struct RecursionGuard(*mut ExtraData);
+
+impl RecursionGuard {
+    unsafe fn new(ed: *mut ExtraData) -> RecursionGuard {
+        (*ed).recursion_level += 1;
+        RecursionGuard(ed)
+    }
+
+    fn recursion_level(&self) -> usize {
+        unsafe { (*self.0).recursion_level }
+    }
+}
+
+impl Drop for RecursionGuard {
+    fn drop(&mut self) {
+        unsafe {
+            (*self.0).recursion_level -= 1;
+        }
+    }
+}
+
+const REF_STACK_SIZE: c_int = 16;
+static FUNCTION_METATABLE_REGISTRY_KEY: u8 = 0;

@@ -610,9 +610,9 @@ fn test_mismatched_registry_key() {
 
 #[test]
 fn scope_func() {
-    let rc = Rc::new(Cell::new(0));
-
     let lua = Lua::new();
+
+    let rc = Rc::new(Cell::new(0));
     lua.scope(|scope| {
         let r = rc.clone();
         let f = scope
@@ -640,6 +640,8 @@ fn scope_func() {
 
 #[test]
 fn scope_drop() {
+    let lua = Lua::new();
+
     struct MyUserdata(Rc<()>);
     impl UserData for MyUserdata {
         fn add_methods(methods: &mut UserDataMethods<Self>) {
@@ -649,7 +651,6 @@ fn scope_drop() {
 
     let rc = Rc::new(());
 
-    let lua = Lua::new();
     lua.scope(|scope| {
         lua.globals()
             .set(
@@ -669,9 +670,9 @@ fn scope_drop() {
 
 #[test]
 fn scope_capture() {
-    let mut i = 0;
-
     let lua = Lua::new();
+
+    let mut i = 0;
     lua.scope(|scope| {
         scope
             .create_function_mut(|_, ()| {
@@ -683,6 +684,23 @@ fn scope_capture() {
             .unwrap();
     });
     assert_eq!(i, 42);
+}
+
+#[test]
+#[should_panic]
+fn outer_lua_access() {
+    let lua = Lua::new();
+    let table = lua.create_table().unwrap();
+    lua.scope(|scope| {
+        scope
+            .create_function_mut(|_, ()| {
+                table.set("a", "b").unwrap();
+                Ok(())
+            })
+            .unwrap()
+            .call::<_, ()>(())
+            .unwrap();
+    });
 }
 
 #[test]
