@@ -721,7 +721,7 @@ impl Lua {
 
             ffi::LUA_TTHREAD => Value::Thread(Thread(self.pop_ref())),
 
-            _ => unreachable!("internal error: LUA_TNONE in pop_value"),
+            _ => rlua_panic!("LUA_TNONE in pop_value"),
         }
     }
 
@@ -1157,8 +1157,7 @@ impl Lua {
             let mut args = MultiValue::new();
             args.reserve(stack_nargs as usize);
 
-            // First, convert all of the reference types in the ref stack area into LuaRef types
-            // in-place.
+            // Convert all of the reference types in the ref stack area into LuaRef types in-place.
             for i in 0..stack_nargs {
                 let n = stack_nargs - i;
 
@@ -1215,7 +1214,7 @@ impl Lua {
                         args.push_front(Value::Thread(Thread(make_ref())));
                     }
 
-                    _ => unreachable!("internal error: LUA_TNONE in pop_value"),
+                    _ => rlua_panic!("LUA_TNONE in setup_callback_stack_slots"),
                 }
             }
 
@@ -1232,7 +1231,6 @@ impl Lua {
                     extra_args.push(self.pop_value());
                 }
                 extra_args.extend(args.into_vec_rev());
-
                 MultiValue::from_vec_rev(extra_args)
             } else {
                 args
