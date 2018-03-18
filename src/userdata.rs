@@ -2,6 +2,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::string::String as StdString;
+use std::os::raw::c_void;
 
 use ffi;
 use error::{Error, Result};
@@ -467,6 +468,34 @@ impl<'lua> AnyUserData<'lua> {
             ffi::lua_getuservalue(lua.state, -1);
             let res = V::from_lua(lua.pop_value(), lua)?;
             Ok(res)
+        }
+    }
+
+    /// Gets a raw pointer for where this object is saved in memory by Lua.
+    ///
+    /// # Example
+    ///
+    /// This can for example to test if two `AnyUserData` instances refer to the same object.
+    ///
+    /// ```
+    /// struct Object(bool);
+    /// impl rlua::UserData for Object {};
+    ///
+    /// let lua = rlua::Lua::new();
+    /// let first = lua.create_userdata(Object(true)).unwrap();
+    /// let second = lua.create_userdata(Object(true)).unwrap();
+    /// assert_eq!(first.to_raw_pointer(), first.to_raw_pointer());
+    /// assert_ne!(first.to_raw_pointer(), second.to_raw_pointer());
+    /// ```
+    pub fn to_raw_pointer(&self) -> *const c_void {
+        let lua = self.0.lua;
+        unsafe {
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 1);
+            lua.push_ref(&self.0);
+            let res = ffi::lua_topointer(lua.state, -1);
+            ffi::lua_pop(lua.state, 1);
+            res
         }
     }
 }

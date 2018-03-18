@@ -116,6 +116,7 @@ extern "C" {
     pub fn lua_tonumberx(state: *mut lua_State, index: c_int, isnum: *mut c_int) -> lua_Number;
     pub fn lua_touserdata(state: *mut lua_State, index: c_int) -> *mut c_void;
     pub fn lua_tothread(state: *mut lua_State, index: c_int) -> *mut lua_State;
+    pub fn lua_topointer(state: *mut lua_State, index: c_int) -> *const c_void;
 
     pub fn lua_gettop(state: *const lua_State) -> c_int;
     pub fn lua_settop(state: *mut lua_State, n: c_int);
