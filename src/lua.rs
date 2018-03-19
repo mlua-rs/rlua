@@ -1013,15 +1013,13 @@ impl Lua {
                     ref_stack_slots: Default::default(),
                 };
 
-                let args = lua.setup_callback_stack_slots();
-
+                let args = lua.setup_callback_stack()?;
                 let func = get_userdata::<Callback>(state, ffi::lua_upvalueindex(1));
 
                 let results = (*func)(&lua, args)?;
                 let nresults = results.len() as c_int;
 
                 check_stack_err(state, nresults)?;
-
                 for r in results {
                     lua.push_value(r);
                 }
@@ -1175,8 +1173,9 @@ impl Lua {
     }
 
     // Set up the stack slot area in a callback, returning all arguments on the stack as a
-    // MultiValue
-    fn setup_callback_stack_slots<'lua>(&'lua self) -> MultiValue<'lua> {
+    // MultiValue.  Also ensures that at least LUA_MINSTACK extra stack slots are available for use
+    // in the callback.
+    fn setup_callback_stack<'lua>(&'lua self) -> Result<MultiValue<'lua>> {
         unsafe {
             check_stack(self.state, 2);
 
@@ -1243,15 +1242,19 @@ impl Lua {
                         args.push_front(Value::Thread(Thread(make_ref())));
                     }
 
-                    _ => rlua_panic!("LUA_TNONE in setup_callback_stack_slots"),
+                    _ => rlua_panic!("LUA_TNONE in setup_callback_stack"),
                 }
             }
 
             if nargs < REF_STACK_SIZE {
-                check_stack(self.state, REF_STACK_SIZE - nargs);
+                check_stack_err(self.state, REF_STACK_SIZE - nargs + ffi::LUA_MINSTACK)?;
                 ffi::lua_settop(self.state, REF_STACK_SIZE);
-                args
+                Ok(args)
             } else if nargs > REF_STACK_SIZE {
+                if nargs - REF_STACK_SIZE < ffi::LUA_MINSTACK {
+                    check_stack_err(self.state, ffi::LUA_MINSTACK - (nargs - REF_STACK_SIZE))?;
+                }
+
                 // If the total number of arguments exceeds the ref stack area, pop off the rest of
                 // the arguments as normal.
                 let mut extra_args = Vec::new();
@@ -1260,9 +1263,10 @@ impl Lua {
                     extra_args.push(self.pop_value());
                 }
                 extra_args.extend(args.into_vec_rev());
-                MultiValue::from_vec_rev(extra_args)
+                Ok(MultiValue::from_vec_rev(extra_args))
             } else {
-                args
+                check_stack_err(self.state, ffi::LUA_MINSTACK)?;
+                Ok(args)
             }
         }
     }

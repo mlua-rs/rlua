@@ -53,6 +53,7 @@ pub const LUA_REGISTRYINDEX: c_int = -LUAI_MAXSTACK - 1000;
 pub const LUA_RIDX_MAINTHREAD: lua_Integer = 1;
 pub const LUA_RIDX_GLOBALS: lua_Integer = 2;
 pub const LUA_IDSIZE: c_int = 60;
+pub const LUA_MINSTACK: c_int = 20;
 // Not actually defined in lua.h / luaconf.h
 pub const LUA_MAX_UPVALUES: c_int = 255;
 
