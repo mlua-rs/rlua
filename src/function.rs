@@ -67,7 +67,7 @@ impl<'lua> Function<'lua> {
         let args = args.to_lua_multi(lua)?;
         let nargs = args.len() as c_int;
 
-        unsafe {
+        let results = unsafe {
             let _sg = StackGuard::new(lua.state);
             check_stack_err(lua.state, nargs + 3)?;
 
@@ -88,8 +88,9 @@ impl<'lua> Function<'lua> {
                 results.push_front(lua.pop_value());
             }
             ffi::lua_pop(lua.state, 1);
-            R::from_lua_multi(results, lua)
-        }
+            results
+        };
+        R::from_lua_multi(results, lua)
     }
 
     /// Returns a function that, when called, calls `self`, passing `args` as the first set of

@@ -408,6 +408,39 @@ impl<'lua> AnyUserData<'lua> {
         })
     }
 
+    /// Sets an associated value to this `AnyUserData`.
+    ///
+    /// The value may be any Lua value whatsoever, and can be retrieved with [`get_user_value`].
+    ///
+    /// [`get_user_value`]: #method.get_user_value
+    pub fn set_user_value<V: ToLua<'lua>>(&self, v: V) -> Result<()> {
+        let lua = self.0.lua;
+        let v = v.to_lua(lua)?;
+        unsafe {
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 2);
+            lua.push_ref(&self.0);
+            lua.push_value(v);
+            ffi::lua_setuservalue(lua.state, -2);
+            Ok(())
+        }
+    }
+
+    /// Returns an associated value set by [`set_user_value`].
+    ///
+    /// [`set_user_value`]: #method.set_user_value
+    pub fn get_user_value<V: FromLua<'lua>>(&self) -> Result<V> {
+        let lua = self.0.lua;
+        let res = unsafe {
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 3);
+            lua.push_ref(&self.0);
+            ffi::lua_getuservalue(lua.state, -1);
+            lua.pop_value()
+        };
+        V::from_lua(res, lua)
+    }
+
     fn inspect<'a, T, R, F>(&'a self, func: F) -> Result<R>
     where
         T: UserData,
@@ -435,38 +468,6 @@ impl<'lua> AnyUserData<'lua> {
                     func(&*get_userdata::<RefCell<T>>(lua.state, -3))
                 }
             }
-        }
-    }
-
-    /// Sets an associated value to this `AnyUserData`.
-    ///
-    /// The value may be any Lua value whatsoever, and can be retrieved with [`get_user_value`].
-    ///
-    /// [`get_user_value`]: #method.get_user_value
-    pub fn set_user_value<V: ToLua<'lua>>(&self, v: V) -> Result<()> {
-        let lua = self.0.lua;
-        unsafe {
-            let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 2);
-            lua.push_ref(&self.0);
-            lua.push_value(v.to_lua(lua)?);
-            ffi::lua_setuservalue(lua.state, -2);
-            Ok(())
-        }
-    }
-
-    /// Returns an associated value set by [`set_user_value`].
-    ///
-    /// [`set_user_value`]: #method.set_user_value
-    pub fn get_user_value<V: FromLua<'lua>>(&self) -> Result<V> {
-        let lua = self.0.lua;
-        unsafe {
-            let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 3);
-            lua.push_ref(&self.0);
-            ffi::lua_getuservalue(lua.state, -1);
-            let res = V::from_lua(lua.pop_value(), lua)?;
-            Ok(res)
         }
     }
 }

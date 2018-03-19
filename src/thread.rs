@@ -77,7 +77,8 @@ impl<'lua> Thread<'lua> {
         R: FromLuaMulti<'lua>,
     {
         let lua = self.0.lua;
-        unsafe {
+        let args = args.to_lua_multi(lua)?;
+        let results = unsafe {
             let _sg = StackGuard::new(lua.state);
             check_stack(lua.state, 1);
 
@@ -91,7 +92,6 @@ impl<'lua> Thread<'lua> {
 
             ffi::lua_pop(lua.state, 1);
 
-            let args = args.to_lua_multi(lua)?;
             let nargs = args.len() as c_int;
             check_stack_err(lua.state, nargs)?;
             check_stack_err(thread_state, nargs + 1)?;
@@ -115,8 +115,9 @@ impl<'lua> Thread<'lua> {
             for _ in 0..nresults {
                 results.push_front(lua.pop_value());
             }
-            R::from_lua_multi(results, lua)
-        }
+            results
+        };
+        R::from_lua_multi(results, lua)
     }
 
     /// Gets the status of the thread.

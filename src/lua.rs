@@ -184,7 +184,9 @@ impl Lua {
     {
         unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 5);
+            // `Lua` instance assumes that on any callback, the Lua stack has at least LUA_MINSTACK
+            // slots available to avoid panics.
+            check_stack_err(self.state, 5 + ffi::LUA_MINSTACK)?;
 
             unsafe extern "C" fn new_table(state: *mut ffi::lua_State) -> c_int {
                 ffi::lua_newtable(state);
@@ -479,12 +481,13 @@ impl Lua {
         name: &str,
         t: T,
     ) -> Result<()> {
+        let t = t.to_lua(self)?;
         unsafe {
             let _sg = StackGuard::new(self.state);
             check_stack(self.state, 5);
 
             push_string(self.state, name)?;
-            self.push_value(t.to_lua(self)?);
+            self.push_value(t);
 
             unsafe extern "C" fn set_registry(state: *mut ffi::lua_State) -> c_int {
                 ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
@@ -501,7 +504,7 @@ impl Lua {
     ///
     /// [`set_named_registry_value`]: #method.set_named_registry_value
     pub fn named_registry_value<'lua, T: FromLua<'lua>>(&'lua self, name: &str) -> Result<T> {
-        unsafe {
+        let value = unsafe {
             let _sg = StackGuard::new(self.state);
             check_stack(self.state, 4);
 
@@ -512,8 +515,9 @@ impl Lua {
             }
             protect_lua(self.state, 1, get_registry)?;
 
-            T::from_lua(self.pop_value(), self)
-        }
+            self.pop_value()
+        };
+        T::from_lua(value, self)
     }
 
     /// Removes a named value in the Lua registry.
@@ -530,11 +534,12 @@ impl Lua {
     /// This value will be available to rust from all `Lua` instances which share the same main
     /// state.
     pub fn create_registry_value<'lua, T: ToLua<'lua>>(&'lua self, t: T) -> Result<RegistryKey> {
+        let t = t.to_lua(self)?;
         unsafe {
             let _sg = StackGuard::new(self.state);
             check_stack(self.state, 2);
 
-            self.push_value(t.to_lua(self)?);
+            self.push_value(t);
             let registry_id = gc_guard(self.state, || {
                 ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX)
             });
@@ -553,7 +558,7 @@ impl Lua {
     ///
     /// [`create_registry_value`]: #method.create_registry_value
     pub fn registry_value<'lua, T: FromLua<'lua>>(&'lua self, key: &RegistryKey) -> Result<T> {
-        unsafe {
+        let value = unsafe {
             if !self.owns_registry_value(key) {
                 return Err(Error::MismatchedRegistryKey);
             }
@@ -566,8 +571,9 @@ impl Lua {
                 ffi::LUA_REGISTRYINDEX,
                 key.registry_id as ffi::lua_Integer,
             );
-            T::from_lua(self.pop_value(), self)
-        }
+            self.pop_value()
+        };
+        T::from_lua(value, self)
     }
 
     /// Removes a value from the Lua registry.
