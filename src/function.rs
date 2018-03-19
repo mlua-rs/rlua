@@ -3,8 +3,7 @@ use std::os::raw::c_int;
 
 use ffi;
 use error::{Error, Result};
-use util::{check_stack, check_stack_err, error_traceback, pop_error, protect_lua_closure,
-           StackGuard};
+use util::{assert_stack, check_stack, error_traceback, pop_error, protect_lua_closure, StackGuard};
 use types::LuaRef;
 use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
@@ -69,7 +68,7 @@ impl<'lua> Function<'lua> {
 
         let results = unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack_err(lua.state, nargs + 3)?;
+            check_stack(lua.state, nargs + 3)?;
 
             ffi::lua_pushcfunction(lua.state, error_traceback);
             let stack_start = ffi::lua_gettop(lua.state);
@@ -83,7 +82,7 @@ impl<'lua> Function<'lua> {
             }
             let nresults = ffi::lua_gettop(lua.state) - stack_start;
             let mut results = MultiValue::new();
-            check_stack(lua.state, 2);
+            assert_stack(lua.state, 2);
             for _ in 0..nresults {
                 results.push_front(lua.pop_value());
             }
@@ -156,7 +155,7 @@ impl<'lua> Function<'lua> {
 
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack_err(lua.state, nargs + 5)?;
+            check_stack(lua.state, nargs + 5)?;
             lua.push_ref(&self.0);
             ffi::lua_pushinteger(lua.state, nargs as ffi::lua_Integer);
             for arg in args {

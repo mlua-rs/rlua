@@ -11,10 +11,10 @@ use libc;
 
 use ffi;
 use error::{Error, Result};
-use util::{callback_error, check_stack, check_stack_err, gc_guard, get_userdata,
-           get_wrapped_error, init_error_metatables, pop_error, protect_lua, protect_lua_closure,
-           push_string, push_userdata, push_wrapped_error, safe_pcall, safe_xpcall,
-           userdata_destructor, StackGuard};
+use util::{assert_stack, callback_error, check_stack, gc_guard, get_userdata, get_wrapped_error,
+           init_error_metatables, pop_error, protect_lua, protect_lua_closure, push_string,
+           push_userdata, push_wrapped_error, safe_pcall, safe_xpcall, userdata_destructor,
+           StackGuard};
 use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 use types::{Callback, Integer, LightUserData, LuaRef, Number, RefType, RegistryKey};
 use string::String;
@@ -91,7 +91,7 @@ impl Lua {
     pub fn load(&self, source: &str, name: Option<&str>) -> Result<Function> {
         unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 1);
+            assert_stack(self.state, 1);
 
             match if let Some(name) = name {
                 let name =
@@ -155,7 +155,7 @@ impl Lua {
     pub fn create_string(&self, s: &str) -> Result<String> {
         unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 4);
+            assert_stack(self.state, 4);
             push_string(self.state, s)?;
             Ok(String(self.pop_ref()))
         }
@@ -165,7 +165,7 @@ impl Lua {
     pub fn create_table(&self) -> Result<Table> {
         unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 3);
+            assert_stack(self.state, 3);
             unsafe extern "C" fn new_table(state: *mut ffi::lua_State) -> c_int {
                 ffi::lua_newtable(state);
                 1
@@ -186,7 +186,7 @@ impl Lua {
             let _sg = StackGuard::new(self.state);
             // `Lua` instance assumes that on any callback, the Lua stack has at least LUA_MINSTACK
             // slots available to avoid panics.
-            check_stack_err(self.state, 5 + ffi::LUA_MINSTACK)?;
+            check_stack(self.state, 5 + ffi::LUA_MINSTACK)?;
 
             unsafe extern "C" fn new_table(state: *mut ffi::lua_State) -> c_int {
                 ffi::lua_newtable(state);
@@ -310,7 +310,7 @@ impl Lua {
     pub fn create_thread<'lua>(&'lua self, func: Function<'lua>) -> Result<Thread<'lua>> {
         unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 2);
+            assert_stack(self.state, 2);
 
             let thread_state =
                 protect_lua_closure(self.state, 0, 1, |state| ffi::lua_newthread(state))?;
@@ -333,7 +333,7 @@ impl Lua {
     pub fn globals(&self) -> Table {
         unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 2);
+            assert_stack(self.state, 2);
             ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
             Table(self.pop_ref())
         }
@@ -374,7 +374,7 @@ impl Lua {
             Value::String(s) => Ok(s),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
-                check_stack(self.state, 4);
+                assert_stack(self.state, 4);
 
                 let ty = v.type_name();
                 self.push_value(v);
@@ -402,7 +402,7 @@ impl Lua {
             Value::Integer(i) => Ok(i),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
-                check_stack(self.state, 2);
+                assert_stack(self.state, 2);
 
                 let ty = v.type_name();
                 self.push_value(v);
@@ -430,7 +430,7 @@ impl Lua {
             Value::Number(n) => Ok(n),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
-                check_stack(self.state, 2);
+                assert_stack(self.state, 2);
 
                 let ty = v.type_name();
                 self.push_value(v);
@@ -484,7 +484,7 @@ impl Lua {
         let t = t.to_lua(self)?;
         unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 5);
+            assert_stack(self.state, 5);
 
             push_string(self.state, name)?;
             self.push_value(t);
@@ -506,7 +506,7 @@ impl Lua {
     pub fn named_registry_value<'lua, T: FromLua<'lua>>(&'lua self, name: &str) -> Result<T> {
         let value = unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 4);
+            assert_stack(self.state, 4);
 
             push_string(self.state, name)?;
             unsafe extern "C" fn get_registry(state: *mut ffi::lua_State) -> c_int {
@@ -537,7 +537,7 @@ impl Lua {
         let t = t.to_lua(self)?;
         unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 2);
+            assert_stack(self.state, 2);
 
             self.push_value(t);
             let registry_id = gc_guard(self.state, || {
@@ -564,7 +564,7 @@ impl Lua {
             }
 
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 2);
+            assert_stack(self.state, 2);
 
             ffi::lua_rawgeti(
                 self.state,
@@ -825,7 +825,7 @@ impl Lua {
                     }
                 }
                 RefType::Registry { registry_id } => {
-                    check_stack(self.state, 2);
+                    assert_stack(self.state, 2);
                     ffi::lua_rawgeti(
                         self.state,
                         ffi::LUA_REGISTRYINDEX,
@@ -900,7 +900,7 @@ impl Lua {
         }
 
         let _sg = StackGuard::new(self.state);
-        check_stack(self.state, 6);
+        assert_stack(self.state, 6);
 
         let mut methods = UserDataMethods {
             methods: HashMap::new(),
@@ -1025,7 +1025,7 @@ impl Lua {
                 let results = (*func)(&lua, args)?;
                 let nresults = results.len() as c_int;
 
-                check_stack_err(state, nresults)?;
+                check_stack(state, nresults)?;
                 for r in results {
                     lua.push_value(r);
                 }
@@ -1036,7 +1036,7 @@ impl Lua {
 
         unsafe {
             let _sg = StackGuard::new(self.state);
-            check_stack(self.state, 4);
+            assert_stack(self.state, 4);
 
             push_userdata::<Callback>(self.state, func)?;
 
@@ -1061,7 +1061,7 @@ impl Lua {
         T: UserData,
     {
         let _sg = StackGuard::new(self.state);
-        check_stack(self.state, 4);
+        assert_stack(self.state, 4);
 
         push_userdata::<RefCell<T>>(self.state, RefCell::new(data))?;
 
@@ -1168,7 +1168,7 @@ impl Lua {
         *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra_data;
 
         rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
-        check_stack(state, REF_STACK_SIZE);
+        assert_stack(state, REF_STACK_SIZE);
         ffi::lua_settop(state, REF_STACK_SIZE);
 
         Lua {
@@ -1183,7 +1183,7 @@ impl Lua {
     // in the callback.
     fn setup_callback_stack<'lua>(&'lua self) -> Result<MultiValue<'lua>> {
         unsafe {
-            check_stack(self.state, 2);
+            assert_stack(self.state, 2);
 
             let nargs = ffi::lua_gettop(self.state);
             let stack_nargs = cmp::min(REF_STACK_SIZE, nargs);
@@ -1253,12 +1253,12 @@ impl Lua {
             }
 
             if nargs < REF_STACK_SIZE {
-                check_stack_err(self.state, REF_STACK_SIZE - nargs + ffi::LUA_MINSTACK)?;
+                check_stack(self.state, REF_STACK_SIZE - nargs + ffi::LUA_MINSTACK)?;
                 ffi::lua_settop(self.state, REF_STACK_SIZE);
                 Ok(args)
             } else if nargs > REF_STACK_SIZE {
                 if nargs - REF_STACK_SIZE < ffi::LUA_MINSTACK {
-                    check_stack_err(self.state, ffi::LUA_MINSTACK - (nargs - REF_STACK_SIZE))?;
+                    check_stack(self.state, ffi::LUA_MINSTACK - (nargs - REF_STACK_SIZE))?;
                 }
 
                 // If the total number of arguments exceeds the ref stack area, pop off the rest of
@@ -1271,7 +1271,7 @@ impl Lua {
                 extra_args.extend(args.into_vec_rev());
                 Ok(MultiValue::from_vec_rev(extra_args))
             } else {
-                check_stack_err(self.state, ffi::LUA_MINSTACK)?;
+                check_stack(self.state, ffi::LUA_MINSTACK)?;
                 Ok(args)
             }
         }

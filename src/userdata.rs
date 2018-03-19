@@ -5,7 +5,7 @@ use std::string::String as StdString;
 
 use ffi;
 use error::{Error, Result};
-use util::{check_stack, get_userdata, StackGuard};
+use util::{assert_stack, get_userdata, StackGuard};
 use types::{Callback, LuaRef};
 use value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
 use lua::Lua;
@@ -418,7 +418,7 @@ impl<'lua> AnyUserData<'lua> {
         let v = v.to_lua(lua)?;
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 2);
+            assert_stack(lua.state, 2);
             lua.push_ref(&self.0);
             lua.push_value(v);
             ffi::lua_setuservalue(lua.state, -2);
@@ -433,7 +433,7 @@ impl<'lua> AnyUserData<'lua> {
         let lua = self.0.lua;
         let res = unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 3);
+            assert_stack(lua.state, 3);
             lua.push_ref(&self.0);
             ffi::lua_getuservalue(lua.state, -1);
             lua.pop_value()
@@ -449,7 +449,7 @@ impl<'lua> AnyUserData<'lua> {
         unsafe {
             let lua = self.0.lua;
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 3);
+            assert_stack(lua.state, 3);
 
             lua.push_ref(&self.0);
 

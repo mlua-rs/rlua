@@ -2,7 +2,7 @@ use std::{slice, str};
 
 use ffi;
 use error::{Error, Result};
-use util::{check_stack, StackGuard};
+use util::{assert_stack, StackGuard};
 use types::LuaRef;
 
 /// Handle to an internal Lua string.
@@ -70,7 +70,7 @@ impl<'lua> String<'lua> {
         let lua = self.0.lua;
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 1);
+            assert_stack(lua.state, 1);
 
             lua.push_ref(&self.0);
             rlua_debug_assert!(

@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 use ffi;
 use error::{Error, Result};
-use util::{check_stack, take_userdata, StackGuard};
+use util::{assert_stack, take_userdata, StackGuard};
 use value::{FromLuaMulti, ToLuaMulti};
 use types::Callback;
 use lua::Lua;
@@ -74,7 +74,7 @@ impl<'scope> Scope<'scope> {
             destructors.push(Box::new(move || {
                 let state = f_destruct.lua.state;
                 let _sg = StackGuard::new(state);
-                check_stack(state, 2);
+                assert_stack(state, 2);
                 f_destruct.lua.push_ref(&f_destruct);
 
                 ffi::lua_getupvalue(state, -1, 1);
@@ -133,7 +133,7 @@ impl<'scope> Scope<'scope> {
             destructors.push(Box::new(move || {
                 let state = u_destruct.lua.state;
                 let _sg = StackGuard::new(state);
-                check_stack(state, 1);
+                assert_stack(state, 1);
                 u_destruct.lua.push_ref(&u_destruct);
                 Box::new(take_userdata::<RefCell<T>>(state))
             }));

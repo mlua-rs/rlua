@@ -3,7 +3,7 @@ use std::os::raw::c_int;
 
 use ffi;
 use error::Result;
-use util::{check_stack, protect_lua, protect_lua_closure, StackGuard};
+use util::{assert_stack, protect_lua, protect_lua_closure, StackGuard};
 use types::{Integer, LuaRef, RefType};
 use value::{FromLua, ToLua};
 
@@ -55,7 +55,7 @@ impl<'lua> Table<'lua> {
         let value = value.to_lua(lua)?;
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 6);
+            assert_stack(lua.state, 6);
 
             lua.push_ref(&self.0);
             lua.push_value(key);
@@ -102,7 +102,7 @@ impl<'lua> Table<'lua> {
         let key = key.to_lua(lua)?;
         let value = unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 5);
+            assert_stack(lua.state, 5);
 
             lua.push_ref(&self.0);
             lua.push_value(key);
@@ -124,7 +124,7 @@ impl<'lua> Table<'lua> {
 
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 5);
+            assert_stack(lua.state, 5);
 
             lua.push_ref(&self.0);
             lua.push_value(key);
@@ -148,7 +148,7 @@ impl<'lua> Table<'lua> {
 
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 6);
+            assert_stack(lua.state, 6);
 
             lua.push_ref(&self.0);
             lua.push_value(key);
@@ -170,7 +170,7 @@ impl<'lua> Table<'lua> {
         let key = key.to_lua(lua)?;
         let value = unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 3);
+            assert_stack(lua.state, 3);
 
             lua.push_ref(&self.0);
             lua.push_value(key);
@@ -189,7 +189,7 @@ impl<'lua> Table<'lua> {
         let lua = self.0.lua;
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 4);
+            assert_stack(lua.state, 4);
             lua.push_ref(&self.0);
             protect_lua_closure(lua.state, 1, 0, |state| ffi::luaL_len(state, -1))
         }
@@ -200,7 +200,7 @@ impl<'lua> Table<'lua> {
         let lua = self.0.lua;
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 1);
+            assert_stack(lua.state, 1);
             lua.push_ref(&self.0);
             let len = ffi::lua_rawlen(lua.state, -1);
             len as Integer
@@ -214,7 +214,7 @@ impl<'lua> Table<'lua> {
         let lua = self.0.lua;
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 1);
+            assert_stack(lua.state, 1);
             lua.push_ref(&self.0);
             if ffi::lua_getmetatable(lua.state, -1) == 0 {
                 None
@@ -233,7 +233,7 @@ impl<'lua> Table<'lua> {
         let lua = self.0.lua;
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 1);
+            assert_stack(lua.state, 1);
             lua.push_ref(&self.0);
             if let Some(metatable) = metatable {
                 lua.push_ref(&metatable.0);
@@ -366,7 +366,7 @@ where
             let res = (|| {
                 let res = unsafe {
                     let _sg = StackGuard::new(lua.state);
-                    check_stack(lua.state, 6);
+                    assert_stack(lua.state, 6);
 
                     lua.push_ref(&self.table);
                     lua.push_ref(&next_key);
@@ -426,7 +426,7 @@ where
 
             let res = unsafe {
                 let _sg = StackGuard::new(lua.state);
-                check_stack(lua.state, 5);
+                assert_stack(lua.state, 5);
 
                 lua.push_ref(&self.table);
                 match protect_lua_closure(lua.state, 1, 1, |state| ffi::lua_geti(state, -1, index))

@@ -2,7 +2,7 @@ use std::os::raw::c_int;
 
 use ffi;
 use error::{Error, Result};
-use util::{check_stack, check_stack_err, error_traceback, pop_error, StackGuard};
+use util::{assert_stack, check_stack, error_traceback, pop_error, StackGuard};
 use types::LuaRef;
 use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
@@ -80,7 +80,7 @@ impl<'lua> Thread<'lua> {
         let args = args.to_lua_multi(lua)?;
         let results = unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 1);
+            assert_stack(lua.state, 1);
 
             lua.push_ref(&self.0);
             let thread_state = ffi::lua_tothread(lua.state, -1);
@@ -93,8 +93,8 @@ impl<'lua> Thread<'lua> {
             ffi::lua_pop(lua.state, 1);
 
             let nargs = args.len() as c_int;
-            check_stack_err(lua.state, nargs)?;
-            check_stack_err(thread_state, nargs + 1)?;
+            check_stack(lua.state, nargs)?;
+            check_stack(thread_state, nargs + 1)?;
 
             for arg in args {
                 lua.push_value(arg);
@@ -111,7 +111,7 @@ impl<'lua> Thread<'lua> {
             let mut results = MultiValue::new();
             ffi::lua_xmove(thread_state, lua.state, nresults);
 
-            check_stack(lua.state, 2);
+            assert_stack(lua.state, 2);
             for _ in 0..nresults {
                 results.push_front(lua.pop_value());
             }
@@ -125,7 +125,7 @@ impl<'lua> Thread<'lua> {
         let lua = self.0.lua;
         unsafe {
             let _sg = StackGuard::new(lua.state);
-            check_stack(lua.state, 1);
+            assert_stack(lua.state, 1);
 
             lua.push_ref(&self.0);
             let thread_state = ffi::lua_tothread(lua.state, -1);

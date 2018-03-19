@@ -10,16 +10,18 @@ use error::{Error, Result};
 
 // Checks that Lua has enough free stack space for future stack operations.  On failure, this will
 // panic.
-pub unsafe fn check_stack(state: *mut ffi::lua_State, amount: c_int) {
+pub unsafe fn assert_stack(state: *mut ffi::lua_State, amount: c_int) {
+    // TODO: This should only be triggered when there is a logic error in `rlua`.  In the future,
+    // when there is a way to be confident about stack safety and test it, this could be enabled
+    // only when `cfg!(debug_assertions)` is true.
     rlua_assert!(
         ffi::lua_checkstack(state, amount) != 0,
         "out of stack space"
     );
 }
 
-// Similar to `check_stack`, but returns `Error::StackError` on failure.  Useful for user controlled
-// sizes, which should not cause a panic.
-pub unsafe fn check_stack_err(state: *mut ffi::lua_State, amount: c_int) -> Result<()> {
+// Similar to `assert_stack`, but returns `Error::StackError` on failure.
+pub unsafe fn check_stack(state: *mut ffi::lua_State, amount: c_int) -> Result<()> {
     if ffi::lua_checkstack(state, amount) == 0 {
         Err(Error::StackError)
     } else {
@@ -452,7 +454,7 @@ pub unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) ->
 
 // Initialize the error, panic, and destructed userdata metatables.
 pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
-    check_stack(state, 8);
+    assert_stack(state, 8);
 
     // Create error metatable
 
