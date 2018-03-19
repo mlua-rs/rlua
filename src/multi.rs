@@ -139,7 +139,7 @@ impl<'lua, T: FromLua<'lua>> FromLuaMulti<'lua> for Variadic<T> {
 macro_rules! impl_tuple {
     () => (
         impl<'lua> ToLuaMulti<'lua> for () {
-            fn to_lua_multi(self, _: &'lua Lua) -> Result<MultiValue> {
+            fn to_lua_multi(self, _: &'lua Lua) -> Result<MultiValue<'lua>> {
                 Ok(MultiValue::new())
             }
         }

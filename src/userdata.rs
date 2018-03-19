@@ -89,7 +89,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + for<'a> Fn(&'lua Lua, &'a T, A) -> Result<R>,
+        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
     {
         self.methods
             .insert(name.to_owned(), Self::box_method(method));
@@ -104,7 +104,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
+        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
     {
         self.methods
             .insert(name.to_owned(), Self::box_method_mut(method));
@@ -155,7 +155,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + for<'a> Fn(&'lua Lua, &'a T, A) -> Result<R>,
+        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_method(method));
     }
@@ -172,7 +172,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
+        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
     {
         self.meta_methods.insert(meta, Self::box_method_mut(method));
     }
@@ -234,7 +234,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + for<'a> Fn(&'lua Lua, &'a T, A) -> Result<R>,
+        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
     {
         Box::new(move |lua, mut args| {
             if let Some(front) = args.pop_front() {
@@ -255,7 +255,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + for<'a> FnMut(&'lua Lua, &'a mut T, A) -> Result<R>,
+        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
     {
         let method = RefCell::new(method);
         Box::new(move |lua, mut args| {
