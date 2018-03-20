@@ -23,8 +23,6 @@
   breaking *user* invariants.
 - Several Lua stack checking bugs have been fixed that could have lead to
   unsafety in release mode.
-- `rlua` now depends on `failure` 1.0 and `cc` 1.0, and does not enable the
-  failure `backtrace` feature by default.
 
 ## [0.13.0]
 - Small API incompatible change which fixes unsafety: Scope and scope created
