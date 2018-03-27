@@ -9,7 +9,7 @@ proc-macro = true
 [dependencies]
 syn = "0.12"
 quote = "0.4"
-synstructure = {git = "https://github.com/nrxus/synstructure.git"}
+synstructure = {git = "https://github.com/mystor/synstructure.git"}
 
 [dev-dependencies]
 rlua = {path = "../", features = ["rlua-derive"]}
