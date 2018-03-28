@@ -9,7 +9,7 @@ use ffi;
 use error::{Error, Result};
 
 // Checks that Lua has enough free stack space for future stack operations.  On failure, this will
-// panic.
+// panic with an internal error message.
 pub unsafe fn assert_stack(state: *mut ffi::lua_State, amount: c_int) {
     // TODO: This should only be triggered when there is a logic error in `rlua`.  In the future,
     // when there is a way to be confident about stack safety and test it, this could be enabled
@@ -398,6 +398,14 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_insert(state, 2);
         ffi::lua_gettop(state) - 1
     }
+}
+
+// Does not call lua_checkstack, uses 1 stack space.
+pub unsafe fn main_state(state: *mut ffi::lua_State) -> *mut ffi::lua_State {
+    ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_MAINTHREAD);
+    let main_state = ffi::lua_tothread(state, -1);
+    ffi::lua_pop(state, 1);
+    main_state
 }
 
 // Pushes a WrappedError::Error to the top of the stack.  Uses two stack spaces and does not call

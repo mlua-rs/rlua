@@ -1,26 +1,26 @@
 ## [0.14.0]
 - Lots of performance improvements, including one major change: Lua handles no
-  longer necessarily point into the registry, they now can instead point into a
-  pre-allocated stack area.  All together, you can expect (VERY rough estimate)
-  somewhere on the order of 30%-60% CPU time reduction in the cost of bindings,
-  depending on usage patterns.
+  longer use the registry, they now instead are stored in an auxillary thread
+  stack created solely for the purpose of holding ref values.  This may seem
+  extremely weird, but it is vastly faster than using the registry or raw tables
+  for this purpose.  The first attempt here was to use the same stack and to do
+  a lot of complex bookkeeping to manage the references, and this DOES work, but
+  it comes with a lot of complexity and downsides along with it.  The second
+  approach of using an auxillary thread turned out to be equally fast and with
+  no real downsides over the previous approach.  With all the performance
+  improvements together, you can expect (VERY rough estimate) somewhere on the
+  order of 30%-60% CPU time reduction in the cost of bindings, depending on
+  usage patterns.
 - Addition of some simple criterion.rs based benchmarking.  This is the first
   `rlua` release to focus on performance, but performance will hopefully remain
   a focus going forward.
-- API incompatible change: Lua handles now must ONLY be used with the `Lua`
-  instance from which they were derived.  Before, this would work if both
-  instances were from the same base state, but are now restricted to ONLY the
-  matching `Lua` instance itself.  This was previously only possible through
-  unsafe code, `Lua::scope`, and things like the `rental` crate which allow self
-  borrowing.  For `Lua::scope` functions, you can use `Function::bind`, and for
-  everything else you can use the `RegistryKey` API.
-- Another API incompatible change: `Lua` (and associated handle values) are no
-  longer `UnwindSafe` / `RefUnwindSafe`.  They should not have been marked as
-  such before, because they are *extremely* internally mutable, so this can be
-  considered a bugfix.  All `rlua` types should actually be perfectly panic safe
-  as far as *internal* invariants are concerned, but (afaict) they should not be
-  marked as `UnwindSafe` due to internal mutability and thus potentially
-  breaking *user* invariants.
+- API incompatible change: `Lua` is no longer `RefUnwindSafe` and associated
+  handle values are no longer `UnwindSafe` or `RefUnwindSafe`.  They should not
+  have been marked as such before, because they are *extremely* internally
+  mutable, so this can be considered a bugfix.  All `rlua` types should actually
+  be perfectly panic safe as far as *internal* invariants are concerned, but
+  (afaict) they should not be marked as `RefUnwindSafe` due to internal
+  mutability and thus potentially breaking *user* invariants.
 - Several Lua stack checking bugs have been fixed that could have lead to
   unsafety in release mode.
 

@@ -1,6 +1,6 @@
-use std::{cmp, mem, ptr, str};
+use std::{mem, ptr, str};
 use std::sync::{Arc, Mutex};
-use std::cell::{Cell, RefCell};
+use std::cell::{RefCell, UnsafeCell};
 use std::ffi::CString;
 use std::any::TypeId;
 use std::marker::PhantomData;
@@ -12,11 +12,11 @@ use libc;
 use ffi;
 use error::{Error, Result};
 use util::{assert_stack, callback_error, check_stack, gc_guard, get_userdata, get_wrapped_error,
-           init_error_metatables, pop_error, protect_lua, protect_lua_closure, push_string,
-           push_userdata, push_wrapped_error, safe_pcall, safe_xpcall, userdata_destructor,
-           StackGuard};
+           init_error_metatables, main_state, pop_error, protect_lua, protect_lua_closure,
+           push_string, push_userdata, push_wrapped_error, safe_pcall, safe_xpcall,
+           userdata_destructor, StackGuard};
 use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-use types::{Callback, Integer, LightUserData, LuaRef, Number, RefType, RegistryKey};
+use types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
 use string::String;
 use table::Table;
 use function::Function;
@@ -27,8 +27,10 @@ use scope::Scope;
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
     pub(crate) state: *mut ffi::lua_State,
-    recursion_level: usize,
-    ref_stack_slots: [Cell<usize>; REF_STACK_SIZE as usize],
+    main_state: *mut ffi::lua_State,
+    ephemeral: bool,
+    // Lua has lots of interior mutability, should not be RefUnwindSafe
+    _phantom: PhantomData<UnsafeCell<()>>,
 }
 
 unsafe impl Send for Lua {}
@@ -36,31 +38,15 @@ unsafe impl Send for Lua {}
 impl Drop for Lua {
     fn drop(&mut self) {
         unsafe {
-            if cfg!(debug_assertions) {
-                for use_count in &self.ref_stack_slots {
-                    rlua_assert!(use_count.get() == 0, "live stack reference detected");
-                }
-
-                if self.recursion_level == 0 {
-                    let top = ffi::lua_gettop(self.state);
-                    rlua_assert!(
-                        top == REF_STACK_SIZE,
-                        "stack problem detected, stack top is {}",
-                        top - REF_STACK_SIZE
-                    );
-                }
-            }
-
-            if self.recursion_level == 0 {
-                let extra_data = *(ffi::lua_getextraspace(self.state) as *mut *mut ExtraData);
-
+            if !self.ephemeral {
+                let extra = extra_data(self.state);
                 rlua_debug_assert!(
-                    (*extra_data).recursion_level == 0,
-                    "Lua recursion level nonzero on Lua drop"
+                    ffi::lua_gettop((*extra).ref_thread) == (*extra).ref_stack_max
+                        && (*extra).ref_stack_max as usize == (*extra).ref_free.len(),
+                    "reference leak detected"
                 );
-
-                *(*extra_data).registry_unref_list.lock().unwrap() = None;
-                Box::from_raw(extra_data);
+                *(*extra).registry_unref_list.lock().unwrap() = None;
+                Box::from_raw(extra);
 
                 ffi::lua_close(self.state);
             }
@@ -71,7 +57,7 @@ impl Drop for Lua {
 impl Lua {
     /// Creates a new Lua state and loads standard library without the `debug` library.
     pub fn new() -> Lua {
-        unsafe { Lua::create_lua(false) }
+        unsafe { create_lua(false) }
     }
 
     /// Creates a new Lua state and loads the standard library including the `debug` library.
@@ -79,7 +65,7 @@ impl Lua {
     /// The debug library is very unsound, loading it and using it breaks all the guarantees of
     /// rlua.
     pub unsafe fn new_with_debug() -> Lua {
-        Lua::create_lua(true)
+        create_lua(true)
     }
 
     /// Loads a chunk of Lua code and returns it as a function.
@@ -546,7 +532,7 @@ impl Lua {
 
             Ok(RegistryKey {
                 registry_id,
-                unref_list: (*ExtraData::get(self.state)).registry_unref_list.clone(),
+                unref_list: (*extra_data(self.state)).registry_unref_list.clone(),
             })
         }
     }
@@ -606,7 +592,7 @@ impl Lua {
         unsafe {
             Arc::ptr_eq(
                 &key.unref_list,
-                &(*ExtraData::get(self.state)).registry_unref_list,
+                &(*extra_data(self.state)).registry_unref_list,
             )
         }
     }
@@ -619,7 +605,7 @@ impl Lua {
     pub fn expire_registry_values(&self) {
         unsafe {
             let unref_list = mem::replace(
-                &mut *(*ExtraData::get(self.state))
+                &mut *(*extra_data(self.state))
                     .registry_unref_list
                     .lock()
                     .unwrap(),
@@ -735,139 +721,48 @@ impl Lua {
         }
     }
 
-    // Used 1 stack space, does not call checkstack
-    pub(crate) unsafe fn push_ref(&self, lref: &LuaRef) {
+    // Pushes a LuaRef value onto the stack, uses 1 stack space, does not call checkstack
+    pub(crate) unsafe fn push_ref<'lua>(&'lua self, lref: &LuaRef<'lua>) {
         assert!(
-            self.is_active(),
-            "parent Lua instance accessed inside callback"
+            lref.lua.main_state == self.main_state,
+            "Lua instance passed Value created from a different main Lua state"
         );
-        assert!(
-            lref.lua as *const Lua == self as *const Lua,
-            "Lua instance passed Value created from a different Lua"
-        );
-
-        match lref.ref_type {
-            RefType::Nil => ffi::lua_pushnil(self.state),
-            RefType::Stack { stack_slot } => {
-                ffi::lua_pushvalue(self.state, stack_slot);
-            }
-            RefType::Registry { registry_id } => {
-                ffi::lua_rawgeti(
-                    self.state,
-                    ffi::LUA_REGISTRYINDEX,
-                    registry_id as ffi::lua_Integer,
-                );
-            }
-        }
+        let extra = extra_data(self.state);
+        ffi::lua_pushvalue((*extra).ref_thread, lref.index);
+        ffi::lua_xmove((*extra).ref_thread, self.state, 1);
     }
 
-    // Pops the topmost element of the stack and stores a reference to it in the
-    // registry.
+    // Pops the topmost element of the stack and stores a reference to it.  This pins the object,
+    // preventing garbage collection until the returned `LuaRef` is dropped.
     //
-    // This pins the object, preventing garbage collection until the returned
-    // `LuaRef` is dropped.
-    //
-    // pop_ref uses 1 extra stack space and does not call checkstack
-    pub(crate) unsafe fn pop_ref(&self) -> LuaRef {
-        assert!(
-            self.is_active(),
-            "parent Lua instance accessed inside callback"
-        );
+    // References are stored in the stack of a specially created auxillary thread that exists only
+    // to store reference values.  This is much faster than storing these in the registry, and also
+    // much more flexible and requires less bookkeeping than storing them directly in the currently
+    // used stack.  The implementation is somewhat biased towards the use case of a relatively small
+    // number of short term references being created, and `RegistryKey` being used for long term
+    // references.
+    pub(crate) unsafe fn pop_ref<'lua>(&'lua self) -> LuaRef<'lua> {
+        let extra = extra_data(self.state);
+        ffi::lua_xmove(self.state, (*extra).ref_thread, 1);
+        let index = ref_stack_pop(extra);
+        LuaRef { lua: self, index }
+    }
 
-        for i in 0..REF_STACK_SIZE {
-            let ref_slot = &self.ref_stack_slots[i as usize];
-            if ref_slot.get() == 0 {
-                ref_slot.set(1);
-                ffi::lua_replace(self.state, i + 1);
-                return LuaRef {
-                    lua: self,
-                    ref_type: RefType::Stack { stack_slot: i + 1 },
-                };
-            }
-        }
-
-        let registry_id = gc_guard(self.state, || {
-            ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX)
-        });
-        if registry_id == ffi::LUA_REFNIL {
-            LuaRef {
-                lua: self,
-                ref_type: RefType::Nil,
-            }
-        } else {
-            LuaRef {
-                lua: self,
-                ref_type: RefType::Registry {
-                    registry_id: registry_id,
-                },
-            }
+    pub(crate) fn clone_ref<'lua>(&'lua self, lref: &LuaRef<'lua>) -> LuaRef<'lua> {
+        unsafe {
+            let extra = extra_data(self.state);
+            ffi::lua_pushvalue((*extra).ref_thread, lref.index);
+            let index = ref_stack_pop(extra);
+            LuaRef { lua: self, index }
         }
     }
 
-    pub(crate) fn clone_ref(&self, lref: &LuaRef) -> LuaRef {
-        assert!(
-            self.is_active(),
-            "parent Lua instance accessed inside callback"
-        );
-
+    pub(crate) fn drop_ref<'lua>(&'lua self, lref: &mut LuaRef<'lua>) {
         unsafe {
-            match lref.ref_type {
-                RefType::Nil => LuaRef {
-                    lua: self,
-                    ref_type: RefType::Nil,
-                },
-                RefType::Stack { stack_slot } => {
-                    let ref_slot = &self.ref_stack_slots[(stack_slot - 1) as usize];
-                    ref_slot.set(ref_slot.get() + 1);
-                    LuaRef {
-                        lua: self,
-                        ref_type: RefType::Stack { stack_slot },
-                    }
-                }
-                RefType::Registry { registry_id } => {
-                    assert_stack(self.state, 2);
-                    ffi::lua_rawgeti(
-                        self.state,
-                        ffi::LUA_REGISTRYINDEX,
-                        registry_id as ffi::lua_Integer,
-                    );
-                    let registry_id = gc_guard(self.state, || {
-                        ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX)
-                    });
-                    LuaRef {
-                        lua: self,
-                        ref_type: RefType::Registry {
-                            registry_id: registry_id,
-                        },
-                    }
-                }
-            }
-        }
-    }
-
-    pub(crate) fn drop_ref(&self, lref: &mut LuaRef) {
-        assert!(
-            self.is_active(),
-            "parent Lua instance accessed inside callback"
-        );
-
-        unsafe {
-            match lref.ref_type {
-                RefType::Nil => {}
-                RefType::Stack { stack_slot } => {
-                    let ref_slot = &self.ref_stack_slots[(stack_slot - 1) as usize];
-                    let ref_count = ref_slot.get();
-                    rlua_debug_assert!(ref_count > 0, "ref slot use count has gone below zero");
-                    ref_slot.set(ref_count - 1);
-                    if ref_count == 1 {
-                        ffi::lua_pushnil(self.state);
-                        ffi::lua_replace(self.state, stack_slot);
-                    }
-                }
-                RefType::Registry { registry_id } => {
-                    ffi::luaL_unref(self.state, ffi::LUA_REGISTRYINDEX, registry_id);
-                }
-            }
+            let extra = extra_data(self.state);
+            ffi::lua_pushnil((*extra).ref_thread);
+            ffi::lua_replace((*extra).ref_thread, lref.index);
+            (*extra).ref_free.push(lref.index);
         }
     }
 
@@ -892,7 +787,7 @@ impl Lua {
             }
         }
 
-        if let Some(table_id) = (*ExtraData::get(self.state))
+        if let Some(table_id) = (*extra_data(self.state))
             .registered_userdata
             .get(&TypeId::of::<T>())
         {
@@ -996,7 +891,7 @@ impl Lua {
         let id = gc_guard(self.state, || {
             ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX)
         });
-        (*ExtraData::get(self.state))
+        (*extra_data(self.state))
             .registered_userdata
             .insert(TypeId::of::<T>(), id);
         Ok(id)
@@ -1011,15 +906,25 @@ impl Lua {
                 if ffi::lua_type(state, ffi::lua_upvalueindex(1)) == ffi::LUA_TNIL {
                     return Err(Error::CallbackDestructed);
                 }
-                let recursion_guard = RecursionGuard::new(ExtraData::get(state));
+
+                let nargs = ffi::lua_gettop(state);
+                if nargs < ffi::LUA_MINSTACK {
+                    check_stack(state, ffi::LUA_MINSTACK - nargs)?;
+                }
 
                 let lua = Lua {
                     state: state,
-                    recursion_level: recursion_guard.recursion_level(),
-                    ref_stack_slots: Default::default(),
+                    main_state: main_state(state),
+                    ephemeral: true,
+                    _phantom: PhantomData,
                 };
 
-                let args = lua.setup_callback_stack()?;
+                let mut args = MultiValue::new();
+                args.reserve(nargs as usize);
+                for _ in 0..nargs {
+                    args.push_front(lua.pop_value());
+                }
+
                 let func = get_userdata::<Callback>(state, ffi::lua_upvalueindex(1));
 
                 let results = (*func)(&lua, args)?;
@@ -1075,249 +980,151 @@ impl Lua {
 
         Ok(AnyUserData(self.pop_ref()))
     }
-
-    unsafe fn create_lua(load_debug: bool) -> Lua {
-        unsafe extern "C" fn allocator(
-            _: *mut c_void,
-            ptr: *mut c_void,
-            _: usize,
-            nsize: usize,
-        ) -> *mut c_void {
-            if nsize == 0 {
-                libc::free(ptr as *mut libc::c_void);
-                ptr::null_mut()
-            } else {
-                let p = libc::realloc(ptr as *mut libc::c_void, nsize);
-                if p.is_null() {
-                    // We require that OOM results in an abort, and that the lua allocator function
-                    // never errors.  Since this is what rust itself normally does on OOM, this is
-                    // not really a huge loss.  Importantly, this allows us to turn off the gc, and
-                    // then know that calling Lua API functions marked as 'm' will not result in a
-                    // 'longjmp' error while the gc is off.
-                    abort!("out of memory in Lua allocation, aborting!");
-                } else {
-                    p as *mut c_void
-                }
-            }
-        }
-
-        let state = ffi::lua_newstate(allocator, ptr::null_mut());
-
-        // Ignores or `unwrap()`s 'm' errors, because this is assuming that nothing in the lua
-        // standard library will have a `__gc` metamethod error.
-
-        // Do not open the debug library, it can be used to cause unsafety.
-        ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
-        ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
-        ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
-        ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
-        ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
-        ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
-        ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
-        ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
-        ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
-        ffi::lua_pop(state, 9);
-
-        init_error_metatables(state);
-
-        if load_debug {
-            ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
-            ffi::lua_pop(state, 1);
-        }
-
-        // Create the function metatable
-
-        ffi::lua_pushlightuserdata(
-            state,
-            &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-        );
-
-        ffi::lua_newtable(state);
-
-        push_string(state, "__gc").unwrap();
-        ffi::lua_pushcfunction(state, userdata_destructor::<Callback>);
-        ffi::lua_rawset(state, -3);
-
-        push_string(state, "__metatable").unwrap();
-        ffi::lua_pushboolean(state, 0);
-        ffi::lua_rawset(state, -3);
-
-        ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
-
-        // Override pcall and xpcall with versions that cannot be used to catch rust panics.
-
-        ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
-
-        push_string(state, "pcall").unwrap();
-        ffi::lua_pushcfunction(state, safe_pcall);
-        ffi::lua_rawset(state, -3);
-
-        push_string(state, "xpcall").unwrap();
-        ffi::lua_pushcfunction(state, safe_xpcall);
-        ffi::lua_rawset(state, -3);
-
-        ffi::lua_pop(state, 1);
-
-        // Create ExtraData, and place it in the lua_State "extra space"
-
-        let extra_data = Box::into_raw(Box::new(ExtraData {
-            recursion_level: 0,
-            registered_userdata: HashMap::new(),
-            registry_unref_list: Arc::new(Mutex::new(Some(Vec::new()))),
-        }));
-        *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra_data;
-
-        rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
-        assert_stack(state, REF_STACK_SIZE);
-        ffi::lua_settop(state, REF_STACK_SIZE);
-
-        Lua {
-            state,
-            recursion_level: 0,
-            ref_stack_slots: Default::default(),
-        }
-    }
-
-    // Set up the stack slot area in a callback, returning all arguments on the stack as a
-    // MultiValue.  Also ensures that at least LUA_MINSTACK extra stack slots are available for use
-    // in the callback.
-    fn setup_callback_stack<'lua>(&'lua self) -> Result<MultiValue<'lua>> {
-        unsafe {
-            assert_stack(self.state, 2);
-
-            let nargs = ffi::lua_gettop(self.state);
-            let stack_nargs = cmp::min(REF_STACK_SIZE, nargs);
-
-            let mut args = MultiValue::new();
-            args.reserve(stack_nargs as usize);
-
-            // Convert all of the reference types in the ref stack area into LuaRef types in-place.
-            for i in 0..stack_nargs {
-                let n = stack_nargs - i;
-
-                let make_ref = || {
-                    self.ref_stack_slots[(n - 1) as usize].set(1);
-                    LuaRef {
-                        lua: self,
-                        ref_type: RefType::Stack { stack_slot: n },
-                    }
-                };
-
-                match ffi::lua_type(self.state, n) {
-                    ffi::LUA_TNIL => {
-                        args.push_front(Value::Nil);
-                    }
-
-                    ffi::LUA_TBOOLEAN => {
-                        args.push_front(Value::Boolean(ffi::lua_toboolean(self.state, n) != 0));
-                    }
-
-                    ffi::LUA_TLIGHTUSERDATA => {
-                        args.push_front(Value::LightUserData(LightUserData(
-                            ffi::lua_touserdata(self.state, n),
-                        )));
-                    }
-
-                    ffi::LUA_TNUMBER => if ffi::lua_isinteger(self.state, n) != 0 {
-                        args.push_front(Value::Integer(ffi::lua_tointeger(self.state, n)));
-                    } else {
-                        args.push_front(Value::Number(ffi::lua_tonumber(self.state, n)));
-                    },
-
-                    ffi::LUA_TSTRING => {
-                        args.push_front(Value::String(String(make_ref())));
-                    }
-
-                    ffi::LUA_TTABLE => {
-                        args.push_front(Value::Table(Table(make_ref())));
-                    }
-
-                    ffi::LUA_TFUNCTION => {
-                        args.push_front(Value::Function(Function(make_ref())));
-                    }
-
-                    ffi::LUA_TUSERDATA => {
-                        if let Some(err) = get_wrapped_error(self.state, n).as_ref() {
-                            args.push_front(Value::Error(err.clone()));
-                        } else {
-                            args.push_front(Value::UserData(AnyUserData(make_ref())));
-                        }
-                    }
-
-                    ffi::LUA_TTHREAD => {
-                        args.push_front(Value::Thread(Thread(make_ref())));
-                    }
-
-                    _ => rlua_panic!("LUA_TNONE in setup_callback_stack"),
-                }
-            }
-
-            if nargs < REF_STACK_SIZE {
-                check_stack(self.state, REF_STACK_SIZE - nargs + ffi::LUA_MINSTACK)?;
-                ffi::lua_settop(self.state, REF_STACK_SIZE);
-                Ok(args)
-            } else if nargs > REF_STACK_SIZE {
-                if nargs - REF_STACK_SIZE < ffi::LUA_MINSTACK {
-                    check_stack(self.state, ffi::LUA_MINSTACK - (nargs - REF_STACK_SIZE))?;
-                }
-
-                // If the total number of arguments exceeds the ref stack area, pop off the rest of
-                // the arguments as normal.
-                let mut extra_args = Vec::new();
-                extra_args.reserve((nargs - REF_STACK_SIZE) as usize);
-                for _ in REF_STACK_SIZE..nargs {
-                    extra_args.push(self.pop_value());
-                }
-                extra_args.extend(args.into_vec_rev());
-                Ok(MultiValue::from_vec_rev(extra_args))
-            } else {
-                check_stack(self.state, ffi::LUA_MINSTACK)?;
-                Ok(args)
-            }
-        }
-    }
-
-    // Returns true if this is the "top" Lua instance.  If this returns false, we are a level deeper
-    // into a callback and `ref_stack_slots` points to an area of the stack that is not currently
-    // accessible.
-    fn is_active(&self) -> bool {
-        unsafe { (*ExtraData::get(self.state)).recursion_level == self.recursion_level }
-    }
 }
 
 // Data associated with the main lua_State via lua_getextraspace.
 struct ExtraData {
-    recursion_level: usize,
     registered_userdata: HashMap<TypeId, c_int>,
     registry_unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
+
+    ref_thread: *mut ffi::lua_State,
+    ref_stack_size: c_int,
+    ref_stack_max: c_int,
+    ref_free: Vec<c_int>,
 }
 
-impl ExtraData {
-    unsafe fn get(state: *mut ffi::lua_State) -> *mut ExtraData {
-        *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
-    }
+unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
+    *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
 }
 
-struct RecursionGuard(*mut ExtraData);
-
-impl RecursionGuard {
-    unsafe fn new(ed: *mut ExtraData) -> RecursionGuard {
-        (*ed).recursion_level += 1;
-        RecursionGuard(ed)
-    }
-
-    fn recursion_level(&self) -> usize {
-        unsafe { (*self.0).recursion_level }
-    }
-}
-
-impl Drop for RecursionGuard {
-    fn drop(&mut self) {
-        unsafe {
-            (*self.0).recursion_level -= 1;
+unsafe fn create_lua(load_debug: bool) -> Lua {
+    unsafe extern "C" fn allocator(
+        _: *mut c_void,
+        ptr: *mut c_void,
+        _: usize,
+        nsize: usize,
+    ) -> *mut c_void {
+        if nsize == 0 {
+            libc::free(ptr as *mut libc::c_void);
+            ptr::null_mut()
+        } else {
+            let p = libc::realloc(ptr as *mut libc::c_void, nsize);
+            if p.is_null() {
+                // We require that OOM results in an abort, and that the lua allocator function
+                // never errors.  Since this is what rust itself normally does on OOM, this is
+                // not really a huge loss.  Importantly, this allows us to turn off the gc, and
+                // then know that calling Lua API functions marked as 'm' will not result in a
+                // 'longjmp' error while the gc is off.
+                abort!("out of memory in Lua allocation, aborting!");
+            } else {
+                p as *mut c_void
+            }
         }
     }
+
+    let state = ffi::lua_newstate(allocator, ptr::null_mut());
+
+    // Ignores or `unwrap()`s 'm' errors, because we are making the assumption that nothing in
+    // the lua standard library will have a `__gc` metamethod error.
+
+    // Do not open the debug library, it can be used to cause unsafety.
+    ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
+    ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
+    ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
+    ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
+    ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
+    ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
+    ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
+    ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
+    ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
+    ffi::lua_pop(state, 9);
+
+    init_error_metatables(state);
+
+    if load_debug {
+        ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
+        ffi::lua_pop(state, 1);
+    }
+
+    // Create the function metatable
+
+    ffi::lua_pushlightuserdata(
+        state,
+        &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+    );
+
+    ffi::lua_newtable(state);
+
+    push_string(state, "__gc").unwrap();
+    ffi::lua_pushcfunction(state, userdata_destructor::<Callback>);
+    ffi::lua_rawset(state, -3);
+
+    push_string(state, "__metatable").unwrap();
+    ffi::lua_pushboolean(state, 0);
+    ffi::lua_rawset(state, -3);
+
+    ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+
+    // Override pcall and xpcall with versions that cannot be used to catch rust panics.
+
+    ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
+
+    push_string(state, "pcall").unwrap();
+    ffi::lua_pushcfunction(state, safe_pcall);
+    ffi::lua_rawset(state, -3);
+
+    push_string(state, "xpcall").unwrap();
+    ffi::lua_pushcfunction(state, safe_xpcall);
+    ffi::lua_rawset(state, -3);
+
+    ffi::lua_pop(state, 1);
+
+    // Create ref stack thread and place it in the registry to prevent it from being garbage
+    // collected.
+
+    let ref_thread = ffi::lua_newthread(state);
+    ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX);
+
+    // Create ExtraData, and place it in the lua_State "extra space"
+
+    let extra = Box::into_raw(Box::new(ExtraData {
+        registered_userdata: HashMap::new(),
+        registry_unref_list: Arc::new(Mutex::new(Some(Vec::new()))),
+        ref_thread,
+        // We need 1 extra stack space to move values in and out of the ref stack.
+        ref_stack_size: ffi::LUA_MINSTACK - 1,
+        ref_stack_max: 0,
+        ref_free: Vec::new(),
+    }));
+    *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra;
+
+    rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
+    assert_stack(state, ffi::LUA_MINSTACK);
+
+    Lua {
+        state,
+        main_state: state,
+        ephemeral: false,
+        _phantom: PhantomData,
+    }
 }
 
-const REF_STACK_SIZE: c_int = 16;
+unsafe fn ref_stack_pop(extra: *mut ExtraData) -> c_int {
+    if let Some(free) = (*extra).ref_free.pop() {
+        ffi::lua_replace((*extra).ref_thread, free);
+        free
+    } else {
+        if (*extra).ref_stack_max >= (*extra).ref_stack_size {
+            // It is a user error to create enough references to exhaust the Lua max stack size for
+            // the ref thread.
+            if ffi::lua_checkstack((*extra).ref_thread, (*extra).ref_stack_size) == 0 {
+                panic!("cannot create a Lua reference, out of auxillary stack space");
+            }
+            (*extra).ref_stack_size *= 2;
+        }
+        (*extra).ref_stack_max += 1;
+        (*extra).ref_stack_max
+    }
+}
+
 static FUNCTION_METATABLE_REGISTRY_KEY: u8 = 0;

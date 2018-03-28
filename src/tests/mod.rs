@@ -687,7 +687,6 @@ fn scope_capture() {
 }
 
 #[test]
-#[should_panic]
 fn outer_lua_access() {
     let lua = Lua::new();
     let table = lua.create_table().unwrap();
@@ -701,6 +700,7 @@ fn outer_lua_access() {
             .call::<_, ()>(())
             .unwrap();
     });
+    assert_eq!(table.get::<_, String>("a").unwrap(), "b");
 }
 
 #[test]

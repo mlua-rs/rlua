@@ -4,8 +4,8 @@ use std::os::raw::c_int;
 use ffi;
 use error::Result;
 use util::{assert_stack, protect_lua, protect_lua_closure, StackGuard};
-use types::{Integer, LuaRef, RefType};
-use value::{FromLua, ToLua};
+use types::{Integer, LuaRef};
+use value::{FromLua, Nil, ToLua, Value};
 
 /// Handle to an internal Lua table.
 #[derive(Clone, Debug)]
@@ -282,14 +282,9 @@ impl<'lua> Table<'lua> {
     /// [`Result`]: type.Result.html
     /// [Lua manual]: http://www.lua.org/manual/5.3/manual.html#pdf-next
     pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(self) -> TablePairs<'lua, K, V> {
-        let next_key = Some(LuaRef {
-            lua: self.0.lua,
-            ref_type: RefType::Nil,
-        });
-
         TablePairs {
             table: self.0,
-            next_key,
+            next_key: Some(Nil),
             _phantom: PhantomData,
         }
     }
@@ -348,7 +343,7 @@ impl<'lua> Table<'lua> {
 /// [`Table::pairs`]: struct.Table.html#method.pairs
 pub struct TablePairs<'lua, K, V> {
     table: LuaRef<'lua>,
-    next_key: Option<LuaRef<'lua>>,
+    next_key: Option<Value<'lua>>,
     _phantom: PhantomData<(K, V)>,
 }
 
@@ -369,7 +364,7 @@ where
                     assert_stack(lua.state, 6);
 
                     lua.push_ref(&self.table);
-                    lua.push_ref(&next_key);
+                    lua.push_value(next_key);
 
                     if protect_lua_closure(lua.state, 2, ffi::LUA_MULTRET, |state| {
                         ffi::lua_next(state, -2) != 0
@@ -377,7 +372,7 @@ where
                         ffi::lua_pushvalue(lua.state, -2);
                         let key = lua.pop_value();
                         let value = lua.pop_value();
-                        self.next_key = Some(lua.pop_ref());
+                        self.next_key = Some(lua.pop_value());
 
                         Some((key, value))
                     } else {

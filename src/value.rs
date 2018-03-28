@@ -122,14 +122,6 @@ impl<'lua> MultiValue<'lua> {
         v
     }
 
-    pub(crate) fn from_vec_rev(v: Vec<Value<'lua>>) -> MultiValue<'lua> {
-        MultiValue(v)
-    }
-
-    pub(crate) fn into_vec_rev(self) -> Vec<Value<'lua>> {
-        self.0
-    }
-
     pub(crate) fn reserve(&mut self, size: usize) {
         self.0.reserve(size);
     }
