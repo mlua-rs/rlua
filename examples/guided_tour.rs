@@ -142,7 +142,10 @@ fn guided_tour() -> Result<()> {
     let vec2_constructor = lua.create_function(|_, (x, y): (f32, f32)| Ok(Vec2(x, y)))?;
     globals.set("vec2", vec2_constructor)?;
 
-    assert!(lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()", None)? - 5.0 < f32::EPSILON);
+    assert!(
+        (lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()", None)? - 5.0).abs()
+            < f32::EPSILON
+    );
 
     // Normally, Rust types passed to `Lua` must be `Send`, because `Lua` itself is `Send`, and must
     // be `'static`, because there is no way to tell when Lua might garbage collect them.  There is,
