@@ -31,6 +31,7 @@ compiletest_rs = { version = "0.3", optional = true }
 
 [build-dependencies]
 cc = { version = "1.0", optional = true }
+pkg-config = "0.3.11"
 
 [dev-dependencies]
 rustyline = "1.0.0"
