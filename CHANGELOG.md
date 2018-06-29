@@ -21,6 +21,7 @@
   be perfectly panic safe as far as *internal* invariants are concerned, but
   (afaict) they should not be marked as `RefUnwindSafe` due to internal
   mutability and thus potentially breaking *user* invariants.
+- Upgrade to require `cc` 1.0.
 - Several Lua stack checking bugs have been fixed that could have lead to
   unsafety in release mode.
 

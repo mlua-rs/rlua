@@ -185,7 +185,10 @@ impl failure::Fail for Error {
     fn cause(&self) -> Option<&failure::Fail> {
         match *self {
             Error::CallbackError { ref cause, .. } => Some(cause.as_ref()),
-            Error::ExternalError(ref err) => err.as_fail().cause(),
+            // Error::cause simply returns the contained Fail type, which we are already displaying
+            // and returning the backtrace for, no need to repeat it as the cause.
+            // When failure 1.0 is released, this can become `err.as_fail.cause()`
+            Error::ExternalError(ref err) => err.cause().cause(),
             _ => None,
         }
     }
