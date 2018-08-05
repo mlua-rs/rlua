@@ -39,35 +39,19 @@ impl<'scope> Scope<'scope> {
     /// This is a version of [`Lua::create_function`] that creates a callback which expires on scope
     /// drop.  See [`Lua::scope`] for more details.
     ///
-    /// Since the provided function does not have to be 'static, it is easy to capture outer
-    /// variables in the provided callback.  However, you must *not* use Lua handle values (`Table`,
-    /// `Function` etc) or a `Lua` instance that you have captured from an outer level inside such a
-    /// callback.  It is *always* a logic error to access a `Lua` instance or handle value from an
-    /// "outer" callback level inside an "inner" callback level, Lua does stack protection during
-    /// callbacks that makes the outer instances unusable until the callback returns.  This is true
-    /// regardless of the use of `Lua::scope`, but it is very difficult (though not impossible!) to
-    /// run into unless you can create callbacks that are non-'static.
-    ///
-    /// If you do access outer `Lua` instances or handles inside an inner callback, this will result
-    /// in a panic.  You can instead use either [`RegistryKey`] values or [`Function::bind`] to pass
-    /// values to callbacks without error.
-    ///
     /// [`Lua::create_function`]: struct.Lua.html#method.create_function
     /// [`Lua::scope`]: struct.Lua.html#method.scope
-    /// [`RegistryKey`]: struct.RegistryKey.html
-    /// [`Function::bind`]: struct.Function.html#method.bind
-    pub fn create_function<'callback, 'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
+    pub fn create_function<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'callback>,
-        R: ToLuaMulti<'callback>,
-        F: 'scope + Fn(&'callback Lua, A) -> Result<R>,
-        'scope: 'callback,
+        A: FromLuaMulti<'scope>,
+        R: ToLuaMulti<'scope>,
+        F: 'scope + Fn(&'scope Lua, A) -> Result<R>,
     {
         unsafe {
             let f = Box::new(move |lua, args| {
                 func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             });
-            let f = mem::transmute::<Callback<'callback, 'scope>, Callback<'callback, 'static>>(f);
+            let f = mem::transmute::<Callback<'scope, 'scope>, Callback<'scope, 'static>>(f);
             let f = self.lua.create_callback(f)?;
 
             let mut destructors = self.destructors.borrow_mut();
@@ -99,15 +83,11 @@ impl<'scope> Scope<'scope> {
     /// [`Lua::create_function_mut`]: struct.Lua.html#method.create_function_mut
     /// [`Lua::scope`]: struct.Lua.html#method.scope
     /// [`Scope::create_function`]: #method.create_function
-    pub fn create_function_mut<'callback, 'lua, A, R, F>(
-        &'lua self,
-        func: F,
-    ) -> Result<Function<'lua>>
+    pub fn create_function_mut<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'callback>,
-        R: ToLuaMulti<'callback>,
-        F: 'scope + FnMut(&'callback Lua, A) -> Result<R>,
-        'scope: 'callback,
+        A: FromLuaMulti<'scope>,
+        R: ToLuaMulti<'scope>,
+        F: 'scope + FnMut(&'scope Lua, A) -> Result<R>,
     {
         let func = RefCell::new(func);
         self.create_function(move |lua, args| {
