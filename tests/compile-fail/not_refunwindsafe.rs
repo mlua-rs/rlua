@@ -7,5 +7,6 @@ use rlua::*;
 fn main() {
     let lua = Lua::new();
     let _ = catch_unwind(|| lua.create_table().unwrap());
-    //~^ error: the trait bound `std::cell::UnsafeCell<()>: std::panic::RefUnwindSafe` is not satisfied in `rlua::Lua`
+    //~^ error: the type `std::cell::UnsafeCell<()>` may contain interior mutability and a reference
+    // may not be safely transferrable across a catch_unwind boundary
 }

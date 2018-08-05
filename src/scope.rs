@@ -61,6 +61,7 @@ impl<'scope> Scope<'scope> {
         A: FromLuaMulti<'callback>,
         R: ToLuaMulti<'callback>,
         F: 'scope + Fn(&'callback Lua, A) -> Result<R>,
+        'scope: 'callback,
     {
         unsafe {
             let f = Box::new(move |lua, args| {
@@ -106,6 +107,7 @@ impl<'scope> Scope<'scope> {
         A: FromLuaMulti<'callback>,
         R: ToLuaMulti<'callback>,
         F: 'scope + FnMut(&'callback Lua, A) -> Result<R>,
+        'scope: 'callback,
     {
         let func = RefCell::new(func);
         self.create_function(move |lua, args| {
