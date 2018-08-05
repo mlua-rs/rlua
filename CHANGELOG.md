@@ -1,3 +1,9 @@
+## [0.14.1]
+- Update to require failure 0.1.2 and fix deprecation warnings.
+- Update embedded Lua to 5.3.5
+- Important soundness fix for `Lua::scope`, no longer allow callbacks created
+  from `Scope` to leak their parameters.
+
 ## [0.14.0]
 - Lots of performance improvements, including one major change: Lua handles no
   longer use the registry, they now instead are stored in an auxillary thread
