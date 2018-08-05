@@ -26,7 +26,7 @@ builtin-lua = ["cc"]
 
 [dependencies]
 libc = { version = "0.2" }
-failure = { version = "0.1.1" }
+failure = { version = "0.1.2" }
 compiletest_rs = { version = "0.3", optional = true }
 
 [build-dependencies]
