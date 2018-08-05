@@ -381,7 +381,7 @@ impl Lua {
 
     /// Coerces a Lua value to an integer.
     ///
-    /// The value must be an integer, or a floating point number or a string that can be converted
+    /// The value must be an integer, or a floating point number, or a string that can be converted
     /// to an integer. Refer to the Lua manual for details.
     pub fn coerce_integer(&self, v: Value) -> Result<Integer> {
         match v {

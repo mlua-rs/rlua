@@ -20,8 +20,8 @@ default = ["builtin-lua"]
 # assumptions about the linked lua library:
 #   * LUA_INTEGER is long long
 #   * LUA_NUMBER as double
-#   * LUA_EXTRASPACE is sizeof(void*)
-#   * LUAI_MAXSTACK is 1000000
+#   * LUA_EXTRASPACE is at least pointer sized and has at least pointer alignment.
+#   * LUAI_MAXSTACK is 1_000_000
 builtin-lua = ["cc"]
 
 [dependencies]

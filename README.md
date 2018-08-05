@@ -116,7 +116,7 @@ If you encounter them, a bug report would be very welcome:
     `cfg!(debug_assertions)` is true, Lua is built with the `LUA_USE_APICHECK`
     define set.  Any abort caused by this internal Lua API checking is
     *absolutely* a bug, particularly because without `LUA_USE_APICHECK` it would
-    generally be unsafe.
+    generally cause UB.
   * Lua C API errors are handled by lonjmp.  *ALL* instances where the Lua C API
     would longjmp should be protected from Rust, except in internal callbacks
     where this is intentional.  If you detect that `rlua` is triggering a
@@ -128,4 +128,4 @@ If you encounter them, a bug report would be very welcome:
     `rlua` instances are supposed to remain fully usable in the face of user
     triggered panics.  This guarantee does NOT extend to panics marked with
     "rlua internal error" simply because that is already indicative of a
-    separate bug, but it may be true in many cases anyway.
+    separate bug.
