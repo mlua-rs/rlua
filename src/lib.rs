@@ -44,36 +44,36 @@
 extern crate failure;
 extern crate libc;
 
-mod ffi;
 mod error;
+mod ffi;
 #[macro_use]
 mod macros;
-mod util;
-mod value;
-mod types;
-mod lua;
 mod conversion;
+mod function;
+mod lua;
 mod multi;
+mod scope;
 mod string;
 mod table;
-mod function;
 mod thread;
+mod types;
 mod userdata;
-mod scope;
+mod util;
+mod value;
 
 #[cfg(test)]
 mod tests;
 
 pub use error::{Error, ExternalError, ExternalResult, Result};
-pub use types::{Integer, LightUserData, Number, RegistryKey};
+pub use function::Function;
+pub use lua::Lua;
 pub use multi::Variadic;
+pub use scope::Scope;
 pub use string::String;
 pub use table::{Table, TablePairs, TableSequence};
-pub use function::Function;
 pub use thread::{Thread, ThreadStatus};
+pub use types::{Integer, LightUserData, Number, RegistryKey};
 pub use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 pub use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-pub use lua::Lua;
-pub use scope::Scope;
 
 pub mod prelude;

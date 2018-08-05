@@ -1,16 +1,16 @@
-use std::mem;
-use std::cell::RefCell;
 use std::any::Any;
+use std::cell::RefCell;
 use std::marker::PhantomData;
+use std::mem;
 
-use ffi;
 use error::{Error, Result};
+use ffi;
+use function::Function;
+use lua::Lua;
+use types::Callback;
+use userdata::{AnyUserData, UserData};
 use util::{assert_stack, take_userdata, StackGuard};
 use value::{FromLuaMulti, ToLuaMulti};
-use types::Callback;
-use lua::Lua;
-use function::Function;
-use userdata::{AnyUserData, UserData};
 
 /// Constructed by the [`Lua::scope`] method, allows temporarily passing to Lua userdata that is
 /// !Send, and callbacks that are !Send and not 'static.
@@ -109,7 +109,8 @@ impl<'scope> Scope<'scope> {
     {
         let func = RefCell::new(func);
         self.create_function(move |lua, args| {
-            (&mut *func.try_borrow_mut()
+            (&mut *func
+                .try_borrow_mut()
                 .map_err(|_| Error::RecursiveMutCallback)?)(lua, args)
         })
     }
@@ -148,7 +149,8 @@ impl<'scope> Drop for Scope<'scope> {
         // userdata type into two phases.  This is so that, in the event a userdata drop panics, we
         // can be sure that all of the userdata in Lua is actually invalidated.
 
-        let to_drop = self.destructors
+        let to_drop = self
+            .destructors
             .get_mut()
             .drain(..)
             .map(|destructor| destructor())

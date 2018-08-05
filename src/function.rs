@@ -1,10 +1,12 @@
-use std::ptr;
 use std::os::raw::c_int;
+use std::ptr;
 
-use ffi;
 use error::{Error, Result};
-use util::{assert_stack, check_stack, error_traceback, pop_error, protect_lua_closure, StackGuard};
+use ffi;
 use types::LuaRef;
+use util::{
+    assert_stack, check_stack, error_traceback, pop_error, protect_lua_closure, StackGuard,
+};
 use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
 /// Handle to an internal Lua function.

@@ -1,9 +1,9 @@
 use std::{slice, str};
 
-use ffi;
 use error::{Error, Result};
-use util::{assert_stack, StackGuard};
+use ffi;
 use types::LuaRef;
+use util::{assert_stack, StackGuard};
 
 /// Handle to an internal Lua string.
 ///

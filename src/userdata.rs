@@ -1,14 +1,14 @@
 use std::cell::{Ref, RefCell, RefMut};
-use std::marker::PhantomData;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::string::String as StdString;
 
-use ffi;
 use error::{Error, Result};
-use util::{assert_stack, get_userdata, StackGuard};
-use types::{Callback, LuaRef};
-use value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
+use ffi;
 use lua::Lua;
+use types::{Callback, LuaRef};
+use util::{assert_stack, get_userdata, StackGuard};
+use value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
 
 /// Kinds of metamethods that can be overridden.
 ///
@@ -403,7 +403,8 @@ impl<'lua> AnyUserData<'lua> {
     /// `UserDataTypeMismatch` if the userdata is not of type `T`.
     pub fn borrow_mut<T: UserData>(&self) -> Result<RefMut<T>> {
         self.inspect(|cell| {
-            Ok(cell.try_borrow_mut()
+            Ok(cell
+                .try_borrow_mut()
                 .map_err(|_| Error::UserDataBorrowMutError)?)
         })
     }

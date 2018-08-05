@@ -1,9 +1,9 @@
 use std::os::raw::c_int;
 
-use ffi;
 use error::{Error, Result};
-use util::{assert_stack, check_stack, error_traceback, pop_error, StackGuard};
+use ffi;
 use types::LuaRef;
+use util::{assert_stack, check_stack, error_traceback, pop_error, StackGuard};
 use value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
 /// Status of a Lua thread (or coroutine).

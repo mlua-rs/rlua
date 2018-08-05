@@ -5,15 +5,17 @@ mod thread;
 mod types;
 mod userdata;
 
-use std::{error, fmt};
-use std::iter::FromIterator;
-use std::rc::Rc;
 use std::cell::Cell;
-use std::sync::Arc;
+use std::iter::FromIterator;
 use std::panic::catch_unwind;
+use std::rc::Rc;
+use std::sync::Arc;
+use std::{error, fmt};
 
-use {Error, ExternalError, Function, Lua, Nil, Result, String, Table, UserData, UserDataMethods,
-     Value, Variadic};
+use {
+    Error, ExternalError, Function, Lua, Nil, Result, String, Table, UserData, UserDataMethods,
+    Value, Variadic,
+};
 
 #[test]
 fn test_load() {
@@ -51,8 +53,9 @@ fn test_exec() {
     ).unwrap();
     assert_eq!(globals.get::<_, String>("res").unwrap(), "foobar");
 
-    let module: Table = lua.exec(
-        r#"
+    let module: Table =
+        lua.exec(
+            r#"
             local module = {}
 
             function module.func()
@@ -61,8 +64,8 @@ fn test_exec() {
 
             return module
         "#,
-        None,
-    ).unwrap();
+            None,
+        ).unwrap();
     assert!(module.contains_key("func").unwrap());
     assert_eq!(
         module
@@ -214,9 +217,9 @@ fn test_error() {
         None,
     ).unwrap();
 
-    let rust_error_function = lua.create_function(|_, ()| -> Result<()> {
-        Err(TestError.to_lua_err())
-    }).unwrap();
+    let rust_error_function = lua
+        .create_function(|_, ()| -> Result<()> { Err(TestError.to_lua_err()) })
+        .unwrap();
     globals
         .set("rust_error_function", rust_error_function)
         .unwrap();
@@ -281,9 +284,9 @@ fn test_error() {
             "#,
             None,
         )?;
-        let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
-            panic!("test_panic")
-        }).unwrap();
+        let rust_panic_function = lua
+            .create_function(|_, ()| -> Result<()> { panic!("test_panic") })
+            .unwrap();
         globals.set("rust_panic_function", rust_panic_function)?;
 
         let rust_panic = globals.get::<_, Function>("rust_panic")?;
@@ -307,9 +310,9 @@ fn test_error() {
             "#,
             None,
         )?;
-        let rust_panic_function = lua.create_function(|_, ()| -> Result<()> {
-            panic!("test_panic")
-        }).unwrap();
+        let rust_panic_function = lua
+            .create_function(|_, ()| -> Result<()> { panic!("test_panic") })
+            .unwrap();
         globals.set("rust_panic_function", rust_panic_function)?;
 
         let rust_panic = globals.get::<_, Function>("rust_panic")?;
@@ -327,12 +330,14 @@ fn test_result_conversions() {
     let lua = Lua::new();
     let globals = lua.globals();
 
-    let err = lua.create_function(|_, ()| {
-        Ok(Err::<String, _>(
-            format_err!("only through failure can we succeed").to_lua_err(),
-        ))
-    }).unwrap();
-    let ok = lua.create_function(|_, ()| Ok(Ok::<_, Error>("!".to_owned())))
+    let err =
+        lua.create_function(|_, ()| {
+            Ok(Err::<String, _>(
+                format_err!("only through failure can we succeed").to_lua_err(),
+            ))
+        }).unwrap();
+    let ok = lua
+        .create_function(|_, ()| Ok(Ok::<_, Error>("!".to_owned())))
         .unwrap();
 
     globals.set("err", err).unwrap();
@@ -389,12 +394,14 @@ fn test_pcall_xpcall() {
 
     // Make sure that the return values from are correct on success
 
-    let (r, e) = lua.eval::<(bool, String)>("pcall(function(p) return p end, 'foo')", None)
+    let (r, e) = lua
+        .eval::<(bool, String)>("pcall(function(p) return p end, 'foo')", None)
         .unwrap();
     assert!(r);
     assert_eq!(e, "foo");
 
-    let (r, e) = lua.eval::<(bool, String)>("xpcall(function(p) return p end, print, 'foo')", None)
+    let (r, e) = lua
+        .eval::<(bool, String)>("xpcall(function(p) return p end, print, 'foo')", None)
         .unwrap();
     assert!(r);
     assert_eq!(e, "foo");
@@ -444,23 +451,26 @@ fn test_recursive_mut_callback_error() {
     let lua = Lua::new();
 
     let mut v = Some(Box::new(123));
-    let f = lua.create_function_mut::<_, (), _>(move |lua, mutate: bool| {
-        if mutate {
-            v = None;
-        } else {
-            // Produce a mutable reference
-            let r = v.as_mut().unwrap();
-            // Whoops, this will recurse into the function and produce another mutable reference!
-            lua.globals().get::<_, Function>("f")?.call::<_, ()>(true)?;
-            println!("Should not get here, mutable aliasing has occurred!");
-            println!("value at {:p}", r as *mut _);
-            println!("value is {}", r);
-        }
+    let f = lua
+        .create_function_mut::<_, (), _>(move |lua, mutate: bool| {
+            if mutate {
+                v = None;
+            } else {
+                // Produce a mutable reference
+                let r = v.as_mut().unwrap();
+                // Whoops, this will recurse into the function and produce another mutable reference!
+                lua.globals().get::<_, Function>("f")?.call::<_, ()>(true)?;
+                println!("Should not get here, mutable aliasing has occurred!");
+                println!("value at {:p}", r as *mut _);
+                println!("value is {}", r);
+            }
 
-        Ok(())
-    }).unwrap();
+            Ok(())
+        })
+        .unwrap();
     lua.globals().set("f", f).unwrap();
-    match lua.globals()
+    match lua
+        .globals()
         .get::<_, Function>("f")
         .unwrap()
         .call::<_, ()>(false)
@@ -516,10 +526,11 @@ fn test_named_registry_value() {
     let lua = Lua::new();
 
     lua.set_named_registry_value::<i32>("test", 42).unwrap();
-    let f = lua.create_function(move |lua, ()| {
-        assert_eq!(lua.named_registry_value::<i32>("test")?, 42);
-        Ok(())
-    }).unwrap();
+    let f =
+        lua.create_function(move |lua, ()| {
+            assert_eq!(lua.named_registry_value::<i32>("test")?, 42);
+            Ok(())
+        }).unwrap();
 
     f.call::<_, ()>(()).unwrap();
 
@@ -535,15 +546,16 @@ fn test_registry_value() {
     let lua = Lua::new();
 
     let mut r = Some(lua.create_registry_value::<i32>(42).unwrap());
-    let f = lua.create_function_mut(move |lua, ()| {
-        if let Some(r) = r.take() {
-            assert_eq!(lua.registry_value::<i32>(&r)?, 42);
-            lua.remove_registry_value(r).unwrap();
-        } else {
-            panic!();
-        }
-        Ok(())
-    }).unwrap();
+    let f =
+        lua.create_function_mut(move |lua, ()| {
+            if let Some(r) = r.take() {
+                assert_eq!(lua.registry_value::<i32>(&r)?, 42);
+                lua.remove_registry_value(r).unwrap();
+            } else {
+                panic!();
+            }
+            Ok(())
+        }).unwrap();
 
     f.call::<_, ()>(()).unwrap();
 }
@@ -628,7 +640,8 @@ fn scope_func() {
     assert_eq!(rc.get(), 42);
     assert_eq!(Rc::strong_count(&rc), 1);
 
-    match lua.globals()
+    match lua
+        .globals()
         .get::<_, Function>("bad")
         .unwrap()
         .call::<_, ()>(())
@@ -706,7 +719,8 @@ fn outer_lua_access() {
 #[test]
 fn too_many_returns() {
     let lua = Lua::new();
-    let f = lua.create_function(|_, ()| Ok(Variadic::from_iter(1..1000000)))
+    let f = lua
+        .create_function(|_, ()| Ok(Variadic::from_iter(1..1000000)))
         .unwrap();
     assert!(f.call::<_, Vec<u32>>(()).is_err());
 }
@@ -729,9 +743,9 @@ fn too_many_arguments() {
 fn too_many_recursions() {
     let lua = Lua::new();
 
-    let f = lua.create_function(move |lua, ()| {
-        lua.globals().get::<_, Function>("f")?.call::<_, ()>(())
-    }).unwrap();
+    let f = lua
+        .create_function(move |lua, ()| lua.globals().get::<_, Function>("f")?.call::<_, ()>(()))
+        .unwrap();
     lua.globals().set("f", f).unwrap();
 
     assert!(
@@ -783,14 +797,15 @@ fn large_args() {
         )
         .unwrap();
 
-    let f: Function = lua.eval(
-        r#"
+    let f: Function =
+        lua.eval(
+            r#"
             return function(...)
                 return c(...)
             end
         "#,
-        None,
-    ).unwrap();
+            None,
+        ).unwrap();
 
     assert_eq!(
         f.call::<_, usize>((0..100).collect::<Variadic<usize>>())
@@ -803,12 +818,13 @@ fn large_args() {
 fn large_args_ref() {
     let lua = Lua::new();
 
-    let f = lua.create_function(|_, args: Variadic<String>| {
-        for i in 0..args.len() {
-            assert_eq!(args[i], i.to_string());
-        }
-        Ok(())
-    }).unwrap();
+    let f =
+        lua.create_function(|_, args: Variadic<String>| {
+            for i in 0..args.len() {
+                assert_eq!(args[i], i.to_string());
+            }
+            Ok(())
+        }).unwrap();
 
     f.call::<_, ()>((0..100).map(|i| i.to_string()).collect::<Variadic<_>>())
         .unwrap();

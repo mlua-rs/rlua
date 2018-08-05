@@ -5,8 +5,10 @@ use {Error, Function, Lua, Result, Thread, ThreadStatus};
 #[test]
 fn test_thread() {
     let lua = Lua::new();
-    let thread = lua.create_thread(lua.eval::<Function>(
-        r#"
+    let thread =
+        lua.create_thread(
+            lua.eval::<Function>(
+                r#"
                 function (s)
                     local sum = s
                     for i = 1,4 do
@@ -15,9 +17,9 @@ fn test_thread() {
                     return sum
                 end
             "#,
-        None,
-    ).unwrap())
-        .unwrap();
+                None,
+            ).unwrap(),
+        ).unwrap();
 
     assert_eq!(thread.status(), ThreadStatus::Resumable);
     assert_eq!(thread.resume::<_, i64>(0).unwrap(), 0);
@@ -31,17 +33,19 @@ fn test_thread() {
     assert_eq!(thread.resume::<_, i64>(4).unwrap(), 10);
     assert_eq!(thread.status(), ThreadStatus::Unresumable);
 
-    let accumulate = lua.create_thread(lua.eval::<Function>(
-        r#"
+    let accumulate =
+        lua.create_thread(
+            lua.eval::<Function>(
+                r#"
                 function (sum)
                     while true do
                         sum = sum + coroutine.yield(sum)
                     end
                 end
             "#,
-        None,
-    ).unwrap())
-        .unwrap();
+                None,
+            ).unwrap(),
+        ).unwrap();
 
     for i in 0..4 {
         accumulate.resume::<_, ()>(i).unwrap();
@@ -51,21 +55,23 @@ fn test_thread() {
     assert!(accumulate.resume::<_, ()>("error").is_err());
     assert_eq!(accumulate.status(), ThreadStatus::Error);
 
-    let thread = lua.eval::<Thread>(
-        r#"
+    let thread =
+        lua.eval::<Thread>(
+            r#"
                 coroutine.create(function ()
                     while true do
                         coroutine.yield(42)
                     end
                 end)
             "#,
-        None,
-    ).unwrap();
+            None,
+        ).unwrap();
     assert_eq!(thread.status(), ThreadStatus::Resumable);
     assert_eq!(thread.resume::<_, i64>(()).unwrap(), 42);
 
-    let thread: Thread = lua.eval(
-        r#"
+    let thread: Thread =
+        lua.eval(
+            r#"
                 coroutine.create(function(arg)
                     assert(arg == 42)
                     local yieldarg = coroutine.yield(123)
@@ -73,8 +79,8 @@ fn test_thread() {
                     return 987
                 end)
             "#,
-        None,
-    ).unwrap();
+            None,
+        ).unwrap();
 
     assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);
     assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);

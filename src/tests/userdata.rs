@@ -131,8 +131,9 @@ fn test_gc_userdata() {
         globals.set("userdata", MyUserdata { id: 123 }).unwrap();
     }
 
-    assert!(lua.eval::<()>(
-        r#"
+    assert!(
+        lua.eval::<()>(
+            r#"
                 local tbl = setmetatable({
                     userdata = userdata
                 }, { __gc = function(self)
@@ -145,8 +146,9 @@ fn test_gc_userdata() {
                 collectgarbage("collect")
                 hatch:access()
             "#,
-        None
-    ).is_err());
+            None
+        ).is_err()
+    );
 }
 
 #[test]

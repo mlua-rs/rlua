@@ -1,28 +1,29 @@
-use std::{mem, ptr, str};
-use std::sync::{Arc, Mutex};
-use std::cell::{RefCell, UnsafeCell};
-use std::ffi::CString;
 use std::any::TypeId;
-use std::marker::PhantomData;
+use std::cell::{RefCell, UnsafeCell};
 use std::collections::HashMap;
+use std::ffi::CString;
+use std::marker::PhantomData;
 use std::os::raw::{c_char, c_int, c_void};
+use std::sync::{Arc, Mutex};
+use std::{mem, ptr, str};
 
 use libc;
 
-use ffi;
 use error::{Error, Result};
-use util::{assert_stack, callback_error, check_stack, gc_guard, get_userdata, get_wrapped_error,
-           init_error_metatables, main_state, pop_error, protect_lua, protect_lua_closure,
-           push_string, push_userdata, push_wrapped_error, safe_pcall, safe_xpcall,
-           userdata_destructor, StackGuard};
-use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-use types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
+use ffi;
+use function::Function;
+use scope::Scope;
 use string::String;
 use table::Table;
-use function::Function;
 use thread::Thread;
+use types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
 use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
-use scope::Scope;
+use util::{
+    assert_stack, callback_error, check_stack, gc_guard, get_userdata, get_wrapped_error,
+    init_error_metatables, main_state, pop_error, protect_lua, protect_lua_closure, push_string,
+    push_userdata, push_wrapped_error, safe_pcall, safe_xpcall, userdata_destructor, StackGuard,
+};
+use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
@@ -285,7 +286,8 @@ impl Lua {
     {
         let func = RefCell::new(func);
         self.create_function(move |lua, args| {
-            (&mut *func.try_borrow_mut()
+            (&mut *func
+                .try_borrow_mut()
                 .map_err(|_| Error::RecursiveMutCallback)?)(lua, args)
         })
     }

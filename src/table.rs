@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 use std::os::raw::c_int;
 
-use ffi;
 use error::Result;
-use util::{assert_stack, protect_lua, protect_lua_closure, StackGuard};
+use ffi;
 use types::{Integer, LuaRef};
+use util::{assert_stack, protect_lua, protect_lua_closure, StackGuard};
 use value::{FromLua, Nil, ToLua, Value};
 
 /// Handle to an internal Lua table.

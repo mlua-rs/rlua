@@ -2,9 +2,9 @@
 #![allow(non_snake_case)]
 #![allow(unused)]
 
-use std::ptr;
 use std::mem;
 use std::os::raw::{c_char, c_double, c_int, c_longlong, c_uchar, c_void};
+use std::ptr;
 
 pub type lua_Integer = c_longlong;
 pub type lua_Number = c_double;

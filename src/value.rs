@@ -1,14 +1,14 @@
-use std::{slice, str, vec};
 use std::iter::{self, FromIterator};
+use std::{slice, str, vec};
 
 use error::{Error, Result};
-use types::{Integer, LightUserData, Number};
+use function::Function;
+use lua::Lua;
 use string::String;
 use table::Table;
-use function::Function;
 use thread::Thread;
+use types::{Integer, LightUserData, Number};
 use userdata::AnyUserData;
-use lua::Lua;
 
 /// A dynamically typed Lua value.  The `String`, `Table`, `Function`, `Thread`, and `UserData`
 /// variants contain handle types into the internal Lua state.  It is a logic error to mix handle

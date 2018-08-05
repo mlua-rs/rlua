@@ -1,10 +1,10 @@
-use std::ops::{Deref, DerefMut};
 use std::iter::FromIterator;
+use std::ops::{Deref, DerefMut};
 use std::result::Result as StdResult;
 
 use error::Result;
-use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti};
 use lua::Lua;
+use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti};
 
 /// Result is convertible to `MultiValue` following the common Lua idiom of returning the result
 /// on success, or in the case of an error, returning `nil` and an error message.

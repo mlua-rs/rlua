@@ -1,11 +1,11 @@
-use std::{fmt, mem, ptr};
 use std::os::raw::{c_int, c_void};
 use std::sync::{Arc, Mutex};
+use std::{fmt, mem, ptr};
 
-use ffi;
 use error::Result;
-use value::MultiValue;
+use ffi;
 use lua::Lua;
+use value::MultiValue;
 
 /// Type of Lua integer numbers.
 pub type Integer = ffi::lua_Integer;

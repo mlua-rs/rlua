@@ -3,14 +3,14 @@ use std::hash::{BuildHasher, Hash};
 use std::string::String as StdString;
 
 use error::{Error, Result};
-use types::{Integer, LightUserData, Number};
+use function::Function;
+use lua::Lua;
 use string::String;
 use table::Table;
-use userdata::{AnyUserData, UserData};
-use function::Function;
 use thread::Thread;
+use types::{Integer, LightUserData, Number};
+use userdata::{AnyUserData, UserData};
 use value::{FromLua, Nil, ToLua, Value};
-use lua::Lua;
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {
@@ -204,7 +204,7 @@ impl<'lua, 'a> ToLua<'lua> for &'a str {
 }
 
 macro_rules! lua_convert_int {
-    ($x: ty) => {
+    ($x:ty) => {
         impl<'lua> ToLua<'lua> for $x {
             fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {
                 Ok(Value::Integer(self as Integer))
@@ -216,7 +216,7 @@ macro_rules! lua_convert_int {
                 Ok(lua.coerce_integer(value)? as $x)
             }
         }
-    }
+    };
 }
 
 lua_convert_int!(i8);
@@ -231,7 +231,7 @@ lua_convert_int!(isize);
 lua_convert_int!(usize);
 
 macro_rules! lua_convert_float {
-    ($x: ty) => {
+    ($x:ty) => {
         impl<'lua> ToLua<'lua> for $x {
             fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {
                 Ok(Value::Number(self as Number))
@@ -243,7 +243,7 @@ macro_rules! lua_convert_float {
                 Ok(lua.coerce_number(value)? as $x)
             }
         }
-    }
+    };
 }
 
 lua_convert_float!(f32);

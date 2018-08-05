@@ -1,12 +1,12 @@
-use std::{mem, ptr};
-use std::sync::Arc;
-use std::ffi::CStr;
 use std::any::Any;
+use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_void};
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
+use std::sync::Arc;
+use std::{mem, ptr};
 
-use ffi;
 use error::{Error, Result};
+use ffi;
 
 // Checks that Lua has enough free stack space for future stack operations.  On failure, this will
 // panic with an internal error message.

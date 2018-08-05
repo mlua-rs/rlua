@@ -58,14 +58,15 @@ fn call_add_function(c: &mut Criterion) {
             || {
                 let lua = Lua::new();
                 let f = {
-                    let f: LuaFunction = lua.eval(
-                        r#"
+                    let f: LuaFunction =
+                        lua.eval(
+                            r#"
                             function(a, b, c)
                                 return a + b + c
                             end
                         "#,
-                        None,
-                    ).unwrap();
+                            None,
+                        ).unwrap();
                     lua.create_registry_value(f).unwrap()
                 };
                 (lua, f)
@@ -89,20 +90,21 @@ fn call_add_callback(c: &mut Criterion) {
             || {
                 let lua = Lua::new();
                 let f = {
-                    let c: LuaFunction = lua.create_function(|_, (a, b, c): (i64, i64, i64)| {
-                        Ok(a + b + c)
-                    }).unwrap();
+                    let c: LuaFunction = lua
+                        .create_function(|_, (a, b, c): (i64, i64, i64)| Ok(a + b + c))
+                        .unwrap();
                     lua.globals().set("callback", c).unwrap();
-                    let f: LuaFunction = lua.eval(
-                        r#"
+                    let f: LuaFunction =
+                        lua.eval(
+                            r#"
                             function()
                                 for i = 1,10 do
                                     callback(i, i, i)
                                 end
                             end
                         "#,
-                        None,
-                    ).unwrap();
+                            None,
+                        ).unwrap();
                     lua.create_registry_value(f).unwrap()
                 };
                 (lua, f)
@@ -129,16 +131,17 @@ fn call_append_callback(c: &mut Criterion) {
                             Ok(format!("{}{}", a.to_str()?, b.to_str()?))
                         }).unwrap();
                     lua.globals().set("callback", c).unwrap();
-                    let f: LuaFunction = lua.eval(
-                        r#"
+                    let f: LuaFunction =
+                        lua.eval(
+                            r#"
                             function()
                                 for _ = 1,10 do
                                     callback("a", "b")
                                 end
                             end
                         "#,
-                        None,
-                    ).unwrap();
+                            None,
+                        ).unwrap();
                     lua.create_registry_value(f).unwrap()
                 };
                 (lua, f)
