@@ -11,8 +11,11 @@ fn main() {
     lua.scope(|scope| {
         let mut inner: Option<Table> = None;
         let f = scope
-            .create_function_mut(|_, t: Table| {
+            .create_function_mut(move |lua, t: Table| {
                 //~^ error: cannot infer an appropriate lifetime for autoref due to conflicting requirements
+                if let Some(old) = inner.take() {
+                    // Access old callback `Lua`.
+                }
                 inner = Some(t);
                 Ok(())
             })

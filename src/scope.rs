@@ -43,15 +43,15 @@ impl<'scope> Scope<'scope> {
     /// [`Lua::scope`]: struct.Lua.html#method.scope
     pub fn create_function<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'scope>,
-        R: ToLuaMulti<'scope>,
-        F: 'scope + Fn(&'scope Lua, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'scope + Fn(&'lua Lua, A) -> Result<R>,
     {
         unsafe {
             let f = Box::new(move |lua, args| {
                 func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             });
-            let f = mem::transmute::<Callback<'scope, 'scope>, Callback<'scope, 'static>>(f);
+            let f = mem::transmute::<Callback<'lua, 'scope>, Callback<'lua, 'static>>(f);
             let f = self.lua.create_callback(f)?;
 
             let mut destructors = self.destructors.borrow_mut();
@@ -85,9 +85,9 @@ impl<'scope> Scope<'scope> {
     /// [`Scope::create_function`]: #method.create_function
     pub fn create_function_mut<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'scope>,
-        R: ToLuaMulti<'scope>,
-        F: 'scope + FnMut(&'scope Lua, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'scope + FnMut(&'lua Lua, A) -> Result<R>,
     {
         let func = RefCell::new(func);
         self.create_function(move |lua, args| {
