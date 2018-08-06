@@ -1,3 +1,9 @@
+## [0.14.2]
+- Another soundness fix for `Lua::scope` that is related to the last soundness
+  fix, forbidding capturing 'lua arguments inside callbacks.  This, like the
+  previous fix, is a breaking change, but anything that it breaks was *probably*
+  unsound.
+
 ## [0.14.1]
 - Update to require failure 0.1.2 and fix deprecation warnings.
 - Update embedded Lua to 5.3.5
