@@ -6,6 +6,6 @@ matrix:
     - rust: stable
     - rust: beta
     - rust: nightly 
-      script: cargo test --features compiletest_rs
+      script: cargo test --all --verbose --features compiletest_rs
   allow_failures:
     - rust: nightly
