@@ -195,20 +195,20 @@ macro_rules! push_reverse {
     ($multi_value:expr,) => ();
 }
 
-impl_tuple!{}
-impl_tuple!{A}
-impl_tuple!{A B}
-impl_tuple!{A B C}
-impl_tuple!{A B C D}
-impl_tuple!{A B C D E}
-impl_tuple!{A B C D E F}
-impl_tuple!{A B C D E F G}
-impl_tuple!{A B C D E F G H}
-impl_tuple!{A B C D E F G H I}
-impl_tuple!{A B C D E F G H I J}
-impl_tuple!{A B C D E F G H I J K}
-impl_tuple!{A B C D E F G H I J K L}
-impl_tuple!{A B C D E F G H I J K L M}
-impl_tuple!{A B C D E F G H I J K L M N}
-impl_tuple!{A B C D E F G H I J K L M N O}
-impl_tuple!{A B C D E F G H I J K L M N O P}
+impl_tuple!();
+impl_tuple!(A);
+impl_tuple!(A B);
+impl_tuple!(A B C);
+impl_tuple!(A B C D);
+impl_tuple!(A B C D E);
+impl_tuple!(A B C D E F);
+impl_tuple!(A B C D E F G);
+impl_tuple!(A B C D E F G H);
+impl_tuple!(A B C D E F G H I);
+impl_tuple!(A B C D E F G H I J);
+impl_tuple!(A B C D E F G H I J K);
+impl_tuple!(A B C D E F G H I J K L);
+impl_tuple!(A B C D E F G H I J K L M);
+impl_tuple!(A B C D E F G H I J K L M N);
+impl_tuple!(A B C D E F G H I J K L M N O);
+impl_tuple!(A B C D E F G H I J K L M N O P);
