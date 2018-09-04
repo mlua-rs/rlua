@@ -112,13 +112,13 @@ impl<'lua> FromLua<'lua> for AnyUserData<'lua> {
     }
 }
 
-impl<'lua, T: Send + UserData> ToLua<'lua> for T {
+impl<'lua, T: 'static + Send + UserData> ToLua<'lua> for T {
     fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>> {
         Ok(Value::UserData(lua.create_userdata(self)?))
     }
 }
 
-impl<'lua, T: UserData + Clone> FromLua<'lua> for T {
+impl<'lua, T: 'static + UserData + Clone> FromLua<'lua> for T {
     fn from_lua(value: Value<'lua>, _: &'lua Lua) -> Result<T> {
         match value {
             Value::UserData(ud) => Ok(ud.borrow::<T>()?.clone()),

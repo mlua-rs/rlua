@@ -1,281 +1,11 @@
 use std::cell::{Ref, RefCell, RefMut};
-use std::collections::HashMap;
-use std::marker::PhantomData;
-use std::string::String as StdString;
 
 use error::{Error, Result};
 use ffi;
-use lua::Lua;
-use types::{Callback, LuaRef};
+use methods::UserDataMethods;
+use types::LuaRef;
 use util::{assert_stack, get_userdata, StackGuard};
-use value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
-
-/// Kinds of metamethods that can be overridden.
-///
-/// Currently, this mechanism does not allow overriding the `__gc` metamethod, since there is
-/// generally no need to do so: [`UserData`] implementors can instead just implement `Drop`.
-///
-/// [`UserData`]: trait.UserData.html
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum MetaMethod {
-    /// The `+` operator.
-    Add,
-    /// The `-` operator.
-    Sub,
-    /// The `*` operator.
-    Mul,
-    /// The `/` operator.
-    Div,
-    /// The `%` operator.
-    Mod,
-    /// The `^` operator.
-    Pow,
-    /// The unary minus (`-`) operator.
-    Unm,
-    /// The floor division (//) operator.
-    IDiv,
-    /// The bitwise AND (&) operator.
-    BAnd,
-    /// The bitwise OR (|) operator.
-    BOr,
-    /// The bitwise XOR (binary ~) operator.
-    BXor,
-    /// The bitwise NOT (unary ~) operator.
-    BNot,
-    /// The bitwise left shift (<<) operator.
-    Shl,
-    /// The bitwise right shift (>>) operator.
-    Shr,
-    /// The string concatenation operator `..`.
-    Concat,
-    /// The length operator `#`.
-    Len,
-    /// The `==` operator.
-    Eq,
-    /// The `<` operator.
-    Lt,
-    /// The `<=` operator.
-    Le,
-    /// Index access `obj[key]`.
-    Index,
-    /// Index write access `obj[key] = value`.
-    NewIndex,
-    /// The call "operator" `obj(arg1, args2, ...)`.
-    Call,
-    /// The `__tostring` metamethod.
-    ///
-    /// This is not an operator, but will be called by methods such as `tostring` and `print`.
-    ToString,
-}
-
-/// Method registry for [`UserData`] implementors.
-///
-/// [`UserData`]: trait.UserData.html
-pub struct UserDataMethods<'lua, T> {
-    pub(crate) methods: HashMap<StdString, Callback<'lua, 'static>>,
-    pub(crate) meta_methods: HashMap<MetaMethod, Callback<'lua, 'static>>,
-    pub(crate) _type: PhantomData<T>,
-}
-
-impl<'lua, T: UserData> UserDataMethods<'lua, T> {
-    /// Add a method which accepts a `&T` as the first parameter.
-    ///
-    /// Regular methods are implemented by overriding the `__index` metamethod and returning the
-    /// accessed method. This allows them to be used with the expected `userdata:method()` syntax.
-    ///
-    /// If `add_meta_method` is used to set the `__index` metamethod, the `__index` metamethod will
-    /// be used as a fall-back if no regular method is found.
-    pub fn add_method<A, R, M>(&mut self, name: &str, method: M)
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
-    {
-        self.methods
-            .insert(name.to_owned(), Self::box_method(method));
-    }
-
-    /// Add a regular method which accepts a `&mut T` as the first parameter.
-    ///
-    /// Refer to [`add_method`] for more information about the implementation.
-    ///
-    /// [`add_method`]: #method.add_method
-    pub fn add_method_mut<A, R, M>(&mut self, name: &str, method: M)
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
-    {
-        self.methods
-            .insert(name.to_owned(), Self::box_method_mut(method));
-    }
-
-    /// Add a regular method as a function which accepts generic arguments, the first argument will
-    /// always be a `UserData` of type T.
-    ///
-    /// Prefer to use [`add_method`] or [`add_method_mut`] as they are easier to use.
-    ///
-    /// [`add_method`]: #method.add_method
-    /// [`add_method_mut`]: #method.add_method_mut
-    pub fn add_function<A, R, F>(&mut self, name: &str, function: F)
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
-    {
-        self.methods
-            .insert(name.to_owned(), Self::box_function(function));
-    }
-
-    /// Add a regular method as a mutable function which accepts generic arguments, the first
-    /// argument will always be a `UserData` of type T.
-    ///
-    /// This is a version of [`add_function`] that accepts a FnMut argument.
-    ///
-    /// [`add_function`]: #method.add_function
-    pub fn add_function_mut<A, R, F>(&mut self, name: &str, function: F)
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
-    {
-        self.methods
-            .insert(name.to_owned(), Self::box_function_mut(function));
-    }
-
-    /// Add a metamethod which accepts a `&T` as the first parameter.
-    ///
-    /// # Note
-    ///
-    /// This can cause an error with certain binary metamethods that can trigger if only the right
-    /// side has a metatable. To prevent this, use [`add_meta_function`].
-    ///
-    /// [`add_meta_function`]: #method.add_meta_function
-    pub fn add_meta_method<A, R, M>(&mut self, meta: MetaMethod, method: M)
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
-    {
-        self.meta_methods.insert(meta, Self::box_method(method));
-    }
-
-    /// Add a metamethod as a function which accepts a `&mut T` as the first parameter.
-    ///
-    /// # Note
-    ///
-    /// This can cause an error with certain binary metamethods that can trigger if only the right
-    /// side has a metatable. To prevent this, use [`add_meta_function`].
-    ///
-    /// [`add_meta_function`]: #method.add_meta_function
-    pub fn add_meta_method_mut<A, R, M>(&mut self, meta: MetaMethod, method: M)
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
-    {
-        self.meta_methods.insert(meta, Self::box_method_mut(method));
-    }
-
-    /// Add a metamethod which accepts generic arguments.
-    ///
-    /// Metamethods for binary operators can be triggered if either the left or right argument to
-    /// the binary operator has a metatable, so the first argument here is not necessarily a
-    /// userdata of type `T`.
-    pub fn add_meta_function<A, R, F>(&mut self, meta: MetaMethod, function: F)
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
-    {
-        self.meta_methods.insert(meta, Self::box_function(function));
-    }
-
-    /// Add a metamethod as a mutable function which accepts generic arguments.
-    ///
-    /// This is a version of [`add_meta_function`] that accepts a FnMut argument.
-    ///
-    /// [`add_meta_function`]: #method.add_meta_function
-    pub fn add_meta_function_mut<A, R, F>(&mut self, meta: MetaMethod, function: F)
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
-    {
-        self.meta_methods
-            .insert(meta, Self::box_function_mut(function));
-    }
-
-    fn box_function<A, R, F>(function: F) -> Callback<'lua, 'static>
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
-    {
-        Box::new(move |lua, args| function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua))
-    }
-
-    fn box_function_mut<A, R, F>(function: F) -> Callback<'lua, 'static>
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
-    {
-        let function = RefCell::new(function);
-        Box::new(move |lua, args| {
-            let function = &mut *function
-                .try_borrow_mut()
-                .map_err(|_| Error::RecursiveMutCallback)?;
-            function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-        })
-    }
-
-    fn box_method<A, R, M>(method: M) -> Callback<'lua, 'static>
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
-    {
-        Box::new(move |lua, mut args| {
-            if let Some(front) = args.pop_front() {
-                let userdata = AnyUserData::from_lua(front, lua)?;
-                let userdata = userdata.borrow::<T>()?;
-                method(lua, &userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-            } else {
-                Err(Error::FromLuaConversionError {
-                    from: "missing argument",
-                    to: "userdata",
-                    message: None,
-                })
-            }
-        })
-    }
-
-    fn box_method_mut<A, R, M>(method: M) -> Callback<'lua, 'static>
-    where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
-    {
-        let method = RefCell::new(method);
-        Box::new(move |lua, mut args| {
-            if let Some(front) = args.pop_front() {
-                let userdata = AnyUserData::from_lua(front, lua)?;
-                let mut userdata = userdata.borrow_mut::<T>()?;
-                let mut method = method
-                    .try_borrow_mut()
-                    .map_err(|_| Error::RecursiveMutCallback)?;
-                (&mut *method)(lua, &mut userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-            } else {
-                Err(Error::FromLuaConversionError {
-                    from: "missing argument",
-                    to: "userdata",
-                    message: None,
-                })
-            }
-        })
-    }
-}
+use value::{FromLua, ToLua};
 
 /// Trait for custom userdata types.
 ///
@@ -315,7 +45,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 /// struct MyUserData(i32);
 ///
 /// impl UserData for MyUserData {
-///     fn add_methods(methods: &mut UserDataMethods<Self>) {
+///     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
 ///         methods.add_method("get", |_, this, _: ()| {
 ///             Ok(this.0)
 ///         });
@@ -350,10 +80,10 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> {
 ///
 /// [`ToLua`]: trait.ToLua.html
 /// [`FromLua`]: trait.FromLua.html
-/// [`UserDataMethods`]: struct.UserDataMethods.html
-pub trait UserData: 'static + Sized {
+/// [`UserDataMethods`]: trait.UserDataMethods.html
+pub trait UserData: Sized {
     /// Adds custom methods and operators specific to this userdata.
-    fn add_methods(_methods: &mut UserDataMethods<Self>) {}
+    fn add_methods<'lua, T: UserDataMethods<'lua, Self>>(_methods: &mut T) {}
 }
 
 /// Handle to an internal Lua userdata for any type that implements [`UserData`].
@@ -377,11 +107,11 @@ pub struct AnyUserData<'lua>(pub(crate) LuaRef<'lua>);
 
 impl<'lua> AnyUserData<'lua> {
     /// Checks whether the type of this userdata is `T`.
-    pub fn is<T: UserData>(&self) -> Result<bool> {
+    pub fn is<T: 'static + UserData>(&self) -> bool {
         match self.inspect(|_: &RefCell<T>| Ok(())) {
-            Ok(()) => Ok(true),
-            Err(Error::UserDataTypeMismatch) => Ok(false),
-            Err(err) => Err(err),
+            Ok(()) => true,
+            Err(Error::UserDataTypeMismatch) => false,
+            Err(_) => unreachable!(),
         }
     }
 
@@ -391,7 +121,7 @@ impl<'lua> AnyUserData<'lua> {
     ///
     /// Returns a `UserDataBorrowError` if the userdata is already mutably borrowed. Returns a
     /// `UserDataTypeMismatch` if the userdata is not of type `T`.
-    pub fn borrow<T: UserData>(&self) -> Result<Ref<T>> {
+    pub fn borrow<T: 'static + UserData>(&self) -> Result<Ref<T>> {
         self.inspect(|cell| Ok(cell.try_borrow().map_err(|_| Error::UserDataBorrowError)?))
     }
 
@@ -401,7 +131,7 @@ impl<'lua> AnyUserData<'lua> {
     ///
     /// Returns a `UserDataBorrowMutError` if the userdata is already borrowed. Returns a
     /// `UserDataTypeMismatch` if the userdata is not of type `T`.
-    pub fn borrow_mut<T: UserData>(&self) -> Result<RefMut<T>> {
+    pub fn borrow_mut<T: 'static + UserData>(&self) -> Result<RefMut<T>> {
         self.inspect(|cell| {
             Ok(cell
                 .try_borrow_mut()
@@ -444,7 +174,7 @@ impl<'lua> AnyUserData<'lua> {
 
     fn inspect<'a, T, R, F>(&'a self, func: F) -> Result<R>
     where
-        T: UserData,
+        T: 'static + UserData,
         F: FnOnce(&'a RefCell<T>) -> Result<R>,
     {
         unsafe {

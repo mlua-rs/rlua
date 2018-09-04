@@ -15,10 +15,10 @@ fn test_user_data() {
     let userdata1 = lua.create_userdata(UserData1(1)).unwrap();
     let userdata2 = lua.create_userdata(UserData2(Box::new(2))).unwrap();
 
-    assert!(userdata1.is::<UserData1>().unwrap());
-    assert!(!userdata1.is::<UserData2>().unwrap());
-    assert!(userdata2.is::<UserData2>().unwrap());
-    assert!(!userdata2.is::<UserData1>().unwrap());
+    assert!(userdata1.is::<UserData1>());
+    assert!(!userdata1.is::<UserData2>());
+    assert!(userdata2.is::<UserData2>());
+    assert!(!userdata2.is::<UserData1>());
 
     assert_eq!(userdata1.borrow::<UserData1>().unwrap().0, 1);
     assert_eq!(*userdata2.borrow::<UserData2>().unwrap().0, 2);
@@ -29,7 +29,7 @@ fn test_methods() {
     struct MyUserData(i64);
 
     impl UserData for MyUserData {
-        fn add_methods(methods: &mut UserDataMethods<Self>) {
+        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
             methods.add_method("get_value", |_, data, ()| Ok(data.0));
             methods.add_method_mut("set_value", |_, data, args| {
                 data.0 = args;
@@ -69,7 +69,7 @@ fn test_metamethods() {
     struct MyUserData(i64);
 
     impl UserData for MyUserData {
-        fn add_methods(methods: &mut UserDataMethods<Self>) {
+        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
             methods.add_method("get", |_, data, ()| Ok(data.0));
             methods.add_meta_function(
                 MetaMethod::Add,
@@ -117,7 +117,7 @@ fn test_gc_userdata() {
     }
 
     impl UserData for MyUserdata {
-        fn add_methods(methods: &mut UserDataMethods<Self>) {
+        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
             methods.add_method("access", |_, this, ()| {
                 assert!(this.id == 123);
                 Ok(())

@@ -2,15 +2,21 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::mem;
+use std::os::raw::c_void;
+use std::rc::Rc;
 
 use error::{Error, Result};
 use ffi;
 use function::Function;
 use lua::Lua;
+use methods::{meta_method_name, NonStaticMethod, NonStaticUserDataMethods};
 use types::Callback;
 use userdata::{AnyUserData, UserData};
-use util::{assert_stack, take_userdata, StackGuard};
-use value::{FromLuaMulti, ToLuaMulti};
+use util::{
+    assert_stack, init_userdata_metatable, protect_lua_closure, push_string, push_userdata,
+    take_userdata, StackGuard,
+};
+use value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 
 /// Constructed by the [`Lua::scope`] method, allows temporarily passing to Lua userdata that is
 /// !Send, and callbacks that are !Send and not 'static.
@@ -48,30 +54,9 @@ impl<'scope> Scope<'scope> {
         F: 'scope + Fn(&'lua Lua, A) -> Result<R>,
     {
         unsafe {
-            let f = Box::new(move |lua, args| {
+            self.create_callback(Box::new(move |lua, args| {
                 func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
-            });
-            let f = mem::transmute::<Callback<'lua, 'scope>, Callback<'lua, 'static>>(f);
-            let f = self.lua.create_callback(f)?;
-
-            let mut destructors = self.destructors.borrow_mut();
-            let f_destruct = f.0.clone();
-            destructors.push(Box::new(move || {
-                let state = f_destruct.lua.state;
-                let _sg = StackGuard::new(state);
-                assert_stack(state, 2);
-                f_destruct.lua.push_ref(&f_destruct);
-
-                ffi::lua_getupvalue(state, -1, 1);
-                let ud = take_userdata::<Callback>(state);
-
-                ffi::lua_pushnil(state);
-                ffi::lua_setupvalue(state, -2, 1);
-
-                ffi::lua_pop(state, 1);
-                Box::new(ud)
-            }));
-            Ok(f)
+            }))
         }
     }
 
@@ -100,14 +85,14 @@ impl<'scope> Scope<'scope> {
     /// Create a Lua userdata object from a custom userdata type.
     ///
     /// This is a version of [`Lua::create_userdata`] that creates a userdata which expires on scope
-    /// drop, and does not require that the userdata type be Send.  See [`Lua::scope`] for more
-    /// details.
+    /// drop, and does not require that the userdata type be Send (but still requires that the
+    /// UserData be 'static).  See [`Lua::scope`] for more details.
     ///
     /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
     /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_userdata<'lua, T>(&'lua self, data: T) -> Result<AnyUserData<'lua>>
+    pub fn create_static_userdata<'lua, T>(&'lua self, data: T) -> Result<AnyUserData<'lua>>
     where
-        T: UserData,
+        T: 'static + UserData,
     {
         unsafe {
             let u = self.lua.make_userdata(data)?;
@@ -122,6 +107,196 @@ impl<'scope> Scope<'scope> {
             }));
             Ok(u)
         }
+    }
+
+    /// Create a Lua userdata object from a custom userdata type.
+    ///
+    /// This is a version of [`Lua::create_userdata`] that creates a userdata which expires on scope
+    /// drop, and does not require that the userdata type be Send or 'static. See [`Lua::scope`] for
+    /// more details.
+    ///
+    /// Lifting the requirement that the UserData type be 'static comes with some important
+    /// limitations, so if you only need to eliminate the Send requirement, it is probably better to
+    /// use [`Scope::create_static_userdata`] instead.
+    ///
+    /// The main limitation that comes from using non-'static userdata is that the produced userdata
+    /// will no longer have a `TypeId` associated with it, becuase `TypeId` can only work for
+    /// 'static types.  This means that it is impossible, once the userdata is created, to get a
+    /// reference to it back *out* of an `AnyUserData` handle.  This also implies that the
+    /// "function" type methods that can be added via [`UserDataMethods`] (the ones that accept
+    /// `AnyUserData` as a first parameter) are vastly less useful.  Also, there is no way to re-use
+    /// a single metatable for multiple non-'static types, so there is a higher cost associated with
+    /// creating the userdata metatable each time a new userdata is created.
+    ///
+    /// [`create_static_userdata`]: #method.create_static_userdata
+    /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
+    /// [`Lua::scope`]: struct.Lua.html#method.scope
+    /// [`UserDataMethods`]: trait.UserDataMethods.html
+    pub fn create_userdata<'lua, T>(&'lua self, data: T) -> Result<AnyUserData<'lua>>
+    where
+        T: 'scope + UserData,
+    {
+        let data = Rc::new(RefCell::new(data));
+
+        // 'callback outliving 'scope is a lie to make the types work out, required due to the
+        // inability to work with the "correct" universally quantified callback type.
+        fn wrap_method<'scope, 'lua, 'callback: 'scope, T: 'scope>(
+            scope: &'lua Scope<'scope>,
+            data: Rc<RefCell<T>>,
+            method: NonStaticMethod<'callback, T>,
+        ) -> Result<Function<'lua>> {
+            // On methods that actually receive the userdata, we fake a type check on the passed in
+            // userdata, where we pretend there is a unique type per call to Scope::create_userdata.
+            // You can grab a method from a userdata and call it on a mismatched userdata type,
+            // which when using normal 'static userdata will fail with a type mismatch, but here
+            // without this check would proceed as though you had called the method on the original
+            // value (since we otherwise completely ignore the first argument).
+            let check_data = data.clone();
+            let check_ud_type = move |lua: &Lua, value| {
+                if let Some(value) = value {
+                    if let Value::UserData(u) = value {
+                        unsafe {
+                            let _sg = StackGuard::new(lua.state);
+                            assert_stack(lua.state, 1);
+                            lua.push_ref(&u.0);
+                            ffi::lua_getuservalue(lua.state, -1);
+                            return ffi::lua_touserdata(lua.state, -1)
+                                == check_data.as_ptr() as *mut c_void;
+                        }
+                    }
+                }
+
+                false
+            };
+
+            match method {
+                NonStaticMethod::Method(method) => {
+                    let method_data = data.clone();
+                    let f = Box::new(move |lua, mut args: MultiValue<'callback>| {
+                        if !check_ud_type(lua, args.pop_front()) {
+                            return Err(Error::UserDataTypeMismatch);
+                        }
+                        let data = method_data
+                            .try_borrow()
+                            .map_err(|_| Error::UserDataBorrowError)?;
+                        method(lua, &*data, args)
+                    });
+                    unsafe { scope.create_callback(f) }
+                }
+                NonStaticMethod::MethodMut(method) => {
+                    let method = RefCell::new(method);
+                    let method_data = data.clone();
+                    let f = Box::new(move |lua, mut args: MultiValue<'callback>| {
+                        if !check_ud_type(lua, args.pop_front()) {
+                            return Err(Error::UserDataTypeMismatch);
+                        }
+                        let mut method = method
+                            .try_borrow_mut()
+                            .map_err(|_| Error::RecursiveMutCallback)?;
+                        let mut data = method_data
+                            .try_borrow_mut()
+                            .map_err(|_| Error::UserDataBorrowMutError)?;
+                        (&mut *method)(lua, &mut *data, args)
+                    });
+                    unsafe { scope.create_callback(f) }
+                }
+                NonStaticMethod::Function(function) => unsafe { scope.create_callback(function) },
+                NonStaticMethod::FunctionMut(function) => {
+                    let function = RefCell::new(function);
+                    let f = Box::new(move |lua, args| {
+                        (&mut *function
+                            .try_borrow_mut()
+                            .map_err(|_| Error::RecursiveMutCallback)?)(
+                            lua, args
+                        )
+                    });
+                    unsafe { scope.create_callback(f) }
+                }
+            }
+        }
+
+        let mut ud_methods = NonStaticUserDataMethods::default();
+        T::add_methods(&mut ud_methods);
+
+        unsafe {
+            let lua = self.lua;
+            let _sg = StackGuard::new(lua.state);
+            assert_stack(lua.state, 6);
+
+            push_userdata(lua.state, ())?;
+            ffi::lua_pushlightuserdata(lua.state, data.as_ptr() as *mut c_void);
+            ffi::lua_setuservalue(lua.state, -2);
+
+            protect_lua_closure(lua.state, 0, 1, move |state| {
+                ffi::lua_newtable(state);
+            })?;
+
+            for (k, m) in ud_methods.meta_methods {
+                push_string(lua.state, meta_method_name(k))?;
+                lua.push_value(Value::Function(wrap_method(self, data.clone(), m)?));
+
+                protect_lua_closure(lua.state, 3, 1, |state| {
+                    ffi::lua_rawset(state, -3);
+                })?;
+            }
+
+            if ud_methods.methods.is_empty() {
+                init_userdata_metatable::<()>(lua.state, -1, None)?;
+            } else {
+                protect_lua_closure(lua.state, 0, 1, |state| {
+                    ffi::lua_newtable(state);
+                })?;
+                for (k, m) in ud_methods.methods {
+                    push_string(lua.state, &k)?;
+                    lua.push_value(Value::Function(wrap_method(self, data.clone(), m)?));
+                    protect_lua_closure(lua.state, 3, 1, |state| {
+                        ffi::lua_rawset(state, -3);
+                    })?;
+                }
+
+                init_userdata_metatable::<()>(lua.state, -2, Some(-1))?;
+                ffi::lua_pop(lua.state, 1);
+            }
+
+            ffi::lua_setmetatable(lua.state, -2);
+
+            Ok(AnyUserData(lua.pop_ref()))
+        }
+    }
+
+    // Unsafe, because the callback (since it is non-'static) can capture any value with 'callback
+    // scope, such as improperly holding onto an argument.  This is not a problem in
+    // Lua::create_callback because all normal callbacks are 'static.  This pattern happens because
+    // it is currently extremely hard to deal with (without ATCs) the "correct" callback type of:
+    //
+    // Box<for<'lua> Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>)>
+    //
+    // So in order for this to be safe, the callback must NOT capture any arguments.
+    unsafe fn create_callback<'lua, 'callback>(
+        &'lua self,
+        f: Callback<'callback, 'scope>,
+    ) -> Result<Function<'lua>> {
+        let f = mem::transmute::<Callback<'callback, 'scope>, Callback<'callback, 'static>>(f);
+        let f = self.lua.create_callback(f)?;
+
+        let mut destructors = self.destructors.borrow_mut();
+        let f_destruct = f.0.clone();
+        destructors.push(Box::new(move || {
+            let state = f_destruct.lua.state;
+            let _sg = StackGuard::new(state);
+            assert_stack(state, 2);
+            f_destruct.lua.push_ref(&f_destruct);
+
+            ffi::lua_getupvalue(state, -1, 1);
+            let ud = take_userdata::<Callback>(state);
+
+            ffi::lua_pushnil(state);
+            ffi::lua_setupvalue(state, -2, 1);
+
+            ffi::lua_pop(state, 1);
+            Box::new(ud)
+        }));
+        Ok(f)
     }
 }
 

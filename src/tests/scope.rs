@@ -40,7 +40,7 @@ fn scope_drop() {
 
     struct MyUserdata(Rc<()>);
     impl UserData for MyUserdata {
-        fn add_methods(methods: &mut UserDataMethods<Self>) {
+        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
             methods.add_method("method", |_, _, ()| Ok(()));
         }
     }
@@ -51,7 +51,9 @@ fn scope_drop() {
         lua.globals()
             .set(
                 "test",
-                scope.create_userdata(MyUserdata(rc.clone())).unwrap(),
+                scope
+                    .create_static_userdata(MyUserdata(rc.clone()))
+                    .unwrap(),
             )
             .unwrap();
         assert_eq!(Rc::strong_count(&rc), 2);
