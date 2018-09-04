@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_int, c_void};
+use std::string::String as StdString;
 use std::sync::{Arc, Mutex};
 use std::{mem, ptr, str};
 
@@ -12,13 +13,12 @@ use libc;
 use error::{Error, Result};
 use ffi;
 use function::Function;
-use methods::{meta_method_name, StaticUserDataMethods};
 use scope::Scope;
 use string::String;
 use table::Table;
 use thread::Thread;
 use types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
-use userdata::{AnyUserData, UserData};
+use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use util::{
     assert_stack, callback_error, check_stack, gc_guard, get_userdata, get_wrapped_error,
     init_error_metatables, init_userdata_metatable, main_state, pop_error, protect_lua,
@@ -788,7 +788,7 @@ impl Lua {
             ffi::lua_newtable(state);
         })?;
         for (k, m) in methods.meta_methods {
-            push_string(self.state, meta_method_name(k))?;
+            push_string(self.state, k.name())?;
             self.push_value(Value::Function(self.create_callback(m)?));
 
             protect_lua_closure(self.state, 3, 1, |state| {
@@ -1061,3 +1061,170 @@ unsafe fn ref_stack_pop(extra: *mut ExtraData) -> c_int {
 }
 
 static FUNCTION_METATABLE_REGISTRY_KEY: u8 = 0;
+
+struct StaticUserDataMethods<'lua, T: 'static + UserData> {
+    methods: HashMap<StdString, Callback<'lua, 'static>>,
+    meta_methods: HashMap<MetaMethod, Callback<'lua, 'static>>,
+    _type: PhantomData<T>,
+}
+
+impl<'lua, T: 'static + UserData> Default for StaticUserDataMethods<'lua, T> {
+    fn default() -> StaticUserDataMethods<'lua, T> {
+        StaticUserDataMethods {
+            methods: HashMap::new(),
+            meta_methods: HashMap::new(),
+            _type: PhantomData,
+        }
+    }
+}
+
+impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMethods<'lua, T> {
+    fn add_method<A, R, M>(&mut self, name: &str, method: M)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
+    {
+        self.methods
+            .insert(name.to_owned(), Self::box_method(method));
+    }
+
+    fn add_method_mut<A, R, M>(&mut self, name: &str, method: M)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
+    {
+        self.methods
+            .insert(name.to_owned(), Self::box_method_mut(method));
+    }
+
+    fn add_function<A, R, F>(&mut self, name: &str, function: F)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
+    {
+        self.methods
+            .insert(name.to_owned(), Self::box_function(function));
+    }
+
+    fn add_function_mut<A, R, F>(&mut self, name: &str, function: F)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+    {
+        self.methods
+            .insert(name.to_owned(), Self::box_function_mut(function));
+    }
+
+    fn add_meta_method<A, R, M>(&mut self, meta: MetaMethod, method: M)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
+    {
+        self.meta_methods.insert(meta, Self::box_method(method));
+    }
+
+    fn add_meta_method_mut<A, R, M>(&mut self, meta: MetaMethod, method: M)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
+    {
+        self.meta_methods.insert(meta, Self::box_method_mut(method));
+    }
+
+    fn add_meta_function<A, R, F>(&mut self, meta: MetaMethod, function: F)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
+    {
+        self.meta_methods.insert(meta, Self::box_function(function));
+    }
+
+    fn add_meta_function_mut<A, R, F>(&mut self, meta: MetaMethod, function: F)
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+    {
+        self.meta_methods
+            .insert(meta, Self::box_function_mut(function));
+    }
+}
+
+impl<'lua, T: 'static + UserData> StaticUserDataMethods<'lua, T> {
+    fn box_method<A, R, M>(method: M) -> Callback<'lua, 'static>
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
+    {
+        Box::new(move |lua, mut args| {
+            if let Some(front) = args.pop_front() {
+                let userdata = AnyUserData::from_lua(front, lua)?;
+                let userdata = userdata.borrow::<T>()?;
+                method(lua, &userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+            } else {
+                Err(Error::FromLuaConversionError {
+                    from: "missing argument",
+                    to: "userdata",
+                    message: None,
+                })
+            }
+        })
+    }
+
+    fn box_method_mut<A, R, M>(method: M) -> Callback<'lua, 'static>
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
+    {
+        let method = RefCell::new(method);
+        Box::new(move |lua, mut args| {
+            if let Some(front) = args.pop_front() {
+                let userdata = AnyUserData::from_lua(front, lua)?;
+                let mut userdata = userdata.borrow_mut::<T>()?;
+                let mut method = method
+                    .try_borrow_mut()
+                    .map_err(|_| Error::RecursiveMutCallback)?;
+                (&mut *method)(lua, &mut userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+            } else {
+                Err(Error::FromLuaConversionError {
+                    from: "missing argument",
+                    to: "userdata",
+                    message: None,
+                })
+            }
+        })
+    }
+
+    fn box_function<A, R, F>(function: F) -> Callback<'lua, 'static>
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
+    {
+        Box::new(move |lua, args| function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua))
+    }
+
+    fn box_function_mut<A, R, F>(function: F) -> Callback<'lua, 'static>
+    where
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+    {
+        let function = RefCell::new(function);
+        Box::new(move |lua, args| {
+            let function = &mut *function
+                .try_borrow_mut()
+                .map_err(|_| Error::RecursiveMutCallback)?;
+            function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
+        })
+    }
+}
