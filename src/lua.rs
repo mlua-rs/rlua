@@ -829,7 +829,8 @@ impl Lua {
     //
     // Box<for<'lua> Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>)>
     //
-    // So we instead use an outer lifetime, which without the 'static requirement would be unsafe.
+    // So we instead use a caller provided lifetime, which without the 'static requirement would be
+    // unsafe.
     pub(crate) fn create_callback<'lua, 'callback>(
         &'lua self,
         func: Callback<'callback, 'static>,
