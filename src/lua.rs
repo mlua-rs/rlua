@@ -823,6 +823,13 @@ impl Lua {
         Ok(id)
     }
 
+    // Creates a Function out of a Callback containing a 'static Fn.  This is safe ONLY because the
+    // Fn is 'static, otherwise it could capture 'callback arguments improperly.  Without ATCs, we
+    // cannot easily deal with the "correct" callback type of:
+    //
+    // Box<for<'lua> Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>)>
+    //
+    // So we instead use an outer lifetime, which without the 'static requirement would be unsafe.
     pub(crate) fn create_callback<'lua, 'callback>(
         &'lua self,
         func: Callback<'callback, 'static>,

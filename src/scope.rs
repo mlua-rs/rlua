@@ -53,6 +53,15 @@ impl<'scope> Scope<'scope> {
         R: ToLuaMulti<'lua>,
         F: 'scope + Fn(&'lua Lua, A) -> Result<R>,
     {
+        // Safe, because 'scope must outlive 'lua (due to Self containing 'scope), however the
+        // callback itself must be 'scope lifetime, so the function should not be able to capture
+        // anything of 'lua lifetime.  'scope can't be shortened due to being invariant, and the
+        // 'lua lifetime here can't be enlarged due to coming from a universal quantification in
+        // Lua::scope.
+        //
+        // I hope I got this explanation right, but in any case this is tested with compiletest_rs
+        // to make sure callbacks can't capture handles with lifetimes outside the scope, inside the
+        // scope, and owned inside the callback itself.
         unsafe {
             self.create_callback(Box::new(move |lua, args| {
                 func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
@@ -94,6 +103,8 @@ impl<'scope> Scope<'scope> {
     where
         T: 'static + UserData,
     {
+        // Safe even though T may not be Send, because the parent Lua cannot be sent to another
+        // thread while the Scope is alive (or the returned AnyUserData handle even).
         unsafe {
             let u = self.lua.make_userdata(data)?;
             let mut destructors = self.destructors.borrow_mut();
@@ -139,7 +150,9 @@ impl<'scope> Scope<'scope> {
         let data = Rc::new(RefCell::new(data));
 
         // 'callback outliving 'scope is a lie to make the types work out, required due to the
-        // inability to work with the "correct" universally quantified callback type.
+        // inability to work with the "correct" universally quantified callback type.  This is safe
+        // though, because actual method callbacks are all 'static so they can't capture 'callback
+        // handles anyway.
         fn wrap_method<'scope, 'lua, 'callback: 'scope, T: 'scope>(
             scope: &'lua Scope<'scope>,
             data: Rc<RefCell<T>>,
@@ -265,13 +278,8 @@ impl<'scope> Scope<'scope> {
     }
 
     // Unsafe, because the callback (since it is non-'static) can capture any value with 'callback
-    // scope, such as improperly holding onto an argument.  This is not a problem in
-    // Lua::create_callback because all normal callbacks are 'static.  This pattern happens because
-    // it is currently extremely hard to deal with (without ATCs) the "correct" callback type of:
-    //
-    // Box<for<'lua> Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>)>
-    //
-    // So in order for this to be safe, the callback must NOT capture any arguments.
+    // scope, such as improperly holding onto an argument. So in order for this to be safe, the
+    // callback must NOT capture any arguments.
     unsafe fn create_callback<'lua, 'callback>(
         &'lua self,
         f: Callback<'callback, 'scope>,
