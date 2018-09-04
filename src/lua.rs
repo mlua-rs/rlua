@@ -970,14 +970,14 @@ impl Lua {
         let _sg = StackGuard::new(self.state);
         assert_stack(self.state, 4);
 
+        let ud_index = self.userdata_metatable::<T>()?;
         push_userdata::<RefCell<T>>(self.state, RefCell::new(data))?;
 
         ffi::lua_rawgeti(
             self.state,
             ffi::LUA_REGISTRYINDEX,
-            self.userdata_metatable::<T>()? as ffi::lua_Integer,
+            ud_index as ffi::lua_Integer,
         );
-
         ffi::lua_setmetatable(self.state, -2);
 
         Ok(AnyUserData(self.pop_ref()))
