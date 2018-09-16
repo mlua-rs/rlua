@@ -136,7 +136,7 @@ fn scope_userdata_methods() {
                 None,
             ).unwrap();
 
-        f.call::<_, ()>(scope.create_userdata(MyUserData(&i)).unwrap())
+        f.call::<_, ()>(scope.create_nonstatic_userdata(MyUserData(&i)).unwrap())
             .unwrap();
     });
 
@@ -178,7 +178,7 @@ fn scope_userdata_functions() {
 
     let dummy = 0;
     lua.scope(|scope| {
-        f.call::<_, ()>(scope.create_userdata(MyUserData(&dummy)).unwrap())
+        f.call::<_, ()>(scope.create_nonstatic_userdata(MyUserData(&dummy)).unwrap())
             .unwrap();
     });
 
@@ -220,8 +220,8 @@ fn scope_userdata_mismatch() {
     let bad: Function = lua.globals().get("bad").unwrap();
 
     lua.scope(|scope| {
-        let au = scope.create_userdata(MyUserData(&a)).unwrap();
-        let bu = scope.create_userdata(MyUserData(&b)).unwrap();
+        let au = scope.create_nonstatic_userdata(MyUserData(&a)).unwrap();
+        let bu = scope.create_nonstatic_userdata(MyUserData(&b)).unwrap();
         assert!(okay.call::<_, ()>((au.clone(), bu.clone())).is_ok());
         match bad.call::<_, ()>((au, bu)) {
             Err(Error::CallbackError { ref cause, .. }) => match *cause.as_ref() {

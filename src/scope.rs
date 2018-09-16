@@ -144,7 +144,7 @@ impl<'scope> Scope<'scope> {
     /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
     /// [`Lua::scope`]: struct.Lua.html#method.scope
     /// [`UserDataMethods`]: trait.UserDataMethods.html
-    pub fn create_userdata<'lua, T>(&'lua self, data: T) -> Result<AnyUserData<'lua>>
+    pub fn create_nonstatic_userdata<'lua, T>(&'lua self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: 'scope + UserData,
     {
@@ -160,11 +160,12 @@ impl<'scope> Scope<'scope> {
             method: NonStaticMethod<'callback, T>,
         ) -> Result<Function<'lua>> {
             // On methods that actually receive the userdata, we fake a type check on the passed in
-            // userdata, where we pretend there is a unique type per call to Scope::create_userdata.
-            // You can grab a method from a userdata and call it on a mismatched userdata type,
-            // which when using normal 'static userdata will fail with a type mismatch, but here
-            // without this check would proceed as though you had called the method on the original
-            // value (since we otherwise completely ignore the first argument).
+            // userdata, where we pretend there is a unique type per call to
+            // Scope::create_nonstatic_userdata.  You can grab a method from a userdata and call it
+            // on a mismatched userdata type, which when using normal 'static userdata will fail
+            // with a type mismatch, but here without this check would proceed as though you had
+            // called the method on the original value (since we otherwise completely ignore the
+            // first argument).
             let check_data = data.clone();
             let check_ud_type = move |lua: &Lua, value| {
                 if let Some(value) = value {
