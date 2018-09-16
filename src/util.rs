@@ -250,6 +250,81 @@ pub unsafe fn take_userdata<T>(state: *mut ffi::lua_State) -> T {
     ptr::read(ud)
 }
 
+// Populates the given table with the appropriate members to be a userdata metatable for the given
+// type.  This function takes the given table at the `metatable` index, and adds an appropriate __gc
+// member to it for the given type and a __metatable entry to protect the table from script access.
+// The function also, if given a `members` table index, will set up an __index metamethod to return
+// the appropriate member on __index.  Additionally, if there is already an __index entry on the
+// given metatable, instead of simply overwriting the __index, instead the created __index method
+// will capture the previous one, and use it as a fallback only if the given key is not found in the
+// provided members table.  Internally uses 6 stack spaces and does not call checkstack.
+pub unsafe fn init_userdata_metatable<T>(
+    state: *mut ffi::lua_State,
+    metatable: c_int,
+    members: Option<c_int>,
+) -> Result<()> {
+    // Used if both an __index metamethod is set and regular methods, checks methods table
+    // first, then __index metamethod.
+    unsafe extern "C" fn meta_index_impl(state: *mut ffi::lua_State) -> c_int {
+        ffi::luaL_checkstack(state, 2, ptr::null());
+
+        ffi::lua_pushvalue(state, -1);
+        ffi::lua_gettable(state, ffi::lua_upvalueindex(2));
+        if ffi::lua_isnil(state, -1) == 0 {
+            ffi::lua_insert(state, -3);
+            ffi::lua_pop(state, 2);
+            1
+        } else {
+            ffi::lua_pop(state, 1);
+            ffi::lua_pushvalue(state, ffi::lua_upvalueindex(1));
+            ffi::lua_insert(state, -3);
+            ffi::lua_call(state, 2, 1);
+            1
+        }
+    }
+
+    let members = members.map(|i| ffi::lua_absindex(state, i));
+    ffi::lua_pushvalue(state, metatable);
+
+    if let Some(members) = members {
+        push_string(state, "__index")?;
+        ffi::lua_pushvalue(state, -1);
+
+        let index_type = ffi::lua_rawget(state, -3);
+        if index_type == ffi::LUA_TNIL {
+            ffi::lua_pop(state, 1);
+            ffi::lua_pushvalue(state, members);
+        } else if index_type == ffi::LUA_TFUNCTION {
+            ffi::lua_pushvalue(state, members);
+            protect_lua_closure(state, 2, 1, |state| {
+                ffi::lua_pushcclosure(state, meta_index_impl, 2);
+            })?;
+        } else {
+            rlua_panic!("improper __index type {}", index_type);
+        }
+
+        protect_lua_closure(state, 3, 1, |state| {
+            ffi::lua_rawset(state, -3);
+        })?;
+    }
+
+    push_string(state, "__gc")?;
+    ffi::lua_pushcfunction(state, userdata_destructor::<T>);
+    protect_lua_closure(state, 3, 1, |state| {
+        ffi::lua_rawset(state, -3);
+    })?;
+
+    push_string(state, "__metatable")?;
+    ffi::lua_pushboolean(state, 0);
+    protect_lua_closure(state, 3, 1, |state| {
+        ffi::lua_rawset(state, -3);
+    })?;
+
+    ffi::lua_pop(state, 1);
+
+    Ok(())
+}
+
 pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c_int {
     callback_error(state, || {
         take_userdata::<T>(state);
