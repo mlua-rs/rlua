@@ -1,4 +1,6 @@
-use {Function, Lua, String};
+extern crate rlua;
+
+use rlua::{Function, Lua, String};
 
 #[test]
 fn test_function() {

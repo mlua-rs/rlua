@@ -1,6 +1,6 @@
 extern crate rlua;
 
-use rlua::*;
+use rlua::{Function, Lua, Result};
 
 fn main() {
     let lua = Lua::new();

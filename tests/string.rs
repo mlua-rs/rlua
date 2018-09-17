@@ -1,6 +1,8 @@
+extern crate rlua;
+
 use std::borrow::Cow;
 
-use {Lua, String};
+use rlua::{Lua, String};
 
 fn with_str<F>(s: &str, f: F)
 where

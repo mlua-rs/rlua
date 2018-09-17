@@ -1,4 +1,6 @@
-use {Lua, Nil, Result, Table, Value};
+extern crate rlua;
+
+use rlua::{Lua, Nil, Result, Table, Value};
 
 #[test]
 fn test_set_get() {

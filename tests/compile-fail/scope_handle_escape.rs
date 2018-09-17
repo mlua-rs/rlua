@@ -1,6 +1,6 @@
 extern crate rlua;
 
-use rlua::*;
+use rlua::{Function, Lua};
 
 fn main() {
     struct Test {

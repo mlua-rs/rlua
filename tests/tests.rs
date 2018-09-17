@@ -1,17 +1,15 @@
-mod function;
-mod scope;
-mod string;
-mod table;
-mod thread;
-mod types;
-mod userdata;
+extern crate failure;
+extern crate rlua;
 
 use std::iter::FromIterator;
 use std::panic::catch_unwind;
 use std::sync::Arc;
 use std::{error, fmt};
 
-use {Error, ExternalError, Function, Lua, Nil, Result, String, Table, UserData, Value, Variadic};
+use failure::err_msg;
+use rlua::{
+    Error, ExternalError, Function, Lua, Nil, Result, String, Table, UserData, Value, Variadic,
+};
 
 #[test]
 fn test_load() {
@@ -329,7 +327,7 @@ fn test_result_conversions() {
     let err =
         lua.create_function(|_, ()| {
             Ok(Err::<String, _>(
-                format_err!("only through failure can we succeed").to_lua_err(),
+                err_msg("only through failure can we succeed").to_lua_err(),
             ))
         }).unwrap();
     let ok = lua

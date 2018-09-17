@@ -1,6 +1,8 @@
+extern crate rlua;
+
 use std::panic::catch_unwind;
 
-use {Error, Function, Lua, Result, Thread, ThreadStatus};
+use rlua::{Error, Function, Lua, Result, Thread, ThreadStatus};
 
 #[test]
 fn test_thread() {

@@ -1,6 +1,8 @@
+extern crate rlua;
+
 use std::os::raw::c_void;
 
-use {Function, LightUserData, Lua};
+use rlua::{Function, LightUserData, Lua};
 
 #[test]
 fn test_lightuserdata() {

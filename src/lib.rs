@@ -40,7 +40,6 @@
 // warnings at all.
 #![doc(test(attr(deny(warnings))))]
 
-#[cfg_attr(test, macro_use)]
 extern crate failure;
 extern crate libc;
 
@@ -60,9 +59,6 @@ mod types;
 mod userdata;
 mod util;
 mod value;
-
-#[cfg(test)]
-mod tests;
 
 pub use error::{Error, ExternalError, ExternalResult, Result};
 pub use function::Function;

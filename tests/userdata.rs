@@ -1,6 +1,10 @@
+extern crate failure;
+extern crate rlua;
+
 use std::sync::Arc;
 
-use {ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods};
+use failure::err_msg;
+use rlua::{ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods};
 
 #[test]
 fn test_user_data() {
@@ -83,7 +87,7 @@ fn test_metamethods() {
                 if index.to_str()? == "inner" {
                     Ok(data.0)
                 } else {
-                    Err(format_err!("no such custom index").to_lua_err())
+                    Err(err_msg("no such custom index").to_lua_err())
                 }
             });
         }
