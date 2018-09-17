@@ -1,6 +1,9 @@
 #[cfg(feature = "builtin-lua")]
 extern crate cc;
 
+#[cfg(not(feature = "builtin-lua"))]
+extern crate pkg_config;
+
 fn main() {
     #[cfg(feature = "builtin-lua")]
     {
@@ -61,5 +64,9 @@ fn main() {
             .file("lua/lvm.c")
             .file("lua/lzio.c")
             .compile("liblua5.3.a");
+    }
+    #[cfg(not(feature = "builtin-lua"))]
+    {
+        pkg_config::Config::new().atleast_version("5.3").probe("lua").unwrap();
     }
 }
