@@ -41,7 +41,7 @@ cc = { version = "1.0", optional = true }
 pkg-config = { version = "0.3.11", optional = true }
 
 [dev-dependencies]
-rustyline = "1.0.0"
+rustyline = "2.0.0"
 criterion = "0.2.0"
 
 [[bench]]

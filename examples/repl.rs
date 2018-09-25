@@ -22,7 +22,7 @@ fn main() {
 
             match lua.eval::<MultiValue>(&line, None) {
                 Ok(values) => {
-                    editor.add_history_entry(&line);
+                    editor.add_history_entry(line);
                     println!(
                         "{}",
                         values
