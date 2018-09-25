@@ -42,6 +42,7 @@
 
 extern crate failure;
 extern crate libc;
+extern crate num_traits;
 
 mod error;
 mod ffi;

@@ -2,13 +2,15 @@ use std::collections::{BTreeMap, HashMap};
 use std::hash::{BuildHasher, Hash};
 use std::string::String as StdString;
 
+use num_traits::cast;
+
 use error::{Error, Result};
 use function::Function;
 use lua::Lua;
 use string::String;
 use table::Table;
 use thread::Thread;
-use types::{Integer, LightUserData, Number};
+use types::{LightUserData, Number};
 use userdata::{AnyUserData, UserData};
 use value::{FromLua, Nil, ToLua, Value};
 
@@ -207,13 +209,22 @@ macro_rules! lua_convert_int {
     ($x:ty) => {
         impl<'lua> ToLua<'lua> for $x {
             fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {
-                Ok(Value::Integer(self as Integer))
+                cast(self)
+                    .ok_or_else(|| Error::ToLuaConversionError {
+                        from: stringify!($x),
+                        to: "integer",
+                        message: Some("integer out of range".to_owned()),
+                    }).map(Value::Integer)
             }
         }
 
         impl<'lua> FromLua<'lua> for $x {
             fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<Self> {
-                Ok(lua.coerce_integer(value)? as $x)
+                cast(lua.coerce_integer(value)?).ok_or_else(|| Error::FromLuaConversionError {
+                    from: "integer",
+                    to: stringify!($x),
+                    message: Some("integer out of range".to_owned()),
+                })
             }
         }
     };
@@ -227,6 +238,8 @@ lua_convert_int!(i32);
 lua_convert_int!(u32);
 lua_convert_int!(i64);
 lua_convert_int!(u64);
+lua_convert_int!(i128);
+lua_convert_int!(u128);
 lua_convert_int!(isize);
 lua_convert_int!(usize);
 

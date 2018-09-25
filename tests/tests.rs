@@ -373,6 +373,10 @@ fn test_num_conversion() {
 
     lua.exec::<()>("a = math.huge", None).unwrap();
     assert!(globals.get::<_, i64>("n").is_err());
+
+    assert!(lua.eval::<u64>("-1", None).is_err());
+    assert!(lua.eval::<i64>("-1", None).is_ok());
+    assert!(lua.pack(1u128 << 64).is_err());
 }
 
 #[test]
