@@ -58,8 +58,8 @@ fn call_add_function(c: &mut Criterion) {
             || {
                 let lua = Lua::new();
                 let f = {
-                    let f: LuaFunction =
-                        lua.eval(
+                    let f: LuaFunction = lua
+                        .eval(
                             r#"
                             function(a, b, c)
                                 return a + b + c
@@ -94,8 +94,8 @@ fn call_add_callback(c: &mut Criterion) {
                         .create_function(|_, (a, b, c): (i64, i64, i64)| Ok(a + b + c))
                         .unwrap();
                     lua.globals().set("callback", c).unwrap();
-                    let f: LuaFunction =
-                        lua.eval(
+                    let f: LuaFunction = lua
+                        .eval(
                             r#"
                             function()
                                 for i = 1,10 do
@@ -126,13 +126,13 @@ fn call_append_callback(c: &mut Criterion) {
             || {
                 let lua = Lua::new();
                 let f = {
-                    let c: LuaFunction =
-                        lua.create_function(|_, (a, b): (LuaString, LuaString)| {
+                    let c: LuaFunction = lua
+                        .create_function(|_, (a, b): (LuaString, LuaString)| {
                             Ok(format!("{}{}", a.to_str()?, b.to_str()?))
                         }).unwrap();
                     lua.globals().set("callback", c).unwrap();
-                    let f: LuaFunction =
-                        lua.eval(
+                    let f: LuaFunction = lua
+                        .eval(
                             r#"
                             function()
                                 for _ = 1,10 do

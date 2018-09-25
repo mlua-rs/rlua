@@ -47,8 +47,8 @@ fn test_exec() {
     ).unwrap();
     assert_eq!(globals.get::<_, String>("res").unwrap(), "foobar");
 
-    let module: Table =
-        lua.exec(
+    let module: Table = lua
+        .exec(
             r#"
             local module = {}
 
@@ -324,8 +324,8 @@ fn test_result_conversions() {
     let lua = Lua::new();
     let globals = lua.globals();
 
-    let err =
-        lua.create_function(|_, ()| {
+    let err = lua
+        .create_function(|_, ()| {
             Ok(Err::<String, _>(
                 err_msg("only through failure can we succeed").to_lua_err(),
             ))
@@ -520,8 +520,8 @@ fn test_named_registry_value() {
     let lua = Lua::new();
 
     lua.set_named_registry_value::<i32>("test", 42).unwrap();
-    let f =
-        lua.create_function(move |lua, ()| {
+    let f = lua
+        .create_function(move |lua, ()| {
             assert_eq!(lua.named_registry_value::<i32>("test")?, 42);
             Ok(())
         }).unwrap();
@@ -540,8 +540,8 @@ fn test_registry_value() {
     let lua = Lua::new();
 
     let mut r = Some(lua.create_registry_value::<i32>(42).unwrap());
-    let f =
-        lua.create_function_mut(move |lua, ()| {
+    let f = lua
+        .create_function_mut(move |lua, ()| {
             if let Some(r) = r.take() {
                 assert_eq!(lua.registry_value::<i32>(&r)?, 42);
                 lua.remove_registry_value(r).unwrap();
@@ -692,11 +692,10 @@ fn large_args() {
                 }
                 Ok(s)
             }).unwrap(),
-        )
-        .unwrap();
+        ).unwrap();
 
-    let f: Function =
-        lua.eval(
+    let f: Function = lua
+        .eval(
             r#"
             return function(...)
                 return c(...)
@@ -716,8 +715,8 @@ fn large_args() {
 fn large_args_ref() {
     let lua = Lua::new();
 
-    let f =
-        lua.create_function(|_, args: Variadic<String>| {
+    let f = lua
+        .create_function(|_, args: Variadic<String>| {
             for i in 0..args.len() {
                 assert_eq!(args[i], i.to_string());
             }

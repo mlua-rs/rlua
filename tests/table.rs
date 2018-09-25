@@ -88,8 +88,7 @@ fn test_table() {
         .set(
             "table4",
             lua.create_sequence_from(vec![1, 2, 3, 4, 5]).unwrap(),
-        )
-        .unwrap();
+        ).unwrap();
     let table4 = globals.get::<_, Table>("table4").unwrap();
     assert_eq!(
         table4.pairs().collect::<Result<Vec<(i64, i64)>>>().unwrap(),
@@ -132,8 +131,7 @@ fn test_metatable() {
         .set(
             "__index",
             lua.create_function(|_, ()| Ok("index_value")).unwrap(),
-        )
-        .unwrap();
+        ).unwrap();
     table.set_metatable(Some(metatable));
     assert_eq!(table.get::<_, String>("any_key").unwrap(), "index_value");
     match table.raw_get::<_, Value>("any_key").unwrap() {
