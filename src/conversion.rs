@@ -34,7 +34,13 @@ impl<'lua> ToLua<'lua> for String<'lua> {
 
 impl<'lua> FromLua<'lua> for String<'lua> {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<String<'lua>> {
+        let ty = value.type_name();
         lua.coerce_string(value)
+            .ok_or_else(|| Error::FromLuaConversionError {
+                from: ty,
+                to: "String",
+                message: Some("expected string or number".to_string()),
+            })
     }
 }
 
@@ -145,8 +151,8 @@ impl<'lua> FromLua<'lua> for Error {
             Value::Error(err) => Ok(err),
             val => Ok(Error::RuntimeError(
                 lua.coerce_string(val)
-                    .and_then(|s| Ok(s.to_str()?.to_owned()))
-                    .unwrap_or_else(|_| "<unprintable error>".to_owned()),
+                    .and_then(|s| Some(s.to_str().ok()?.to_owned()))
+                    .unwrap_or_else(|| "<unprintable error>".to_owned()),
             )),
         }
     }
@@ -195,7 +201,15 @@ impl<'lua> ToLua<'lua> for StdString {
 
 impl<'lua> FromLua<'lua> for StdString {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<Self> {
-        Ok(lua.coerce_string(value)?.to_str()?.to_owned())
+        let ty = value.type_name();
+        Ok(lua
+            .coerce_string(value)
+            .ok_or_else(|| Error::FromLuaConversionError {
+                from: ty,
+                to: "String",
+                message: Some("expected string or number".to_string()),
+            })?.to_str()?
+            .to_owned())
     }
 }
 
@@ -209,21 +223,39 @@ macro_rules! lua_convert_int {
     ($x:ty) => {
         impl<'lua> ToLua<'lua> for $x {
             fn to_lua(self, _: &'lua Lua) -> Result<Value<'lua>> {
-                cast(self)
-                    .ok_or_else(|| Error::ToLuaConversionError {
-                        from: stringify!($x),
-                        to: "integer",
-                        message: Some("integer out of range".to_owned()),
-                    }).map(Value::Integer)
+                if let Some(i) = cast(self) {
+                    Ok(Value::Integer(i))
+                } else {
+                    cast(self)
+                        .ok_or_else(|| Error::ToLuaConversionError {
+                            from: stringify!($x),
+                            to: "number",
+                            message: Some("out of range".to_owned()),
+                        }).map(Value::Number)
+                }
             }
         }
 
         impl<'lua> FromLua<'lua> for $x {
             fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<Self> {
-                cast(lua.coerce_integer(value)?).ok_or_else(|| Error::FromLuaConversionError {
-                    from: "integer",
+                let ty = value.type_name();
+                (if let Some(i) = lua.coerce_integer(value.clone()) {
+                    cast(i)
+                } else {
+                    cast(
+                        lua.coerce_number(value)
+                            .ok_or_else(|| Error::FromLuaConversionError {
+                                from: ty,
+                                to: stringify!($x),
+                                message: Some(
+                                    "expected number or string coercible to number".to_string(),
+                                ),
+                            })?,
+                    )
+                }).ok_or_else(|| Error::FromLuaConversionError {
+                    from: ty,
                     to: stringify!($x),
-                    message: Some("integer out of range".to_owned()),
+                    message: Some("out of range".to_owned()),
                 })
             }
         }
@@ -253,7 +285,19 @@ macro_rules! lua_convert_float {
 
         impl<'lua> FromLua<'lua> for $x {
             fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<Self> {
-                Ok(lua.coerce_number(value)? as $x)
+                let ty = value.type_name();
+                lua.coerce_number(value)
+                    .ok_or_else(|| Error::FromLuaConversionError {
+                        from: ty,
+                        to: stringify!($x),
+                        message: Some("expected number or string coercible to number".to_string()),
+                    }).and_then(|n| {
+                        cast(n).ok_or_else(|| Error::FromLuaConversionError {
+                            from: ty,
+                            to: stringify!($x),
+                            message: Some("number out of range".to_string()),
+                        })
+                    })
             }
         }
     };

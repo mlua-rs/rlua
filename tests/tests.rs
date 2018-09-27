@@ -4,7 +4,7 @@ extern crate rlua;
 use std::iter::FromIterator;
 use std::panic::catch_unwind;
 use std::sync::Arc;
-use std::{error, fmt};
+use std::{error, f32, f64, fmt};
 
 use failure::err_msg;
 use rlua::{
@@ -354,29 +354,52 @@ fn test_result_conversions() {
 #[test]
 fn test_num_conversion() {
     let lua = Lua::new();
-    let globals = lua.globals();
 
-    globals.set("n", "1.0").unwrap();
-    assert_eq!(globals.get::<_, i64>("n").unwrap(), 1);
-    assert_eq!(globals.get::<_, f64>("n").unwrap(), 1.0);
-    assert_eq!(globals.get::<_, String>("n").unwrap(), "1.0");
+    assert_eq!(
+        lua.coerce_integer(Value::String(lua.create_string("1").unwrap())),
+        Some(1)
+    );
+    assert_eq!(
+        lua.coerce_integer(Value::String(lua.create_string("1.0").unwrap())),
+        Some(1)
+    );
+    assert_eq!(
+        lua.coerce_integer(Value::String(lua.create_string("1.5").unwrap())),
+        None
+    );
 
-    globals.set("n", "1.5").unwrap();
-    assert!(globals.get::<_, i64>("n").is_err());
-    assert_eq!(globals.get::<_, f64>("n").unwrap(), 1.5);
-    assert_eq!(globals.get::<_, String>("n").unwrap(), "1.5");
+    assert_eq!(
+        lua.coerce_number(Value::String(lua.create_string("1").unwrap())),
+        Some(1.0)
+    );
+    assert_eq!(
+        lua.coerce_number(Value::String(lua.create_string("1.0").unwrap())),
+        Some(1.0)
+    );
+    assert_eq!(
+        lua.coerce_number(Value::String(lua.create_string("1.5").unwrap())),
+        Some(1.5)
+    );
 
-    globals.set("n", 1.5).unwrap();
-    assert!(globals.get::<_, i64>("n").is_err());
-    assert_eq!(globals.get::<_, f64>("n").unwrap(), 1.5);
-    assert_eq!(globals.get::<_, String>("n").unwrap(), "1.5");
+    assert_eq!(lua.eval::<i64>("1.0", None).unwrap(), 1);
+    assert_eq!(lua.eval::<f64>("1.0", None).unwrap(), 1.0);
+    assert_eq!(lua.eval::<String>("1.0", None).unwrap(), "1.0");
 
-    lua.exec::<()>("a = math.huge", None).unwrap();
-    assert!(globals.get::<_, i64>("n").is_err());
+    assert_eq!(lua.eval::<i64>("1.5", None).unwrap(), 1);
+    assert_eq!(lua.eval::<f64>("1.5", None).unwrap(), 1.5);
+    assert_eq!(lua.eval::<String>("1.5", None).unwrap(), "1.5");
 
     assert!(lua.eval::<u64>("-1", None).is_err());
-    assert!(lua.eval::<i64>("-1", None).is_ok());
-    assert!(lua.pack(1u128 << 64).is_err());
+    assert_eq!(lua.eval::<i64>("-1", None).unwrap(), -1);
+
+    assert!(lua.unpack::<u64>(lua.pack(1u128 << 64).unwrap()).is_err());
+    assert!(lua.eval::<i64>("math.huge", None).is_err());
+
+    assert_eq!(
+        lua.unpack::<f64>(lua.pack(f32::MAX).unwrap()).unwrap(),
+        f32::MAX as f64
+    );
+    assert!(lua.unpack::<f32>(lua.pack(f64::MAX).unwrap()).is_err());
 }
 
 #[test]

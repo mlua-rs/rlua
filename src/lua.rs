@@ -356,84 +356,73 @@ impl Lua {
         r
     }
 
-    /// Coerces a Lua value to a string.
+    /// Attempts to coerce a Lua value into a String in a manner consistent with Lua's internal
+    /// behavior.
     ///
-    /// The value must be a string (in which case this is a no-op) or a number.
-    pub fn coerce_string<'lua>(&'lua self, v: Value<'lua>) -> Result<String<'lua>> {
+    /// To succeed, the value must be a string (in which case this is a no-op), an integer, or a
+    /// number.
+    pub fn coerce_string<'lua>(&'lua self, v: Value<'lua>) -> Option<String<'lua>> {
         match v {
-            Value::String(s) => Ok(s),
+            Value::String(s) => Some(s),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
                 assert_stack(self.state, 4);
 
-                let ty = v.type_name();
                 self.push_value(v);
-                let s =
-                    protect_lua_closure(self.state, 1, 1, |state| ffi::lua_tostring(state, -1))?;
+                let s = gc_guard(self.state, || ffi::lua_tostring(self.state, -1));
                 if s.is_null() {
-                    Err(Error::FromLuaConversionError {
-                        from: ty,
-                        to: "String",
-                        message: Some("expected string or number".to_string()),
-                    })
+                    None
                 } else {
-                    Ok(String(self.pop_ref()))
+                    Some(String(self.pop_ref()))
                 }
             },
         }
     }
 
-    /// Coerces a Lua value to an integer.
+    /// Attempts to coerce a Lua value into an integer in a manner consistent with Lua's internal
+    /// behavior.
     ///
-    /// The value must be an integer, or a floating point number, or a string that can be converted
-    /// to an integer. Refer to the Lua manual for details.
-    pub fn coerce_integer(&self, v: Value) -> Result<Integer> {
+    /// To succeed, the value must be an integer, a floating point number that has an exact
+    /// representation as an integer, or a string that can be converted to an integer. Refer to the
+    /// Lua manual for details.
+    pub fn coerce_integer(&self, v: Value) -> Option<Integer> {
         match v {
-            Value::Integer(i) => Ok(i),
+            Value::Integer(i) => Some(i),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
                 assert_stack(self.state, 2);
 
-                let ty = v.type_name();
                 self.push_value(v);
                 let mut isint = 0;
                 let i = ffi::lua_tointegerx(self.state, -1, &mut isint);
                 if isint == 0 {
-                    Err(Error::FromLuaConversionError {
-                        from: ty,
-                        to: "integer",
-                        message: None,
-                    })
+                    None
                 } else {
-                    Ok(i)
+                    Some(i)
                 }
             },
         }
     }
 
-    /// Coerce a Lua value to a number.
+    /// Attempts to coerce a Lua value into a Number in a manner consistent with Lua's internal
+    /// behavior.
     ///
-    /// The value must be a number or a string that can be converted to a number. Refer to the Lua
-    /// manual for details.
-    pub fn coerce_number(&self, v: Value) -> Result<Number> {
+    /// To succeed, the value must be a number or a string that can be converted to a number. Refer
+    /// to the Lua manual for details.
+    pub fn coerce_number(&self, v: Value) -> Option<Number> {
         match v {
-            Value::Number(n) => Ok(n),
+            Value::Number(n) => Some(n),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
                 assert_stack(self.state, 2);
 
-                let ty = v.type_name();
                 self.push_value(v);
                 let mut isnum = 0;
                 let n = ffi::lua_tonumberx(self.state, -1, &mut isnum);
                 if isnum == 0 {
-                    Err(Error::FromLuaConversionError {
-                        from: ty,
-                        to: "number",
-                        message: Some("number or string coercible to number".to_string()),
-                    })
+                    None
                 } else {
-                    Ok(n)
+                    Some(n)
                 }
             },
         }
