@@ -104,20 +104,26 @@ where
     F: Fn(*mut ffi::lua_State) -> R,
     R: Copy,
 {
-    struct Params<F, R> {
+    union URes<R: Copy> {
+        uninit: (),
+        init: R,
+    }
+
+    struct Params<F, R: Copy> {
         function: F,
-        result: R,
+        result: URes<R>,
         nresults: c_int,
     }
 
     unsafe extern "C" fn do_call<F, R>(state: *mut ffi::lua_State) -> c_int
     where
+        R: Copy,
         F: Fn(*mut ffi::lua_State) -> R,
     {
         let params = ffi::lua_touserdata(state, -1) as *mut Params<F, R>;
         ffi::lua_pop(state, 1);
 
-        (*params).result = ((*params).function)(state);
+        (*params).result.init = ((*params).function)(state);
 
         if (*params).nresults == ffi::LUA_MULTRET {
             ffi::lua_gettop(state)
@@ -136,7 +142,7 @@ where
 
     let mut params = Params {
         function: f,
-        result: mem::uninitialized(),
+        result: URes { uninit: () },
         nresults,
     };
 
@@ -147,7 +153,7 @@ where
     if ret == ffi::LUA_OK {
         // LUA_OK is only returned when the do_call function has completed successfully, so
         // params.result is definitely initialized.
-        Ok(params.result)
+        Ok(params.result.init)
     } else {
         Err(pop_error(state, ret))
     }
