@@ -400,6 +400,11 @@ fn test_num_conversion() {
         f32::MAX as f64
     );
     assert!(lua.unpack::<f32>(lua.pack(f64::MAX).unwrap()).is_err());
+
+    assert_eq!(
+        lua.unpack::<i128>(lua.pack(1i128 << 64).unwrap()).unwrap(),
+        1i128 << 64
+    );
 }
 
 #[test]
