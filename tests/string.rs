@@ -60,3 +60,10 @@ fn string_views() {
     assert_eq!(empty.as_bytes_with_nul(), &[0]);
     assert_eq!(empty.as_bytes(), &[]);
 }
+
+#[test]
+fn raw_string() {
+    let lua = Lua::new();
+    let rs = lua.create_string(&[0, 1, 2, 3, 0, 1, 2, 3]).unwrap();
+    assert_eq!(rs.as_bytes(), &[0, 1, 2, 3, 0, 1, 2, 3]);
+}

@@ -140,8 +140,10 @@ impl Lua {
             .call(())
     }
 
-    /// Pass a `&str` slice to Lua, creating and returning an interned Lua string.
-    pub fn create_string(&self, s: &str) -> Result<String> {
+    /// Create and return an interned Lua string.  Lua strings can be arbitrary [u8] data including
+    /// embedded nulls, so in addition to `&str` and `&String`, you can also pass plain `&[u8]`
+    /// here.
+    pub fn create_string<S: ?Sized + AsRef<[u8]>>(&self, s: &S) -> Result<String> {
         unsafe {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 4);

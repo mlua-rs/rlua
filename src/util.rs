@@ -220,8 +220,12 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
 }
 
 // Internally uses 4 stack spaces, does not call checkstack
-pub unsafe fn push_string(state: *mut ffi::lua_State, s: &str) -> Result<()> {
+pub unsafe fn push_string<S: ?Sized + AsRef<[u8]>>(
+    state: *mut ffi::lua_State,
+    s: &S,
+) -> Result<()> {
     protect_lua_closure(state, 0, 1, |state| {
+        let s = s.as_ref();
         ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
     })
 }
