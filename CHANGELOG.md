@@ -1,3 +1,23 @@
+## [0.15.0]
+- Implement MultiValue conversion up to 16
+- Small fix to prevent leaking on errors in metatable creation
+- API incompatible change: New API for non-'static UserData!  Scoped UserData is
+  now split into `create_static_userdata` and `create_nonstatic_userdata`
+  because there are certain limitations on `create_nonstatic_userdata` that mean
+  that nonstatic is not always what you want.
+- Added pkg-config feature that can be used if builtin-lua is disabled to use
+  pkg-config to find lua5.3 externally (thanks @acrisci!).
+- API incompatible change: Add conversions for i128 and u128 and change the
+  behavior of numeric conversions to not implicitly `as` cast.  Numeric
+  conversions now use `num_traits::cast` internally and error when the cast
+  function fails.  This errors on out of range but *not* loss of precision, so
+  casting 1.1f64 to i32 will succeed, but casting (1i64 << 32) to i32 will not.
+  When casting *to* lua, integers that are out of range of the lua_Integer type
+  are instead converted to lua_Number.
+- Allow arbitrary &[u8]-like data in `Lua::create_string`.  This uses
+  `AsRef<[u8]>` so you can use &str and &String, but you can also now use
+  `&[u8]`, which enables you to create non-utf8 Lua strings.
+
 ## [0.14.2]
 - Another soundness fix for `Lua::scope` that is related to the last soundness
   fix, forbidding capturing 'lua arguments inside callbacks.  This, like the

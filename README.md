@@ -35,7 +35,7 @@ Additionally, there are ways I would like to change this API, once support lands
 in rustc.  For example:
 
   * Currently, variadics are handled entirely with tuples and traits implemented
-    by macro for tuples up to size 12, it would be great if this was replaced
+    by macro for tuples up to size 16, it would be great if this was replaced
     with real variadic generics when this is available in Rust.
 
 ## API stability
