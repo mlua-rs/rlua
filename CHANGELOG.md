@@ -1,3 +1,11 @@
+## [0.15.2]
+- API Incompatible change: Allow `Lua::load` `Lua::exec` and `Lua::eval` to take
+  &String &str and &[u8] like `Lua::create_string` does.  I think this might be
+  technically allowed in a minor revision, but due to how rlua is used it's
+  definitely more like an API incompatible change.  This is a last minute
+  same-day change to 0.15 though, so there's no sense in adding another version
+  bump.
+
 ## [0.15.1]
 - Docs and changelog fixes
 
