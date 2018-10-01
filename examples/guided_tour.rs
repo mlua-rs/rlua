@@ -170,14 +170,14 @@ fn main() -> Result<()> {
 
             lua.eval::<()>("sketchy()", None)
         })?;
+
+        assert_eq!(rust_val, 42);
     }
 
     // We were able to run our 'sketchy' function inside the scope just fine.  However, if we try to
     // run our 'sketchy' function outside of the scope, the function we created will have been
     // invalidated and we will generate an error.  If our function wasn't invalidated, we might be
     // able to improperly access the destroyed `rust_val` which would be unsafe.
-
-    assert_eq!(rust_val, 42);
     assert!(lua.eval::<()>("sketchy()", None).is_err());
 
     Ok(())
