@@ -9,7 +9,7 @@ fn test_thread() {
     let lua = Lua::new();
     let thread = lua
         .create_thread(
-            lua.eval::<Function>(
+            lua.eval::<_, Function>(
                 r#"
                 function (s)
                     local sum = s
@@ -37,7 +37,7 @@ fn test_thread() {
 
     let accumulate = lua
         .create_thread(
-            lua.eval::<Function>(
+            lua.eval::<_, Function>(
                 r#"
                 function (sum)
                     while true do
@@ -58,7 +58,7 @@ fn test_thread() {
     assert_eq!(accumulate.status(), ThreadStatus::Error);
 
     let thread = lua
-        .eval::<Thread>(
+        .eval::<_, Thread>(
             r#"
                 coroutine.create(function ()
                     while true do

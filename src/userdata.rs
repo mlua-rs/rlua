@@ -219,7 +219,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
 /// // `MyUserData` now implements `ToLua`:
 /// lua.globals().set("myobject", MyUserData(123))?;
 ///
-/// lua.exec::<()>("assert(type(myobject) == 'userdata')", None)?;
+/// lua.exec::<_, ()>("assert(type(myobject) == 'userdata')", None)?;
 /// # Ok(())
 /// # }
 /// # fn main() {
@@ -257,7 +257,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
 ///
 /// lua.globals().set("myobject", MyUserData(123))?;
 ///
-/// lua.exec::<()>(r#"
+/// lua.exec::<_, ()>(r#"
 ///     assert(myobject:get() == 123)
 ///     myobject:add(7)
 ///     assert(myobject:get() == 130)

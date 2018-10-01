@@ -46,7 +46,7 @@ fn test_methods() {
     let globals = lua.globals();
     let userdata = lua.create_userdata(MyUserData(42)).unwrap();
     globals.set("userdata", userdata.clone()).unwrap();
-    lua.exec::<()>(
+    lua.exec::<_, ()>(
         r#"
             function get_it()
                 return userdata:get_value()
@@ -98,20 +98,20 @@ fn test_metamethods() {
     globals.set("userdata1", MyUserData(7)).unwrap();
     globals.set("userdata2", MyUserData(3)).unwrap();
     assert_eq!(
-        lua.eval::<MyUserData>("userdata1 + userdata2", None)
+        lua.eval::<_, MyUserData>("userdata1 + userdata2", None)
             .unwrap()
             .0,
         10
     );
     assert_eq!(
-        lua.eval::<MyUserData>("userdata1 - userdata2", None)
+        lua.eval::<_, MyUserData>("userdata1 - userdata2", None)
             .unwrap()
             .0,
         4
     );
-    assert_eq!(lua.eval::<i64>("userdata1:get()", None).unwrap(), 7);
-    assert_eq!(lua.eval::<i64>("userdata2.inner", None).unwrap(), 3);
-    assert!(lua.eval::<()>("userdata2.nonexist_field", None).is_err());
+    assert_eq!(lua.eval::<_, i64>("userdata1:get()", None).unwrap(), 7);
+    assert_eq!(lua.eval::<_, i64>("userdata2.inner", None).unwrap(), 3);
+    assert!(lua.eval::<_, ()>("userdata2.nonexist_field", None).is_err());
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn test_gc_userdata() {
     }
 
     assert!(
-        lua.eval::<()>(
+        lua.eval::<_, ()>(
             r#"
                 local tbl = setmetatable({
                     userdata = userdata

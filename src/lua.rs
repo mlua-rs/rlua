@@ -77,10 +77,14 @@ impl Lua {
     /// results in better error traces.
     ///
     /// Equivalent to Lua's `load` function.
-    pub fn load(&self, source: &str, name: Option<&str>) -> Result<Function> {
+    pub fn load<S>(&self, source: &S, name: Option<&str>) -> Result<Function>
+    where
+        S: ?Sized + AsRef<[u8]>,
+    {
         unsafe {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 1);
+            let source = source.as_ref();
 
             match if let Some(name) = name {
                 let name =
@@ -115,11 +119,15 @@ impl Lua {
     /// function with no arguments.
     ///
     /// Returns the values returned by the chunk.
-    pub fn exec<'lua, R: FromLuaMulti<'lua>>(
+    pub fn exec<'lua, S, R: FromLuaMulti<'lua>>(
         &'lua self,
-        source: &str,
+        source: &S,
         name: Option<&str>,
-    ) -> Result<R> {
+    ) -> Result<R>
+    where
+        S: ?Sized + AsRef<[u8]>,
+        R: FromLuaMulti<'lua>,
+    {
         self.load(source, name)?.call(())
     }
 
@@ -127,15 +135,17 @@ impl Lua {
     ///
     /// If `source` is an expression, returns the value it evaluates to. Otherwise, returns the
     /// values returned by the chunk (if any).
-    pub fn eval<'lua, R: FromLuaMulti<'lua>>(
-        &'lua self,
-        source: &str,
-        name: Option<&str>,
-    ) -> Result<R> {
+    pub fn eval<'lua, S, R>(&'lua self, source: &S, name: Option<&str>) -> Result<R>
+    where
+        S: ?Sized + AsRef<[u8]>,
+        R: FromLuaMulti<'lua>,
+    {
         // First, try interpreting the lua as an expression by adding
         // "return", then as a statement.  This is the same thing the
         // actual lua repl does.
-        self.load(&format!("return {}", source), name)
+        let mut return_source = "return ".as_bytes().to_vec();
+        return_source.extend(source.as_ref());
+        self.load(&return_source, name)
             .or_else(|_| self.load(source, name))?
             .call(())
     }
@@ -143,7 +153,10 @@ impl Lua {
     /// Create and return an interned Lua string.  Lua strings can be arbitrary [u8] data including
     /// embedded nulls, so in addition to `&str` and `&String`, you can also pass plain `&[u8]`
     /// here.
-    pub fn create_string<S: ?Sized + AsRef<[u8]>>(&self, s: &S) -> Result<String> {
+    pub fn create_string<S>(&self, s: &S) -> Result<String>
+    where
+        S: ?Sized + AsRef<[u8]>,
+    {
         unsafe {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 4);

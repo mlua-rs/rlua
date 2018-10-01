@@ -30,7 +30,7 @@ fn compare() {
 #[test]
 fn string_views() {
     let lua = Lua::new();
-    lua.eval::<()>(
+    lua.eval::<_, ()>(
         r#"
             ok = "null bytes are valid utf-8, wh\0 knew?"
             err = "but \xff isn't :("

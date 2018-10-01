@@ -27,7 +27,7 @@ fn test_table() {
     assert_eq!(table2.get::<_, String>("foo").unwrap(), "bar");
     assert_eq!(table1.get::<_, String>("baz").unwrap(), "baf");
 
-    lua.exec::<()>(
+    lua.exec::<_, ()>(
         r#"
                 table1 = {1, 2, 3, 4, 5}
                 table2 = {}
@@ -100,7 +100,7 @@ fn test_table() {
 fn test_table_scope() {
     let lua = Lua::new();
     let globals = lua.globals();
-    lua.exec::<()>(
+    lua.exec::<_, ()>(
         r#"
             touter = {
                 tin = {1, 2, 3}
@@ -149,7 +149,7 @@ fn test_metatable() {
 fn test_table_error() {
     let lua = Lua::new();
     let globals = lua.globals();
-    lua.exec::<()>(
+    lua.exec::<_, ()>(
         r#"
             table = {}
             setmetatable(table, {

@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     // You can load and evaluate lua code.  The second parameter here gives the chunk a better name
     // when lua error messages are printed.
 
-    lua.exec::<()>(
+    lua.exec::<_, ()>(
         r#"
             global = 'foo'..'bar'
         "#,
@@ -35,9 +35,9 @@ fn main() -> Result<()> {
     )?;
     assert_eq!(globals.get::<_, String>("global")?, "foobar");
 
-    assert_eq!(lua.eval::<i32>("1 + 1", None)?, 2);
-    assert_eq!(lua.eval::<bool>("false == false", None)?, true);
-    assert_eq!(lua.eval::<i32>("return 1 + 2", None)?, 3);
+    assert_eq!(lua.eval::<_, i32>("1 + 1", None)?, 2);
+    assert_eq!(lua.eval::<_, bool>("false == false", None)?, true);
+    assert_eq!(lua.eval::<_, i32>("return 1 + 2", None)?, 3);
 
     // You can create and manage lua tables
 
@@ -59,7 +59,7 @@ fn main() -> Result<()> {
     globals.set("array_table", array_table)?;
     globals.set("map_table", map_table)?;
 
-    lua.eval::<()>(
+    lua.eval::<_, ()>(
         r#"
         for k, v in pairs(array_table) do
             print(k, v)
@@ -110,14 +110,17 @@ fn main() -> Result<()> {
     globals.set("join", join)?;
 
     assert_eq!(
-        lua.eval::<bool>(r#"check_equal({"a", "b", "c"}, {"a", "b", "c"})"#, None)?,
+        lua.eval::<_, bool>(r#"check_equal({"a", "b", "c"}, {"a", "b", "c"})"#, None)?,
         true
     );
     assert_eq!(
-        lua.eval::<bool>(r#"check_equal({"a", "b", "c"}, {"d", "e", "f"})"#, None)?,
+        lua.eval::<_, bool>(r#"check_equal({"a", "b", "c"}, {"d", "e", "f"})"#, None)?,
         false
     );
-    assert_eq!(lua.eval::<String>(r#"join("a", "b", "c")"#, None)?, "abc");
+    assert_eq!(
+        lua.eval::<_, String>(r#"join("a", "b", "c")"#, None)?,
+        "abc"
+    );
 
     // You can create userdata with methods and metamethods defined on them.
     // Here's a worked example that shows many of the features of this API
@@ -143,7 +146,7 @@ fn main() -> Result<()> {
     globals.set("vec2", vec2_constructor)?;
 
     assert!(
-        (lua.eval::<f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()", None)? - 5.0).abs()
+        (lua.eval::<_, f32>("(vec2(1, 2) + vec2(2, 2)):magnitude()", None)? - 5.0).abs()
             < f32::EPSILON
     );
 
@@ -168,7 +171,7 @@ fn main() -> Result<()> {
                 })?,
             )?;
 
-            lua.eval::<()>("sketchy()", None)
+            lua.eval::<_, ()>("sketchy()", None)
         })?;
 
         assert_eq!(rust_val, 42);
@@ -178,7 +181,7 @@ fn main() -> Result<()> {
     // run our 'sketchy' function outside of the scope, the function we created will have been
     // invalidated and we will generate an error.  If our function wasn't invalidated, we might be
     // able to improperly access the destroyed `rust_val` which would be unsafe.
-    assert!(lua.eval::<()>("sketchy()", None).is_err());
+    assert!(lua.eval::<_, ()>("sketchy()", None).is_err());
 
     Ok(())
 }

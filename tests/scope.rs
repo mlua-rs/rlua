@@ -60,7 +60,7 @@ fn scope_drop() {
     });
     assert_eq!(Rc::strong_count(&rc), 1);
 
-    match lua.exec::<()>("test:method()", None) {
+    match lua.exec::<_, ()>("test:method()", None) {
         Err(Error::CallbackError { .. }) => {}
         r => panic!("improper return for destructed userdata: {:?}", r),
     };
@@ -162,7 +162,7 @@ fn scope_userdata_functions() {
 
     let lua = Lua::new();
     let f = lua
-        .exec::<Function>(
+        .exec::<_, Function>(
             r#"
                 i = 0
                 return function(u)
@@ -197,7 +197,7 @@ fn scope_userdata_mismatch() {
     }
 
     let lua = Lua::new();
-    lua.exec::<()>(
+    lua.exec::<_, ()>(
         r#"
             function okay(a, b)
                 a.inc(a)

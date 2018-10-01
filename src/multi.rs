@@ -71,7 +71,7 @@ impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
 ///     Ok(vals.iter().sum())
 /// }).unwrap();
 /// lua.globals().set("add", add)?;
-/// assert_eq!(lua.eval::<f64>("add(3, 2, 5)", None)?, 10.0);
+/// assert_eq!(lua.eval::<_, f64>("add(3, 2, 5)", None)?, 10.0);
 /// # Ok(())
 /// # }
 /// # fn main() {

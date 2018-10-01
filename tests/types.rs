@@ -8,7 +8,7 @@ use rlua::{Function, LightUserData, Lua};
 fn test_lightuserdata() {
     let lua = Lua::new();
     let globals = lua.globals();
-    lua.exec::<()>(
+    lua.exec::<_, ()>(
         r#"
             function id(a)
                 return a
