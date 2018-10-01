@@ -34,7 +34,7 @@
 //! [`ToLuaMulti`]: trait.ToLuaMulti.html
 //! [`FromLuaMulti`]: trait.FromLuaMulti.html
 //! [`UserData`]: trait.UserData.html
-//! [`UserDataMethods`]: struct.UserDataMethods.html
+//! [`UserDataMethods`]: trait.UserDataMethods.html
 
 // Deny warnings inside doc tests / examples. When this isn't present, rustdoc doesn't show *any*
 // warnings at all.

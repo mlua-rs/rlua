@@ -82,7 +82,7 @@ pub enum Error {
     /// details.
     ///
     /// [`AnyUserData`]: struct.AnyUserData.html
-    /// [`UserDataMethods`]: struct.UserDataMethods.html
+    /// [`UserDataMethods`]: trait.UserDataMethods.html
     UserDataTypeMismatch,
     /// An [`AnyUserData`] immutable borrow failed because it is already borrowed mutably.
     ///

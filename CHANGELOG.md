@@ -1,3 +1,6 @@
+## [0.15.1]
+- Docs and changelog fixes
+
 ## [0.15.0]
 - Implement MultiValue conversion up to 16
 - Small fix to prevent leaking on errors in metatable creation
@@ -5,6 +8,9 @@
   now split into `create_static_userdata` and `create_nonstatic_userdata`
   because there are certain limitations on `create_nonstatic_userdata` that mean
   that nonstatic is not always what you want.
+- API incompatible change: In order to support the new non-'static scoped
+  UserData, the API for UserData methods has changed, and UserDataMethods is now
+  a trait rather than a concrete type.
 - Added pkg-config feature that can be used if builtin-lua is disabled to use
   pkg-config to find lua5.3 externally (thanks @acrisci!).
 - API incompatible change: Add conversions for i128 and u128 and change the
