@@ -153,26 +153,29 @@ fn main() -> Result<()> {
     // create userdata and callbacks types that only live for as long as the call to scope, but do
     // not have to be `Send` OR `'static`.
 
-    let mut rust_val = 0;
+    {
+        let mut rust_val = 0;
 
-    lua.scope(|scope| {
-        // We create a 'sketchy' lua callback that modifies the variable `rust_val`.  Outside of a
-        // `Lua::scope` call, this would not be allowed.
+        lua.scope(|scope| {
+            // We create a 'sketchy' lua callback that modifies the variable `rust_val`.  Outside of a
+            // `Lua::scope` call, this would not be allowed because it could be unsafe.
 
-        lua.globals().set(
-            "sketchy",
-            scope.create_function_mut(|_, ()| {
-                rust_val = 42;
-                Ok(())
-            })?,
-        )?;
+            lua.globals().set(
+                "sketchy",
+                scope.create_function_mut(|_, ()| {
+                    rust_val = 42;
+                    Ok(())
+                })?,
+            )?;
 
-        lua.eval::<()>("sketchy()", None)
-    })?;
+            lua.eval::<()>("sketchy()", None)
+        })?;
+    }
 
     // We were able to run our 'sketchy' function inside the scope just fine.  However, if we try to
     // run our 'sketchy' function outside of the scope, the function we created will have been
-    // destroyed and we will generate an error.
+    // invalidated and we will generate an error.  If our function wasn't invalidated, we might be
+    // able to improperly access the destroyed `rust_val` which would be unsafe.
 
     assert_eq!(rust_val, 42);
     assert!(lua.eval::<()>("sketchy()", None).is_err());
