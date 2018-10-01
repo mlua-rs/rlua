@@ -150,8 +150,8 @@ fn main() -> Result<()> {
     // Normally, Rust types passed to `Lua` must be `Send`, because `Lua` itself is `Send`, and must
     // be `'static`, because there is no way to tell when Lua might garbage collect them.  There is,
     // however, a limited way to lift both of these restrictions.  You can call `Lua::scope` to
-    // create userdata types that do not have to be `Send`, and callback types that do not have to
-    // be `Send` OR `'static`.
+    // create userdata and callbacks types that only live for as long as the call to scope, but do
+    // not have to be `Send` OR `'static`.
 
     let mut rust_val = 0;
 
