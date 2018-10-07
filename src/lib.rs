@@ -60,6 +60,7 @@ mod types;
 mod userdata;
 mod util;
 mod value;
+mod hook;
 
 pub use error::{Error, ExternalError, ExternalResult, Result};
 pub use function::Function;

@@ -17,6 +17,7 @@ pub type lua_KContext = *mut c_void;
 pub type lua_KFunction =
     unsafe extern "C" fn(state: *mut lua_State, status: c_int, ctx: lua_KContext) -> c_int;
 pub type lua_CFunction = unsafe extern "C" fn(state: *mut lua_State) -> c_int;
+pub type lua_Hook = unsafe extern "C" fn(state: *mut lua_State, ar: *mut lua_Debug);
 
 #[repr(C)]
 pub struct lua_Debug {
@@ -77,6 +78,11 @@ pub const LUA_GCSTEP: c_int = 5;
 pub const LUA_GCSETPAUSE: c_int = 6;
 pub const LUA_GCSETSTEPMUL: c_int = 7;
 pub const LUA_GCISRUNNING: c_int = 9;
+
+pub const LUA_MASKCALL: c_int = 1;
+pub const LUA_MASKRET: c_int = 2;
+pub const LUA_MASKLINE: c_int = 4;
+pub const LUA_MASKCOUNT: c_int = 8;
 
 extern "C" {
     pub fn lua_newstate(alloc: lua_Alloc, ud: *mut c_void) -> *mut lua_State;
@@ -162,6 +168,8 @@ extern "C" {
     pub fn lua_atpanic(state: *mut lua_State, panic: lua_CFunction) -> lua_CFunction;
     pub fn lua_gc(state: *mut lua_State, what: c_int, data: c_int) -> c_int;
     pub fn lua_getinfo(state: *mut lua_State, what: *const c_char, ar: *mut lua_Debug) -> c_int;
+
+    pub fn lua_sethook(state: *mut lua_State, f: Option<lua_Hook>, mask: c_int, count: c_int);
 
     pub fn luaopen_base(state: *mut lua_State) -> c_int;
     pub fn luaopen_coroutine(state: *mut lua_State) -> c_int;

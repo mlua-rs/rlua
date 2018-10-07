@@ -26,6 +26,7 @@ use util::{
     userdata_destructor, StackGuard,
 };
 use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
+use hook::{Debug, HookOptions, hook_proc};
 
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
@@ -625,6 +626,33 @@ impl Lua {
         }
     }
 
+    /// Sets a function for Lua to call on conditions specified by the function. This function will
+    /// always succeed, but its hook can raise an error if necessary.
+    ///
+    /// # Example
+    ///
+    /// Shows each line of code being executed by the Lua interpreter.
+    /// TODO: When finished.
+    ///
+    pub fn set_hook<F>(&self, options: HookOptions, callback: F)
+    where
+        F: 'static + Send + Fn(&Debug) -> Result<()>
+    {
+        unsafe {
+            (*extra_data(self.state)).hook_callback = Some(Box::new(callback));
+            ffi::lua_sethook(self.state, Some(hook_proc), options.mask() as _, options.count as _);
+        }
+    }
+
+    /// Removes any hook previously set by `set_hook`. This function has no effect if no hook was
+    /// set.
+    pub fn remove_hook(&self) {
+        unsafe {
+            (*extra_data(self.state)).hook_callback = None;
+            ffi::lua_sethook(self.state, None, 0, 0);
+        }
+    }
+
     // Uses 2 stack spaces, does not call checkstack
     pub(crate) unsafe fn push_value(&self, value: Value) {
         match value {
@@ -921,7 +949,7 @@ impl Lua {
 }
 
 // Data associated with the main lua_State via lua_getextraspace.
-struct ExtraData {
+pub(crate) struct ExtraData {
     registered_userdata: HashMap<TypeId, c_int>,
     registry_unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
 
@@ -929,9 +957,11 @@ struct ExtraData {
     ref_stack_size: c_int,
     ref_stack_max: c_int,
     ref_free: Vec<c_int>,
+
+    pub hook_callback: Option<Box<Fn(&Debug) -> Result<()>>>
 }
 
-unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
+pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
     *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
 }
 
@@ -1033,6 +1063,7 @@ unsafe fn create_lua(load_debug: bool) -> Lua {
         ref_stack_size: ffi::LUA_MINSTACK - 1,
         ref_stack_max: 0,
         ref_free: Vec::new(),
+        hook_callback: None
     }));
     *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra;
 
