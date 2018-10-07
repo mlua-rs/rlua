@@ -73,5 +73,6 @@ pub use thread::{Thread, ThreadStatus};
 pub use types::{Integer, LightUserData, Number, RegistryKey};
 pub use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 pub use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
+pub use hook::{HookOptions, Debug};
 
 pub mod prelude;

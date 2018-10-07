@@ -631,9 +631,26 @@ impl Lua {
     /// Shows each line of code being executed by the Lua interpreter.
     /// TODO: When finished.
     ///
-    pub fn set_hook<F>(&self, options: HookOptions, callback: F)
+    pub fn set_hook<F>(
+        &self,
+        options: HookOptions,
+        callback: F)
     where
         F: 'static + Send + Fn(&Debug) -> Result<()>
+    {
+        self.set_mut_hook(options, callback)
+    }
+
+    /// Sets a function for Lua the same way as [`set_hook`], but allows the use of a mutable
+    /// function. The behavior is the same otherwise.
+    ///
+    /// [`set_hook`]: #method.set_hook
+    pub fn set_mut_hook<F>(
+        &self,
+        options: HookOptions,
+        callback: F)
+    where
+        F: 'static + Send + FnMut(&Debug) -> Result<()>
     {
         unsafe {
             (*extra_data(self.state)).hook_callback = Some(Box::new(callback));
@@ -988,7 +1005,7 @@ pub(crate) struct ExtraData {
     ref_stack_max: c_int,
     ref_free: Vec<c_int>,
 
-    pub hook_callback: Option<Box<Fn(&Debug) -> Result<()>>>
+    pub hook_callback: Option<Box<FnMut(&Debug) -> Result<()>>>
 }
 
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {

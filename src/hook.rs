@@ -47,17 +47,17 @@ impl Default for HookOptions {
     }
 }
 
-// This callback is passed to `lua_sethook` and gets called whenever debug information is received.
-pub unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_Debug) {
+/// This callback is passed to `lua_sethook` and gets called whenever debug information is received.
+pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_Debug) {
     callback_error(state, || {
-        let extra = &*extra_data(state);
+        let extra = &mut *extra_data(state);
 
         let debug = Debug {
             curr_line: (*ar).currentline as u32
         };
 
         let cb = extra.hook_callback
-            .as_ref()
+            .as_mut()
             .expect("no hooks previously set; this is a bug");
         cb(&debug)
     });
