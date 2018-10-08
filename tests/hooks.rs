@@ -69,9 +69,9 @@ fn error_within_hook() {
 #[test]
 fn limit_execution_time() {
     let code = r#"
-    while true do
-        x = x + 1
-    end
+        while true do
+            x = x + 1
+        end
     "#;
     let start = Instant::now();
 
