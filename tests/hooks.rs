@@ -2,7 +2,8 @@ extern crate rlua;
 
 use std::sync::mpsc::{channel, TryRecvError};
 use std::ops::Deref;
-use rlua::{Lua, Debug, HookOptions, Error};
+use std::time::{Instant, Duration};
+use rlua::{Lua, Debug, HookOptions, Error, Value};
 
 #[test]
 fn line_counts() {
@@ -48,9 +49,9 @@ fn function_calls() {
 #[test]
 fn error_within_hook() {
     let lua = Lua::new();
-    lua.set_mut_hook(HookOptions {
+    lua.set_hook(HookOptions {
         lines: true, ..Default::default()
-    }, move |_debug: &Debug| {
+    }, |_debug: &Debug| {
         Err(Error::RuntimeError("Something happened in there!".to_string()))
     });
 
@@ -62,4 +63,46 @@ fn error_within_hook() {
         },
         _ => panic!("wrong error kind caught")
     }
+}
+
+#[test]
+fn limit_execution_time() {
+    let code = r#"
+    while true do
+        x = x + 1
+    end
+    "#;
+    let start = Instant::now();
+
+    let lua = Lua::new();
+    let _ = lua.globals().set("x", Value::Integer(0));
+    lua.set_hook(HookOptions {
+        after_counts: true, count: 30, ..Default::default()
+    }, move |_debug: &Debug| {
+        if start.elapsed() >= Duration::from_millis(500) {
+            Err(Error::RuntimeError("time's up".to_string()))
+        } else {
+            Ok(())
+        }
+    });
+
+    let _ = lua.exec::<_, ()>(code, None).expect_err("timeout didn't occur");
+    assert!(start.elapsed() < Duration::from_millis(750));
+    //println!("{}", lua.globals().get::<_, i64>("x").unwrap());
+}
+
+#[test]
+fn hook_removal() {
+    let code = r#"local x = 1"#;
+    let lua = Lua::new();
+
+    lua.set_hook(HookOptions {
+        after_counts: true, count: 1, ..Default::default()
+    }, |_debug: &Debug| {
+        Err(Error::RuntimeError("this hook should've been removed by this time".to_string()))
+    });
+    assert!(lua.exec::<_, ()>(code, None).is_err());
+
+    lua.remove_hook();
+    assert!(lua.exec::<_, ()>(code, None).is_ok());
 }
