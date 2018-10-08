@@ -1,4 +1,5 @@
 use std::{slice, ptr, mem, str};
+use std::borrow::Cow;
 use libc::{self, c_int};
 use ffi::{self, lua_State, lua_Debug};
 use lua::extra_data;
@@ -7,10 +8,10 @@ use util::callback_error;
 /// Contains information about the running code at the moments specified when setting the hook.
 #[derive(Clone, Debug)]
 pub struct Debug<'a> {
-    pub name: Option<&'a str>,
-    pub namewhat: Option<&'a str>,
-    pub what: Option<&'a str>,
-    pub source: Option<&'a str>,
+    pub name: Option<Cow<'a, str>>,
+    pub namewhat: Option<Cow<'a, str>>,
+    pub what: Option<Cow<'a, str>>,
+    pub source: Option<Cow<'a, str>>,
     pub curr_line: u32,
     pub line_defined: u32,
     pub last_line_defined: u32,
@@ -18,7 +19,28 @@ pub struct Debug<'a> {
     pub num_params: u32,
     pub is_vararg: bool,
     pub is_tailcall: bool,
-    pub short_src: Option<&'a str>
+    pub short_src: Option<Cow<'a, str>>
+}
+
+impl<'a> Debug<'a> {
+    /// Constructs a new `Debug` structure that is not associated with a Lua debug structure. It
+    /// involves some string copying.
+    pub fn to_owned(&'a self) -> Debug<'static> {
+        Debug {
+            name: self.name.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
+            namewhat: self.namewhat.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
+            what: self.what.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
+            source: self.source.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
+            curr_line: self.curr_line,
+            line_defined: self.line_defined,
+            last_line_defined: self.last_line_defined,
+            num_ups: self.num_ups,
+            num_params: self.num_params,
+            is_vararg: self.is_vararg,
+            is_tailcall: self.is_tailcall,
+            short_src: self.short_src.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string())))
+        }
+    }
 }
 
 /// Indicates in which circumstances the hook should be called by Lua.
@@ -82,7 +104,7 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             is_vararg: (*ar).isvararg == 1,
             is_tailcall: (*ar).istailcall == 1,
             short_src: str::from_utf8(mem::transmute((*ar).short_src.as_ref()))
-                .and_then(|r| Ok(Some(r)))
+                .and_then(|r| Ok(Some(Cow::from(r))))
                 .unwrap_or(None)
         };
 
@@ -93,11 +115,13 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
     });
 }
 
-unsafe fn ptr_to_str<'a>(input: *const i8) -> Option<&'a str> {
+unsafe fn ptr_to_str<'a>(input: *const i8) -> Option<Cow<'a, str>> {
     if input == ptr::null() || ptr::read(input) == 0 {
         return None;
     }
     let len = libc::strlen(input) as usize;
     let input = slice::from_raw_parts(input as *const u8, len);
-    str::from_utf8(input).and_then(|r| Ok(Some(r.trim_right()))).unwrap_or(None)
+    str::from_utf8(input)
+        .and_then(|r| Ok(Some(Cow::from(r.trim_right()))))
+        .unwrap_or(None)
 }
