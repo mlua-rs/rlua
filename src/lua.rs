@@ -626,12 +626,14 @@ impl Lua {
         }
     }
 
-    /// Sets a function for Lua to call on conditions specified by the function. This function will
-    /// always succeed, but its hook can raise an error if necessary.
+    /// Set a function for Lua to call on conditions configured by `options`. This function will
+    /// always succeed, but the hook may raise an error to be reported back to the caller when
+    /// running Lua code.
     ///
     /// # Example
     ///
-    /// Shows each line of code being executed by the Lua interpreter.
+    /// Shows each line number of code being executed by the Lua interpreter.
+    ///
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, HookOptions, Debug};
@@ -661,7 +663,7 @@ impl Lua {
         self.set_mut_hook(options, callback)
     }
 
-    /// Sets a function for Lua the same way as [`set_hook`], but allows the use of a mutable
+    /// Set a function for Lua the same way as [`set_hook`], but allows the use of a mutable
     /// function. The behavior is the same otherwise.
     ///
     /// [`set_hook`]: #method.set_hook
@@ -678,7 +680,7 @@ impl Lua {
         }
     }
 
-    /// Removes any hook previously set by `set_hook`. This function has no effect if no hook was
+    /// Remove any hook previously set by `set_hook`. This function has no effect if no hook was
     /// set.
     pub fn remove_hook(&self) {
         unsafe {

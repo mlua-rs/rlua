@@ -6,6 +6,12 @@ use lua::extra_data;
 use util::callback_error;
 
 /// Contains information about the running code at the moments specified when setting the hook.
+/// Each field is described in the [Lua 5.3 documentaton][lua_doc].
+///
+/// Depending on when the hook is called, some fields might not be available. In these cases,
+/// integers and booleans might not be valid and/or strings are set to `None`.
+///
+/// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#lua_Debug
 #[derive(Clone, Debug)]
 pub struct Debug<'a> {
     pub name: Option<Cow<'a, str>>,
@@ -23,7 +29,7 @@ pub struct Debug<'a> {
 }
 
 impl<'a> Debug<'a> {
-    /// Constructs a new `Debug` structure that is not associated with a Lua debug structure. It
+    /// Construct a new `Debug` structure that is not associated with a Lua debug structure. It
     /// involves some string copying.
     pub fn to_owned(&'a self) -> Debug<'static> {
         Debug {
@@ -43,7 +49,7 @@ impl<'a> Debug<'a> {
     }
 }
 
-/// Indicates in which circumstances the hook should be called by Lua.
+/// Indicate in which circumstances the hook should be called by Lua.
 pub struct HookOptions {
     /// Before a function call.
     pub calls: bool,
@@ -53,13 +59,13 @@ pub struct HookOptions {
     pub lines: bool,
     /// After a certain amount of instructions specified by `count`.
     pub after_counts: bool,
-    /// Indicates how many instructions to execute before calling the hook. Only effective when
+    /// Specify how many instructions to execute before calling the hook. Only effective when
     /// `after_counts` is set to true.
     pub count: u32
 }
 
 impl HookOptions {
-    // Computes the mask to pass to `lua_sethook`.
+    // Compute the mask to pass to `lua_sethook`.
     pub(crate) fn mask(&self) -> c_int {
         let mut mask: c_int = 0;
         if self.calls { mask |= ffi::LUA_MASKCALL }
