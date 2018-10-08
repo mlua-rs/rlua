@@ -626,9 +626,13 @@ impl Lua {
         }
     }
 
-    /// Set a function for Lua to call on conditions configured by `options`. This function will
+    /// Set a function for Lua to call on conditions configured by `triggers`. This function will
     /// always succeed, but the hook may raise an error to be reported back to the caller when
     /// running Lua code.
+    ///
+    /// You may use this functionality for a few reasons. You may limit yourself to viewing the
+    /// information or react to certain events. However, you can also use it to limit for how long
+    /// the script will run.
     ///
     /// # Example
     ///
@@ -655,14 +659,14 @@ impl Lua {
     /// ```
     pub fn set_hook<F>(
         &self,
-        options: HookTriggers,
+        triggers: HookTriggers,
         callback: F)
     where
         F: 'static + Send + FnMut(&Debug) -> Result<()>
     {
         unsafe {
             (*extra_data(self.state)).hook_callback = Some(Box::new(callback));
-            ffi::lua_sethook(self.state, Some(hook_proc), options.mask(), options.count());
+            ffi::lua_sethook(self.state, Some(hook_proc), triggers.mask(), triggers.count());
         }
     }
 
