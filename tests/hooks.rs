@@ -3,18 +3,19 @@ extern crate rlua;
 use std::sync::mpsc::{channel, TryRecvError};
 use std::ops::Deref;
 use std::time::{Instant, Duration};
-use rlua::{Lua, Debug, HookOptions, Error, Value};
+use rlua::{Lua, Debug, HookTriggers, Error, Value};
 
 #[test]
 fn line_counts() {
-    let code = r#"local x = 2 + 3
-    local y = x * 63
-    local z = string.len(x..", "..y)
+    let code = r#"
+        local x = 2 + 3
+        local y = x * 63
+        local z = string.len(x..", "..y)
     "#;
 
     let (sx, rx) = channel();
     let lua = Lua::new();
-    lua.set_mut_hook(HookOptions {
+    lua.set_hook(HookTriggers {
         lines: true, ..Default::default()
     }, move |debug: &Debug| {
         let _ = sx.send(debug.curr_line);
@@ -22,9 +23,9 @@ fn line_counts() {
     });
     let _: () = lua.exec(code, None).expect("exec error");
 
-    assert_eq!(rx.try_recv(), Ok(1));
     assert_eq!(rx.try_recv(), Ok(2));
     assert_eq!(rx.try_recv(), Ok(3));
+    assert_eq!(rx.try_recv(), Ok(4));
     assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
 }
 
@@ -34,7 +35,7 @@ fn function_calls() {
 
     let (sx, rx) = channel();
     let lua = Lua::new();
-    lua.set_mut_hook(HookOptions {
+    lua.set_hook(HookTriggers {
         calls: true, ..Default::default()
     }, move |debug: &Debug| {
         let _ = sx.send(debug.to_owned());
@@ -49,7 +50,7 @@ fn function_calls() {
 #[test]
 fn error_within_hook() {
     let lua = Lua::new();
-    lua.set_hook(HookOptions {
+    lua.set_hook(HookTriggers {
         lines: true, ..Default::default()
     }, |_debug: &Debug| {
         Err(Error::RuntimeError("Something happened in there!".to_string()))
@@ -76,8 +77,8 @@ fn limit_execution_time() {
 
     let lua = Lua::new();
     let _ = lua.globals().set("x", Value::Integer(0));
-    lua.set_hook(HookOptions {
-        after_counts: true, count: 30, ..Default::default()
+    lua.set_hook(HookTriggers {
+        after_counts: Some(30), ..Default::default()
     }, move |_debug: &Debug| {
         if start.elapsed() >= Duration::from_millis(500) {
             Err(Error::RuntimeError("time's up".to_string()))
@@ -96,8 +97,8 @@ fn hook_removal() {
     let code = r#"local x = 1"#;
     let lua = Lua::new();
 
-    lua.set_hook(HookOptions {
-        after_counts: true, count: 1, ..Default::default()
+    lua.set_hook(HookTriggers {
+        after_counts: Some(1), ..Default::default()
     }, |_debug: &Debug| {
         Err(Error::RuntimeError("this hook should've been removed by this time".to_string()))
     });

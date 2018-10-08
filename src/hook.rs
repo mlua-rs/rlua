@@ -25,7 +25,10 @@ pub struct Debug<'a> {
     pub num_params: u32,
     pub is_vararg: bool,
     pub is_tailcall: bool,
-    pub short_src: Option<Cow<'a, str>>
+    pub short_src: Option<Cow<'a, str>>,
+
+    #[doc(hidden)]
+    _unused: ()
 }
 
 impl<'a> Debug<'a> {
@@ -44,46 +47,71 @@ impl<'a> Debug<'a> {
             num_params: self.num_params,
             is_vararg: self.is_vararg,
             is_tailcall: self.is_tailcall,
-            short_src: self.short_src.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string())))
+            short_src: self.short_src.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
+            _unused: ()
         }
     }
 }
 
 /// Indicate in which circumstances the hook should be called by Lua.
-pub struct HookOptions {
+///
+/// # Usage
+///
+/// In order to clearly show which fields you are setting to `true` or `Some`, it is highly
+/// recommended you use the `Default` trait to fill in any remaining fields. This will also cover
+/// you in case new hook features gets added to Lua.
+///
+/// # Example
+///
+/// Constructs a `HookTriggers` structure that tells Lua to call the hook after every instruction.
+/// Note the use of `Default`.
+///
+/// ```
+/// # use rlua::HookTriggers;
+/// # fn main() {
+/// let triggers = HookTriggers {
+///     after_counts: Some(1), ..Default::default()
+/// };
+/// # let _ = triggers;
+/// # }
+/// ```
+pub struct HookTriggers {
     /// Before a function call.
     pub calls: bool,
     /// When Lua returns from a function.
     pub returns: bool,
     /// Before executing a new line, or returning from a function call.
     pub lines: bool,
-    /// After a certain amount of instructions specified by `count`.
-    pub after_counts: bool,
-    /// Specify how many instructions to execute before calling the hook. Only effective when
-    /// `after_counts` is set to true.
-    pub count: u32
+    /// After a certain amount of instructions. When set to `Some(count)`, `count` is the number of
+    /// instructions to execute before calling the hook.
+    pub after_counts: Option<u32>,
 }
 
-impl HookOptions {
-    // Compute the mask to pass to `lua_sethook`.
+impl HookTriggers {
+    /// Compute the mask to pass to `lua_sethook`.
     pub(crate) fn mask(&self) -> c_int {
         let mut mask: c_int = 0;
         if self.calls { mask |= ffi::LUA_MASKCALL }
         if self.returns { mask |= ffi::LUA_MASKRET }
         if self.lines { mask |= ffi::LUA_MASKLINE }
-        if self.after_counts { mask |= ffi::LUA_MASKCOUNT }
+        if self.after_counts.is_some() { mask |= ffi::LUA_MASKCOUNT }
         mask
+    }
+
+    /// Returns the `count` parameter to pass to `lua_sethook`, if applicable. Otherwise, zero is
+    /// returned.
+    pub(crate) fn count(&self) -> c_int {
+        self.after_counts.unwrap_or(0) as c_int
     }
 }
 
-impl Default for HookOptions {
+impl Default for HookTriggers {
     fn default() -> Self {
-        HookOptions {
+        HookTriggers {
             calls: false,
             returns: false,
             lines: false,
-            after_counts: false,
-            count: 0
+            after_counts: None
         }
     }
 }
@@ -111,7 +139,8 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             is_tailcall: (*ar).istailcall == 1,
             short_src: str::from_utf8(mem::transmute((*ar).short_src.as_ref()))
                 .and_then(|r| Ok(Some(Cow::from(r))))
-                .unwrap_or(None)
+                .unwrap_or(None),
+            _unused: ()
         };
 
         let cb = extra.hook_callback

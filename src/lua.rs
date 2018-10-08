@@ -26,7 +26,7 @@ use util::{
     userdata_destructor, StackGuard,
 };
 use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-use hook::{Debug, HookOptions, hook_proc};
+use hook::{Debug, HookTriggers, hook_proc};
 
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
@@ -633,7 +633,7 @@ impl Lua {
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::{Lua, HookOptions, Debug};
+    /// # use rlua::{Lua, HookTriggers, Debug};
     /// # fn main() {
     /// let code = r#"local x = 2 + 3
     /// local y = x * 63
@@ -641,7 +641,7 @@ impl Lua {
     /// "#;
     ///
     /// let lua = Lua::new();
-    /// lua.set_hook(HookOptions {
+    /// lua.set_hook(HookTriggers {
     ///     lines: true, ..Default::default()
     /// }, |debug: &Debug| {
     ///     println!("line {}", debug.curr_line);
@@ -652,28 +652,14 @@ impl Lua {
     /// ```
     pub fn set_hook<F>(
         &self,
-        options: HookOptions,
-        callback: F)
-    where
-        F: 'static + Send + Fn(&Debug) -> Result<()>
-    {
-        self.set_mut_hook(options, callback)
-    }
-
-    /// Set a function for Lua the same way as [`set_hook`], but allows the use of a mutable
-    /// function. The behavior is the same otherwise.
-    ///
-    /// [`set_hook`]: #method.set_hook
-    pub fn set_mut_hook<F>(
-        &self,
-        options: HookOptions,
+        options: HookTriggers,
         callback: F)
     where
         F: 'static + Send + FnMut(&Debug) -> Result<()>
     {
         unsafe {
             (*extra_data(self.state)).hook_callback = Some(Box::new(callback));
-            ffi::lua_sethook(self.state, Some(hook_proc), options.mask() as _, options.count as _);
+            ffi::lua_sethook(self.state, Some(hook_proc), options.mask(), options.count());
         }
     }
 
