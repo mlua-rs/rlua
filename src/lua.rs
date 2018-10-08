@@ -629,8 +629,25 @@ impl Lua {
     /// # Example
     ///
     /// Shows each line of code being executed by the Lua interpreter.
-    /// TODO: When finished.
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, HookOptions, Debug};
+    /// # fn main() {
+    /// let code = r#"local x = 2 + 3
+    /// local y = x * 63
+    /// local z = string.len(x..", "..y)
+    /// "#;
     ///
+    /// let lua = Lua::new();
+    /// lua.set_hook(HookOptions {
+    ///     lines: true, ..Default::default()
+    /// }, |debug: &Debug| {
+    ///     println!("line {}", debug.curr_line);
+    ///     Ok(())
+    /// });
+    /// let _ = lua.exec::<_, ()>(code, None);
+    /// # }
+    /// ```
     pub fn set_hook<F>(
         &self,
         options: HookOptions,
