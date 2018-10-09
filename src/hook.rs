@@ -70,7 +70,7 @@ impl<'a> Debug<'a> {
 /// # use rlua::HookTriggers;
 /// # fn main() {
 /// let triggers = HookTriggers {
-///     after_counts: Some(1), ..Default::default()
+///     on_every_nth_instruction: Some(1), ..Default::default()
 /// };
 /// # let _ = triggers;
 /// # }
