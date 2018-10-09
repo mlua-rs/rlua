@@ -77,41 +77,41 @@ impl<'a> Debug<'a> {
 /// ```
 pub struct HookTriggers {
     /// Before a function call.
-    pub calls: bool,
+    pub on_calls: bool,
     /// When Lua returns from a function.
-    pub returns: bool,
+    pub on_returns: bool,
     /// Before executing a new line, or returning from a function call.
-    pub lines: bool,
+    pub each_line: bool,
     /// After a certain amount of instructions. When set to `Some(count)`, `count` is the number of
     /// instructions to execute before calling the hook.
-    pub after_counts: Option<u32>,
+    pub on_every_nth_instruction: Option<u32>,
 }
 
 impl HookTriggers {
     /// Compute the mask to pass to `lua_sethook`.
     pub(crate) fn mask(&self) -> c_int {
         let mut mask: c_int = 0;
-        if self.calls { mask |= ffi::LUA_MASKCALL }
-        if self.returns { mask |= ffi::LUA_MASKRET }
-        if self.lines { mask |= ffi::LUA_MASKLINE }
-        if self.after_counts.is_some() { mask |= ffi::LUA_MASKCOUNT }
+        if self.on_calls { mask |= ffi::LUA_MASKCALL }
+        if self.on_returns { mask |= ffi::LUA_MASKRET }
+        if self.each_line { mask |= ffi::LUA_MASKLINE }
+        if self.on_every_nth_instruction.is_some() { mask |= ffi::LUA_MASKCOUNT }
         mask
     }
 
     /// Returns the `count` parameter to pass to `lua_sethook`, if applicable. Otherwise, zero is
     /// returned.
     pub(crate) fn count(&self) -> c_int {
-        self.after_counts.unwrap_or(0) as c_int
+        self.on_every_nth_instruction.unwrap_or(0) as c_int
     }
 }
 
 impl Default for HookTriggers {
     fn default() -> Self {
         HookTriggers {
-            calls: false,
-            returns: false,
-            lines: false,
-            after_counts: None
+            on_calls: false,
+            on_returns: false,
+            each_line: false,
+            on_every_nth_instruction: None
         }
     }
 }
@@ -145,7 +145,7 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
 
         let cb = extra.hook_callback
             .as_mut()
-            .expect("no hooks previously set; this is a bug");
+            .expect("rlua internal error: no hooks previously set; this is a bug");
         cb(&debug)
     });
 }

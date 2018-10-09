@@ -16,7 +16,7 @@ fn line_counts() {
     let (sx, rx) = channel();
     let lua = Lua::new();
     lua.set_hook(HookTriggers {
-        lines: true, ..Default::default()
+        each_line: true, ..Default::default()
     }, move |debug: &Debug| {
         let _ = sx.send(debug.curr_line);
         Ok(())
@@ -36,7 +36,7 @@ fn function_calls() {
     let (sx, rx) = channel();
     let lua = Lua::new();
     lua.set_hook(HookTriggers {
-        calls: true, ..Default::default()
+        on_calls: true, ..Default::default()
     }, move |debug: &Debug| {
         let _ = sx.send(debug.to_owned());
         Ok(())
@@ -51,7 +51,7 @@ fn function_calls() {
 fn error_within_hook() {
     let lua = Lua::new();
     lua.set_hook(HookTriggers {
-        lines: true, ..Default::default()
+        each_line: true, ..Default::default()
     }, |_debug: &Debug| {
         Err(Error::RuntimeError("Something happened in there!".to_string()))
     });
@@ -78,7 +78,7 @@ fn limit_execution_time() {
     let lua = Lua::new();
     let _ = lua.globals().set("x", Value::Integer(0));
     lua.set_hook(HookTriggers {
-        after_counts: Some(30), ..Default::default()
+        on_every_nth_instruction: Some(30), ..Default::default()
     }, move |_debug: &Debug| {
         if start.elapsed() >= Duration::from_millis(500) {
             Err(Error::RuntimeError("time's up".to_string()))
@@ -98,7 +98,7 @@ fn hook_removal() {
     let lua = Lua::new();
 
     lua.set_hook(HookTriggers {
-        after_counts: Some(1), ..Default::default()
+        on_every_nth_instruction: Some(1), ..Default::default()
     }, |_debug: &Debug| {
         Err(Error::RuntimeError("this hook should've been removed by this time".to_string()))
     });
