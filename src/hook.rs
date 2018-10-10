@@ -70,7 +70,7 @@ impl<'a> Debug<'a> {
 /// # use rlua::HookTriggers;
 /// # fn main() {
 /// let triggers = HookTriggers {
-///     on_every_nth_instruction: Some(1), ..Default::default()
+///     every_nth_instruction: Some(1), ..Default::default()
 /// };
 /// # let _ = triggers;
 /// # }
@@ -81,10 +81,20 @@ pub struct HookTriggers {
     /// When Lua returns from a function.
     pub on_returns: bool,
     /// Before executing a new line, or returning from a function call.
-    pub each_line: bool,
+    pub every_line: bool,
     /// After a certain amount of instructions. When set to `Some(count)`, `count` is the number of
     /// instructions to execute before calling the hook.
-    pub on_every_nth_instruction: Option<u32>,
+    ///
+    /// # Performance
+    ///
+    /// Setting this to a low value will certainly result in a large overhead due to the crate's
+    /// safety layer and convenience wrapped over Lua's low-level hooks. `1` is such an example of
+    /// a high overhead choice.
+    ///
+    /// Please find a number that is high enough so it's not that bad of an issue, while still
+    /// having enough precision for your needs. Keep in mind instructions are additions, calls to
+    /// functions, assignments to variables, etc.; they are very short.
+    pub every_nth_instruction: Option<u32>,
 }
 
 impl HookTriggers {
@@ -93,15 +103,15 @@ impl HookTriggers {
         let mut mask: c_int = 0;
         if self.on_calls { mask |= ffi::LUA_MASKCALL }
         if self.on_returns { mask |= ffi::LUA_MASKRET }
-        if self.each_line { mask |= ffi::LUA_MASKLINE }
-        if self.on_every_nth_instruction.is_some() { mask |= ffi::LUA_MASKCOUNT }
+        if self.every_line { mask |= ffi::LUA_MASKLINE }
+        if self.every_nth_instruction.is_some() { mask |= ffi::LUA_MASKCOUNT }
         mask
     }
 
     /// Returns the `count` parameter to pass to `lua_sethook`, if applicable. Otherwise, zero is
     /// returned.
     pub(crate) fn count(&self) -> c_int {
-        self.on_every_nth_instruction.unwrap_or(0) as c_int
+        self.every_nth_instruction.unwrap_or(0) as c_int
     }
 }
 
@@ -110,8 +120,8 @@ impl Default for HookTriggers {
         HookTriggers {
             on_calls: false,
             on_returns: false,
-            each_line: false,
-            on_every_nth_instruction: None
+            every_line: false,
+            every_nth_instruction: None
         }
     }
 }
