@@ -1,5 +1,6 @@
 extern crate rlua;
 
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, TryRecvError};
 use std::ops::Deref;
 use std::time::{Instant, Duration};
@@ -107,3 +108,32 @@ fn hook_removal() {
     lua.remove_hook();
     assert!(lua.exec::<_, ()>(code, None).is_ok());
 }
+
+/* TODO: Will need to get readjusted.
+#[test]
+fn hook_swap_within_hook() {
+    let code = r#"
+        local x = 1
+        x = 2
+        local y = 3
+    "#.trim_left_matches("\r\n");
+    let lua = Lua::new();
+
+    lua.set_hook(HookTriggers {
+        every_line: true, ..Default::default()
+    }, |_debug| {
+        lua.globals().set("ok", 1i64);
+        lua.set_hook(HookTriggers {
+            every_line: true, ..Default::default()
+        }, |_debug| {
+            lua.globals().set("ok", 2i64);
+            lua.remove_hook();
+            Ok(())
+        });
+        Ok(())
+    });
+
+    assert!(lua.exec::<_, ()>(code, None).is_ok());
+    assert_eq!(lua.globals().get::<_, i64>("ok").unwrap_or(-1), 2);
+}
+*/

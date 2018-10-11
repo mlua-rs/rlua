@@ -133,8 +133,6 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             rlua_panic!("lua_getinfo failed")
         }
 
-        let extra = &mut *extra_data(state);
-
         let debug = Debug {
             name: ptr_to_str((*ar).name as *const i8),
             namewhat: ptr_to_str((*ar).namewhat as *const i8),
@@ -153,10 +151,10 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             _unused: ()
         };
 
-        let cb = extra.hook_callback
-            .as_mut()
+        let cb = (&*extra_data(state)).hook_callback
+            .as_ref()
             .expect("rlua internal error: no hooks previously set; this is a bug");
-        cb(&debug)
+        (*cb)(&debug)
     });
 }
 
