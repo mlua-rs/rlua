@@ -8,7 +8,6 @@ use std::os::raw::{c_char, c_int, c_void};
 use std::string::String as StdString;
 use std::sync::{Arc, Mutex};
 use std::{mem, ptr, str};
-use std::sync::atomic::{Ordering, AtomicBool};
 
 use libc;
 
@@ -84,7 +83,7 @@ impl Lua {
     where
         S: ?Sized + AsRef<[u8]>,
     {
-        self.execution_scope(|| unsafe {
+        unsafe {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 1);
             let source = source.as_ref();
@@ -113,7 +112,7 @@ impl Lua {
                 ffi::LUA_OK => Ok(Function(self.pop_ref())),
                 err => Err(pop_error(self.state, err)),
             }
-        })
+        }
     }
 
     /// Execute a chunk of Lua code.
@@ -131,7 +130,7 @@ impl Lua {
         S: ?Sized + AsRef<[u8]>,
         R: FromLuaMulti<'lua>,
     {
-        self.execution_scope(|| self.load(source, name)?.call(()))
+        self.load(source, name)?.call(())
     }
 
     /// Evaluate the given expression or chunk inside this Lua state.
@@ -148,11 +147,9 @@ impl Lua {
         // actual lua repl does.
         let mut return_source = "return ".as_bytes().to_vec();
         return_source.extend(source.as_ref());
-        self.execution_scope(||
-            self.load(&return_source, name)
-                .or_else(|_| self.load(source, name))?
-                .call(())
-        )
+        self.load(&return_source, name)
+            .or_else(|_| self.load(source, name))?
+            .call(())
     }
 
     /// Create and return an interned Lua string.  Lua strings can be arbitrary [u8] data including
@@ -1006,21 +1003,6 @@ impl Lua {
 
         Ok(AnyUserData(self.pop_ref()))
     }
-
-    // Any code that desires to tell Lua to execute code should go through this function. It will
-    // panic if it is running within a hook.
-    fn execution_scope<F, R>(&self, proc: F) -> Result<R>
-    where
-        F: FnOnce() -> Result<R>,
-        R: Sized
-    {
-        let in_hook = (unsafe { &*extra_data(self.state) }).in_hook.load(Ordering::Relaxed);
-        if in_hook {
-            rlua_panic!("attempted to run code within a hook")
-        } else {
-            proc()
-        }
-    }
 }
 
 // Data associated with the main lua_State via lua_getextraspace.
@@ -1033,9 +1015,7 @@ pub(crate) struct ExtraData {
     ref_stack_max: c_int,
     ref_free: Vec<c_int>,
 
-    pub hook_callback: Option<Rc<Fn(&Debug) -> Result<()>>>,
-    // When this boolean is true, `Lua::execution_scope` will refuse to run to prevent recursion.
-    pub in_hook: AtomicBool
+    pub hook_callback: Option<Rc<Fn(&Debug) -> Result<()>>>
 }
 
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
@@ -1147,8 +1127,7 @@ unsafe fn create_lua(load_debug: bool) -> Lua {
         ref_stack_size: ffi::LUA_MINSTACK - 1,
         ref_stack_max: 0,
         ref_free: Vec::new(),
-        hook_callback: None,
-        in_hook: AtomicBool::new(false)
+        hook_callback: None
     }));
     *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra;
 
