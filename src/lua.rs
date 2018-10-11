@@ -1,5 +1,6 @@
 use std::any::TypeId;
 use std::cell::{RefCell, UnsafeCell};
+use std::rc::Rc;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::marker::PhantomData;
@@ -659,10 +660,10 @@ impl Lua {
         triggers: HookTriggers,
         callback: F)
     where
-        F: 'static + Send + FnMut(&Debug) -> Result<()>
+        F: 'static + Send + Fn(&Debug) -> Result<()>
     {
         unsafe {
-            (*extra_data(self.state)).hook_callback = Some(Box::new(callback));
+            (*extra_data(self.state)).hook_callback = Some(Rc::new(callback));
             ffi::lua_sethook(self.state, Some(hook_proc), triggers.mask(), triggers.count());
         }
     }
@@ -1014,7 +1015,7 @@ pub(crate) struct ExtraData {
     ref_stack_max: c_int,
     ref_free: Vec<c_int>,
 
-    pub hook_callback: Option<Box<FnMut(&Debug) -> Result<()>>>
+    pub hook_callback: Option<Rc<Fn(&Debug) -> Result<()>>>
 }
 
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
