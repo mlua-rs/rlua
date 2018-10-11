@@ -2,7 +2,7 @@ use std::{slice, ptr, mem, str};
 use std::borrow::Cow;
 use libc::{self, c_int};
 use ffi::{self, lua_State, lua_Debug};
-use lua::extra_data;
+use lua::{Lua, extra_data};
 use util::callback_error;
 
 /// Contains information about the running code at the moments specified when setting the hook.
@@ -133,6 +133,7 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             rlua_panic!("lua_getinfo failed")
         }
 
+        let lua = Lua::from_state(state, false);
         let debug = Debug {
             name: ptr_to_str((*ar).name as *const i8),
             namewhat: ptr_to_str((*ar).namewhat as *const i8),
@@ -154,7 +155,11 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
         let cb = (&*extra_data(state)).hook_callback
             .as_ref()
             .expect("rlua internal error: no hooks previously set; this is a bug");
-        (*cb)(&debug)
+        (&mut *match cb.try_borrow_mut() {
+            Ok(b) => b,
+            Err(_) => rlua_panic!("Lua should not allow hooks to be called within another hook;\
+                please make an issue")
+        })(lua, &debug)
     });
 }
 

@@ -24,11 +24,20 @@
 //! The [`UserData`] trait can be implemented by user-defined types to make them available to Lua.
 //! Methods and operators to be used from Lua can be added using the [`UserDataMethods`] API.
 //!
+//! # Hooks
+//!
+//! The [`Lua`] struct provides you with a [`hook`] setter method which you may call to gain
+//! information about your script or simply to control it.
+//!
+//! You are safe to use an `FnMut` function as Lua will never call your hook if you are executing
+//! more Lua code within the hook. You have full access to Lua from it.
+//!
 //! [Lua programming language]: https://www.lua.org/
 //! [`Lua`]: struct.Lua.html
 //! [executing]: struct.Lua.html#method.exec
 //! [evaluating]: struct.Lua.html#method.eval
 //! [globals]: struct.Lua.html#method.globals
+//! [hook]: struct.Lua.html#method.set_hook
 //! [`ToLua`]: trait.ToLua.html
 //! [`FromLua`]: trait.FromLua.html
 //! [`ToLuaMulti`]: trait.ToLuaMulti.html
