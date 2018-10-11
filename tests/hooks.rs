@@ -1,6 +1,5 @@
 extern crate rlua;
 
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, TryRecvError};
 use std::ops::Deref;
 use std::time::{Instant, Duration};
@@ -18,7 +17,7 @@ fn line_counts() {
     let lua = Lua::new();
     lua.set_hook(HookTriggers {
         every_line: true, ..Default::default()
-    }, move |debug: &Debug| {
+    }, move |_lua, debug: &Debug| {
         let _ = sx.send(debug.curr_line);
         Ok(())
     });
@@ -38,7 +37,7 @@ fn function_calls() {
     let lua = Lua::new();
     lua.set_hook(HookTriggers {
         on_calls: true, ..Default::default()
-    }, move |debug: &Debug| {
+    }, move |_lua, debug: &Debug| {
         let _ = sx.send(debug.to_owned());
         Ok(())
     });
@@ -53,7 +52,7 @@ fn error_within_hook() {
     let lua = Lua::new();
     lua.set_hook(HookTriggers {
         every_line: true, ..Default::default()
-    }, |_debug: &Debug| {
+    }, |_lua, _debug: &Debug| {
         Err(Error::RuntimeError("Something happened in there!".to_string()))
     });
 
@@ -80,7 +79,7 @@ fn limit_execution_time() {
     let _ = lua.globals().set("x", Value::Integer(0));
     lua.set_hook(HookTriggers {
         every_nth_instruction: Some(30), ..Default::default()
-    }, move |_debug: &Debug| {
+    }, move |_lua, _debug: &Debug| {
         if start.elapsed() >= Duration::from_millis(500) {
             Err(Error::RuntimeError("time's up".to_string()))
         } else {
@@ -100,7 +99,7 @@ fn hook_removal() {
 
     lua.set_hook(HookTriggers {
         every_nth_instruction: Some(1), ..Default::default()
-    }, |_debug: &Debug| {
+    }, |_lua, _debug: &Debug| {
         Err(Error::RuntimeError("this hook should've been removed by this time".to_string()))
     });
     assert!(lua.exec::<_, ()>(code, None).is_err());

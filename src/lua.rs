@@ -73,6 +73,18 @@ impl Lua {
         create_lua(true)
     }
 
+    /// Creates a new Lua state from a state already declared. It is assumed `state` is valid.
+    /// `owns`, if true, indicates `state` is not bound to another `Lua` structure, as opposed to
+    /// false, which will make the new structure act as a simple wrapper.
+    pub(crate) unsafe fn from_state(state: *mut ffi::lua_State, owns: bool) -> Lua {
+        Lua {
+            state,
+            main_state: state,
+            ephemeral: !owns,
+            _phantom: PhantomData
+        }
+    }
+
     /// Loads a chunk of Lua code and returns it as a function.
     ///
     /// The source can be named by setting the `name` parameter. This is generally recommended as it
@@ -651,7 +663,7 @@ impl Lua {
     /// let lua = Lua::new();
     /// lua.set_hook(HookTriggers {
     ///     every_line: true, ..Default::default()
-    /// }, |debug: &Debug| {
+    /// }, |_lua: Lua, debug: &Debug| {
     ///     println!("line {}", debug.curr_line);
     ///     Ok(())
     /// });
@@ -663,10 +675,10 @@ impl Lua {
         triggers: HookTriggers,
         callback: F)
     where
-        F: 'static + Send + Fn(&Debug) -> Result<()>
+        F: 'static + Send + FnMut(Lua, &Debug) -> Result<()>
     {
         unsafe {
-            (*extra_data(self.state)).hook_callback = Some(Rc::new(callback));
+            (*extra_data(self.state)).hook_callback = Some(Rc::new(RefCell::new(callback)));
             ffi::lua_sethook(self.state, Some(hook_proc), triggers.mask(), triggers.count());
         }
     }
@@ -985,7 +997,7 @@ pub(crate) struct ExtraData {
     ref_stack_max: c_int,
     ref_free: Vec<c_int>,
 
-    pub hook_callback: Option<Rc<Fn(&Debug) -> Result<()>>>
+    pub hook_callback: Option<Rc<RefCell<FnMut(Lua, &Debug) -> Result<()>>>>
 }
 
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
