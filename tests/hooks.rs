@@ -108,7 +108,6 @@ fn hook_removal() {
     assert!(lua.exec::<_, ()>(code, None).is_ok());
 }
 
-/* TODO: Will need to get readjusted.
 #[test]
 fn hook_swap_within_hook() {
     let code = r#"
@@ -116,16 +115,18 @@ fn hook_swap_within_hook() {
         x = 2
         local y = 3
     "#.trim_left_matches("\r\n");
+    let inc_code = r#"if ok ~= nil then ok = ok + 1 end"#;
     let lua = Lua::new();
 
     lua.set_hook(HookTriggers {
         every_line: true, ..Default::default()
-    }, |_debug| {
+    }, move |lua, _debug| {
         lua.globals().set("ok", 1i64);
         lua.set_hook(HookTriggers {
             every_line: true, ..Default::default()
-        }, |_debug| {
-            lua.globals().set("ok", 2i64);
+        }, move |lua: Lua, _debug| {
+            let _: () = lua.exec(inc_code, Some("hook_incrementer"))
+                .expect("exec failure within hook");
             lua.remove_hook();
             Ok(())
         });
@@ -135,4 +136,4 @@ fn hook_swap_within_hook() {
     assert!(lua.exec::<_, ()>(code, None).is_ok());
     assert_eq!(lua.globals().get::<_, i64>("ok").unwrap_or(-1), 2);
 }
-*/
+
