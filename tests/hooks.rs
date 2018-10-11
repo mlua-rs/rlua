@@ -1,5 +1,6 @@
 extern crate rlua;
 
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, TryRecvError};
 use std::ops::Deref;
 use std::time::{Instant, Duration};
