@@ -18,7 +18,7 @@ fn line_counts() {
     lua.set_hook(HookTriggers {
         every_line: true, ..Default::default()
     }, move |_lua, debug: &Debug| {
-        let _ = sx.send(debug.curr_line);
+        sx.send(debug.curr_line).unwrap();
         Ok(())
     });
     let _: () = lua.exec(code, None).expect("exec error");
@@ -38,7 +38,7 @@ fn function_calls() {
     lua.set_hook(HookTriggers {
         on_calls: true, ..Default::default()
     }, move |_lua, debug: &Debug| {
-        let _ = sx.send(debug.to_owned());
+        sx.send(debug.to_owned()).unwrap();
         Ok(())
     });
     let _: () = lua.exec(code, None).expect("exec error");
@@ -76,7 +76,7 @@ fn limit_execution_time() {
     let start = Instant::now();
 
     let lua = Lua::new();
-    let _ = lua.globals().set("x", Value::Integer(0));
+    lua.globals().set("x", Value::Integer(0)).unwrap();
     lua.set_hook(HookTriggers {
         every_nth_instruction: Some(30), ..Default::default()
     }, move |_lua, _debug: &Debug| {
@@ -120,8 +120,8 @@ fn hook_swap_within_hook() {
 
     lua.set_hook(HookTriggers {
         every_line: true, ..Default::default()
-    }, move |lua, _debug| {
-        let _ = lua.globals().set("ok", 1i64);
+    }, move |lua: Lua, _debug| {
+        lua.globals().set("ok", 1i64).unwrap();
         lua.set_hook(HookTriggers {
             every_line: true, ..Default::default()
         }, move |lua: Lua, _debug| {

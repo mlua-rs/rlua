@@ -74,13 +74,11 @@ impl Lua {
     }
 
     /// Creates a new Lua state from a state already declared. It is assumed `state` is valid.
-    /// `owns`, if true, indicates `state` is not bound to another `Lua` structure, as opposed to
-    /// false, which will make the new structure act as a simple wrapper.
-    pub(crate) unsafe fn from_state(state: *mut ffi::lua_State, owns: bool) -> Lua {
+    pub(crate) unsafe fn from_state(state: *mut ffi::lua_State) -> Lua {
         Lua {
             state,
-            main_state: state,
-            ephemeral: !owns,
+            main_state: main_state(state),
+            ephemeral: true,
             _phantom: PhantomData
         }
     }

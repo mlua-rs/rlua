@@ -133,7 +133,7 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             rlua_panic!("lua_getinfo failed")
         }
 
-        let lua = Lua::from_state(state, false);
+        let lua = Lua::from_state(state);
         let debug = Debug {
             name: ptr_to_str((*ar).name as *const i8),
             namewhat: ptr_to_str((*ar).namewhat as *const i8),
