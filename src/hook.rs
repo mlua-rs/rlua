@@ -1,5 +1,6 @@
 use std::{slice, ptr, mem, str};
 use std::borrow::Cow;
+use std::sync::atomic::Ordering;
 use libc::{self, c_int};
 use ffi::{self, lua_State, lua_Debug};
 use lua::extra_data;
@@ -128,7 +129,7 @@ impl Default for HookTriggers {
 
 /// This callback is passed to `lua_sethook` and gets called whenever debug information is received.
 pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_Debug) {
-    callback_error(state, || {
+    let result = callback_error(state, || {
         if ffi::lua_getinfo(state, cstr!("nSltu"), ar) == 0 {
             rlua_panic!("lua_getinfo failed")
         }
@@ -151,11 +152,14 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             _unused: ()
         };
 
+        (&mut *extra_data(state)).in_hook.store(true, Ordering::Relaxed);
         let cb = (&*extra_data(state)).hook_callback
             .as_ref()
             .expect("rlua internal error: no hooks previously set; this is a bug");
         (*cb)(&debug)
     });
+    (&mut *extra_data(state)).in_hook.store(false, Ordering::Relaxed);
+    result
 }
 
 unsafe fn ptr_to_str<'a>(input: *const i8) -> Option<Cow<'a, str>> {
