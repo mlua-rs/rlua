@@ -18,7 +18,7 @@ fn line_counts() {
     lua.set_hook(HookTriggers {
         every_line: true, ..Default::default()
     }, move |_lua, debug: &Debug| {
-        sx.send(debug.curr_line).unwrap();
+        sx.send(debug.curr_line()).unwrap();
         Ok(())
     });
     let _: () = lua.exec(code, None).expect("exec error");
@@ -38,13 +38,17 @@ fn function_calls() {
     lua.set_hook(HookTriggers {
         on_calls: true, ..Default::default()
     }, move |_lua, debug: &Debug| {
-        sx.send(debug.to_owned()).unwrap();
+        let names = debug.names();
+        let source = debug.source();
+        let name = names.name.map(|s| s.to_string());
+        let what = source.what.map(|s| s.to_string());
+        sx.send((name, what)).unwrap();
         Ok(())
     });
     let _: () = lua.exec(code, None).expect("exec error");
 
-    assert_eq!(rx.recv().unwrap().what.as_ref().unwrap().as_ref(), "main");
-    assert_eq!(rx.recv().unwrap().name.as_ref().unwrap().as_ref(), "len");
+    assert_eq!(rx.recv().unwrap(), (None, Some("main".to_string())));
+    assert_eq!(rx.recv().unwrap(), (Some("len".to_string()), Some("C".to_string())));
 }
 
 #[test]

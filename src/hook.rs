@@ -1,56 +1,128 @@
-use std::{slice, ptr, mem, str};
-use std::borrow::Cow;
+use std::{slice, ptr, str};
+use std::marker::PhantomData;
 use libc::{self, c_int};
 use ffi::{self, lua_State, lua_Debug};
 use lua::{Lua, extra_data};
 use util::callback_error;
 
 /// Contains information about the running code at the moments specified when setting the hook.
-/// Each field is described in the [Lua 5.3 documentaton][lua_doc].
+/// All the documentation can be read in the [Lua 5.3 documentaton][lua_doc].
 ///
-/// Depending on when the hook is called, some fields might not be available. In these cases,
-/// integers and booleans might not be valid and/or strings are set to `None`.
+/// # Usage
+///
+/// For optimal performance, the user must call the methods that return the information they need to
+/// use. Those methods return a short structure with the data in the fields. That being said,
+/// depending on where the hook is called, some methods might return zeroes and empty strings or
+/// possibly bad values.
+///
+/// This structure does not cache the data obtained; you should only call each function once and
+/// keep the reference obtained for as long as needed. However, you may not outlive the hook
+/// callback; if you need to, please clone the internals that you need and move them outside.
+///
+/// # Panics
+///
+/// This structure contains methods that will panic if there is an internal error. If this happens
+/// to you, please make an issue to rlua's repository. as this behavior isn't normal.
 ///
 /// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#lua_Debug
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Debug<'a> {
-    pub name: Option<Cow<'a, str>>,
-    pub namewhat: Option<Cow<'a, str>>,
-    pub what: Option<Cow<'a, str>>,
-    pub source: Option<Cow<'a, str>>,
-    pub curr_line: u32,
-    pub line_defined: u32,
-    pub last_line_defined: u32,
-    pub num_ups: u32,
-    pub num_params: u32,
-    pub is_vararg: bool,
-    pub is_tailcall: bool,
-    pub short_src: Option<Cow<'a, str>>,
-
-    #[doc(hidden)]
-    _unused: ()
+    ar: *mut lua_Debug,
+    state: *mut lua_State,
+    _phantom: PhantomData<&'a ()>
 }
 
 impl<'a> Debug<'a> {
-    /// Construct a new `Debug` structure that is not associated with a Lua debug structure. It
-    /// involves some string copying.
-    pub fn to_owned(&'a self) -> Debug<'static> {
-        Debug {
-            name: self.name.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
-            namewhat: self.namewhat.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
-            what: self.what.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
-            source: self.source.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
-            curr_line: self.curr_line,
-            line_defined: self.line_defined,
-            last_line_defined: self.last_line_defined,
-            num_ups: self.num_ups,
-            num_params: self.num_params,
-            is_vararg: self.is_vararg,
-            is_tailcall: self.is_tailcall,
-            short_src: self.short_src.as_ref().and_then(|s| Some(Cow::Owned(s.as_ref().to_string()))),
-            _unused: ()
+    /// Corresponds to the `n` what mask.
+    pub fn names(&self) -> Names<'a> {
+        unsafe {
+            if ffi::lua_getinfo(self.state, cstr!("n"), self.ar) == 0 {
+                rlua_panic!("lua_getinfo failed with `n`")
+            } else {
+                Names {
+                    name: ptr_to_str((*self.ar).name as *const i8),
+                    name_what: ptr_to_str((*self.ar).namewhat as *const i8)
+                }
+            }
         }
     }
+
+    /// Corresponds to the `n` what mask.
+    pub fn source(&self) -> Source<'a> {
+        unsafe {
+            if ffi::lua_getinfo(self.state, cstr!("S"), self.ar) == 0 {
+                rlua_panic!("lua_getinfo failed with `S`")
+            } else {
+                Source {
+                    source: ptr_to_str((*self.ar).source as *const i8),
+                    short_src: ptr_to_str((*self.ar).short_src.as_ptr() as *const i8),
+                    line_defined: (*self.ar).linedefined as i32,
+                    last_line_defined: (*self.ar).lastlinedefined as i32,
+                    what: ptr_to_str((*self.ar).what as *const i8),
+                }
+            }
+        }
+    }
+
+    /// Corresponds to the `l` what mask. Returns the current line.
+    pub fn curr_line(&self) -> i32 {
+        unsafe {
+            if ffi::lua_getinfo(self.state, cstr!("l"), self.ar) == 0 {
+                rlua_panic!("lua_getinfo failed with `l`")
+            } else {
+                (*self.ar).currentline as i32
+            }
+        }
+    }
+
+    /// Corresponds to the `t` what mask. Returns true if the hook is in a function tail call, false
+    /// otherwise.
+    pub fn is_tail_call(&self) -> bool {
+        unsafe {
+            if ffi::lua_getinfo(self.state, cstr!("t"), self.ar) == 0 {
+                rlua_panic!("lua_getinfo failed with `t`")
+            } else {
+                (*self.ar).currentline != 0
+            }
+        }
+    }
+
+    /// Corresponds to the `u` what mask.
+    pub fn stack(&self) -> Stack {
+        unsafe {
+            if ffi::lua_getinfo(self.state, cstr!("u"), self.ar) == 0 {
+                rlua_panic!("lua_getinfo failed with `u`")
+            } else {
+                Stack {
+                    num_ups: (*self.ar).nups as i32,
+                    num_params: (*self.ar).nparams as i32,
+                    is_vararg: (*self.ar).isvararg != 0
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Names<'a> {
+    pub name: Option<&'a str>,
+    pub name_what: Option<&'a str>
+}
+
+#[derive(Clone, Debug)]
+pub struct Source<'a> {
+    pub source: Option<&'a str>,
+    pub short_src: Option<&'a str>,
+    pub line_defined: i32,
+    pub last_line_defined: i32,
+    pub what: Option<&'a str>
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Stack {
+    pub num_ups: i32,
+    pub num_params: i32,
+    pub is_vararg: bool
 }
 
 /// Indicate in which circumstances the hook should be called by Lua.
@@ -129,27 +201,9 @@ impl Default for HookTriggers {
 /// This callback is passed to `lua_sethook` and gets called whenever debug information is received.
 pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_Debug) {
     callback_error(state, || {
-        if ffi::lua_getinfo(state, cstr!("nSltu"), ar) == 0 {
-            rlua_panic!("lua_getinfo failed")
-        }
-
         let lua = Lua::make_ephemeral(state);
         let debug = Debug {
-            name: ptr_to_str((*ar).name as *const i8),
-            namewhat: ptr_to_str((*ar).namewhat as *const i8),
-            what: ptr_to_str((*ar).what as *const i8),
-            source: ptr_to_str((*ar).source as *const i8),
-            curr_line: (*ar).currentline as u32,
-            line_defined: (*ar).linedefined as u32,
-            last_line_defined: (*ar).lastlinedefined as u32,
-            num_ups: (*ar).nups as u32,
-            num_params: (*ar).nparams as u32,
-            is_vararg: (*ar).isvararg == 1,
-            is_tailcall: (*ar).istailcall == 1,
-            short_src: str::from_utf8(mem::transmute((*ar).short_src.as_ref()))
-                .and_then(|r| Ok(Some(Cow::from(r))))
-                .unwrap_or(None),
-            _unused: ()
+            ar, state, _phantom: PhantomData
         };
 
         let cb = (&*extra_data(state)).hook_callback
@@ -165,13 +219,13 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
     });
 }
 
-unsafe fn ptr_to_str<'a>(input: *const i8) -> Option<Cow<'a, str>> {
+unsafe fn ptr_to_str<'a>(input: *const i8) -> Option<&'a str> {
     if input == ptr::null() || ptr::read(input) == 0 {
         return None;
     }
     let len = libc::strlen(input) as usize;
     let input = slice::from_raw_parts(input as *const u8, len);
     str::from_utf8(input)
-        .and_then(|r| Ok(Some(Cow::from(r.trim_right()))))
+        .map(|s| Some(s.trim_right()))
         .unwrap_or(None)
 }
