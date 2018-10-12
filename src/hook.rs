@@ -133,7 +133,7 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             rlua_panic!("lua_getinfo failed")
         }
 
-        let lua = Lua::from_state(state);
+        let lua = Lua::make_ephemeral(state);
         let debug = Debug {
             name: ptr_to_str((*ar).name as *const i8),
             namewhat: ptr_to_str((*ar).namewhat as *const i8),
@@ -152,15 +152,16 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             _unused: ()
         };
 
-        let cb = (extra_data(state)).hook_callback
+        let cb = (&*extra_data(state)).hook_callback
             .as_ref()
             .map(|rc| rc.clone())
             .expect("rlua internal error: no hooks previously set; this is a bug");
-        (&mut *match cb.try_borrow_mut() {
-            Ok(b) => b,
+        let outcome = match cb.try_borrow_mut() {
+            Ok(mut b) => (&mut *b)(&lua, &debug),
             Err(_) => rlua_panic!("Lua should not allow hooks to be called within another hook;\
                 please make an issue")
-        })(&lua, &debug)
+        };
+        outcome
     });
 }
 
