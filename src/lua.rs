@@ -658,7 +658,7 @@ impl Lua {
     /// let lua = Lua::new();
     /// lua.set_hook(HookTriggers {
     ///     every_line: true, ..Default::default()
-    /// }, |_lua: Lua, debug: &Debug| {
+    /// }, |_lua: &Lua, debug: &Debug| {
     ///     println!("line {}", debug.curr_line);
     ///     Ok(())
     /// });
@@ -670,7 +670,7 @@ impl Lua {
         triggers: HookTriggers,
         callback: F)
     where
-        F: 'static + Send + FnMut(Lua, &Debug) -> Result<()>
+        F: 'static + Send + FnMut(&Lua, &Debug) -> Result<()>
     {
         unsafe {
             (*extra_data(self.state)).hook_callback = Some(Rc::new(RefCell::new(callback)));
@@ -1025,7 +1025,7 @@ pub(crate) struct ExtraData {
     ref_stack_max: c_int,
     ref_free: Vec<c_int>,
 
-    pub hook_callback: Option<Rc<RefCell<FnMut(Lua, &Debug) -> Result<()>>>>
+    pub hook_callback: Option<Rc<RefCell<FnMut(&Lua, &Debug) -> Result<()>>>>
 }
 
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {

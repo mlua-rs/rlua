@@ -120,11 +120,11 @@ fn hook_swap_within_hook() {
 
     lua.set_hook(HookTriggers {
         every_line: true, ..Default::default()
-    }, move |lua: Lua, _debug| {
+    }, move |lua: &Lua, _debug| {
         lua.globals().set("ok", 1i64).unwrap();
         lua.set_hook(HookTriggers {
             every_line: true, ..Default::default()
-        }, move |lua: Lua, _debug| {
+        }, move |lua: &Lua, _debug| {
             let _: () = lua.exec(inc_code, Some("hook_incrementer"))
                 .expect("exec failure within hook");
             lua.remove_hook();
