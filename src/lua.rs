@@ -74,7 +74,8 @@ impl Lua {
     }
 
     /// Creates a new Lua state from a state already declared. It is assumed `state` is valid.
-    pub(crate) unsafe fn from_state(state: *mut ffi::lua_State) -> Lua {
+    /// this instance will not delete its state after being dropped.
+    pub(crate) unsafe fn make_ephemeral(state: *mut ffi::lua_State) -> Lua {
         Lua {
             state,
             main_state: main_state(state),
@@ -915,12 +916,7 @@ impl Lua {
                     check_stack(state, ffi::LUA_MINSTACK - nargs)?;
                 }
 
-                let lua = Lua {
-                    state: state,
-                    main_state: main_state(state),
-                    ephemeral: true,
-                    _phantom: PhantomData,
-                };
+                let lua = Lua::make_ephemeral(state);
 
                 let mut args = MultiValue::new();
                 args.reserve(nargs as usize);
