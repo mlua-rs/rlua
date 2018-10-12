@@ -663,7 +663,7 @@ impl Lua {
     /// lua.set_hook(HookTriggers {
     ///     every_line: true, ..Default::default()
     /// }, |_lua: &Lua, debug: &Debug| {
-    ///     println!("line {}", debug.curr_line);
+    ///     println!("line {}", debug.curr_line());
     ///     Ok(())
     /// });
     /// let _ = lua.exec::<_, ()>(code, None);
