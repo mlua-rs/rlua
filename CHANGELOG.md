@@ -1,3 +1,7 @@
+## [0.15.3]
+- Fix improper num-traits dependency, proper [ui]128 support only added
+  later in 0.2 series
+
 ## [0.15.2]
 - API Incompatible change: Allow `Lua::load` `Lua::exec` and `Lua::eval` to take
   &String &str and &[u8] like `Lua::create_string` does.  I think this might be
