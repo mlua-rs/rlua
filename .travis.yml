@@ -7,10 +7,10 @@ matrix:
   include:
     - rust: stable
       script:
-        cargo fmt --all -- --check
-        cargo test --all --verbose
+        - cargo fmt --all -- --check
+        - cargo test --all --verbose
     - rust: beta
-        cargo test --all --verbose
+      script: cargo test --all --verbose
     - rust: nightly 
       script: cargo test --all --verbose --features compiletest_rs
   allow_failures:
