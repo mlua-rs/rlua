@@ -962,66 +962,73 @@ unsafe fn create_lua(load_debug: bool) -> Lua {
 
     let state = ffi::lua_newstate(allocator, ptr::null_mut());
 
-    // Ignores or `unwrap()`s 'm' errors, because we are making the assumption that nothing in
-    // the lua standard library will have a `__gc` metamethod error.
+    let ref_thread = rlua_expect!(
+        protect_lua_closure(state, 0, 0, |state| {
+            // Do not open the debug library, it can be used to cause unsafety.
+            ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
+            ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
+            ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
+            ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
+            ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
+            ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
+            ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
+            ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
+            ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
+            ffi::lua_pop(state, 9);
 
-    // Do not open the debug library, it can be used to cause unsafety.
-    ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
-    ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
-    ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
-    ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
-    ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
-    ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
-    ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
-    ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
-    ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
-    ffi::lua_pop(state, 9);
+            init_error_metatables(state);
 
-    init_error_metatables(state);
+            if load_debug {
+                ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
+                ffi::lua_pop(state, 1);
+            }
 
-    if load_debug {
-        ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
-        ffi::lua_pop(state, 1);
-    }
+            // Create the function metatable
 
-    // Create the function metatable
+            ffi::lua_pushlightuserdata(
+                state,
+                &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+            );
 
-    ffi::lua_pushlightuserdata(
-        state,
-        &FUNCTION_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+            ffi::lua_newtable(state);
+
+            ffi::lua_pushstring(state, cstr!("__gc"));
+            ffi::lua_pushcfunction(state, userdata_destructor::<Callback>);
+            ffi::lua_rawset(state, -3);
+
+            ffi::lua_pushstring(state, cstr!("__metatable"));
+            ffi::lua_pushboolean(state, 0);
+            ffi::lua_rawset(state, -3);
+
+            ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+
+            // Override pcall and xpcall with versions that cannot be used to catch rust panics.
+
+            ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
+
+            ffi::lua_pushstring(state, cstr!("pcall"));
+            ffi::lua_pushcfunction(state, safe_pcall);
+            ffi::lua_rawset(state, -3);
+
+            ffi::lua_pushstring(state, cstr!("xpcall"));
+            ffi::lua_pushcfunction(state, safe_xpcall);
+            ffi::lua_rawset(state, -3);
+
+            ffi::lua_pop(state, 1);
+
+            // Create ref stack thread and place it in the registry to prevent it from being garbage
+            // collected.
+
+            let ref_thread = ffi::lua_newthread(state);
+            ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX);
+
+            ref_thread
+        }),
+        "Error during Lua construction",
     );
 
-    ffi::lua_newtable(state);
-
-    push_string(state, "__gc").unwrap();
-    ffi::lua_pushcfunction(state, userdata_destructor::<Callback>);
-    ffi::lua_rawset(state, -3);
-
-    push_string(state, "__metatable").unwrap();
-    ffi::lua_pushboolean(state, 0);
-    ffi::lua_rawset(state, -3);
-
-    ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
-
-    // Override pcall and xpcall with versions that cannot be used to catch rust panics.
-
-    ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
-
-    push_string(state, "pcall").unwrap();
-    ffi::lua_pushcfunction(state, safe_pcall);
-    ffi::lua_rawset(state, -3);
-
-    push_string(state, "xpcall").unwrap();
-    ffi::lua_pushcfunction(state, safe_xpcall);
-    ffi::lua_rawset(state, -3);
-
-    ffi::lua_pop(state, 1);
-
-    // Create ref stack thread and place it in the registry to prevent it from being garbage
-    // collected.
-
-    let ref_thread = ffi::lua_newthread(state);
-    ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX);
+    rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
+    assert_stack(state, ffi::LUA_MINSTACK);
 
     // Create ExtraData, and place it in the lua_State "extra space"
 
@@ -1035,9 +1042,6 @@ unsafe fn create_lua(load_debug: bool) -> Lua {
         ref_free: Vec::new(),
     }));
     *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra;
-
-    rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
-    assert_stack(state, ffi::LUA_MINSTACK);
 
     Lua {
         state,
