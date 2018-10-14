@@ -1,6 +1,6 @@
 ## [0.15.3]
 - Fix improper num-traits dependency, proper [ui]128 support only added
-  later in 0.2 series
+  later in 0.2 series (thanks @sakridge for catching this!)
 
 ## [0.15.2]
 - API Incompatible change: Allow `Lua::load` `Lua::exec` and `Lua::eval` to take
