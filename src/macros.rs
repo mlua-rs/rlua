@@ -104,3 +104,13 @@ macro_rules! rlua_abort {
         rlua_abort!($msg, $($arg)+);
     };
 }
+
+macro_rules! rlua_expect {
+    ($res:expr, $msg:expr) => {
+        $res.expect(concat!("rlua internal error: ", $msg))
+    };
+
+    ($res:expr, $msg:expr,) => {
+        rlua_expect!($res, $msg)
+    };
+}

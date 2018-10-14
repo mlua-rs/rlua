@@ -48,7 +48,7 @@ impl Drop for Lua {
                         && (*extra).ref_stack_max as usize == (*extra).ref_free.len(),
                     "reference leak detected"
                 );
-                *(*extra).registry_unref_list.lock().unwrap() = None;
+                *rlua_expect!((*extra).registry_unref_list.lock(), "unref list poisoned") = None;
                 Box::from_raw(extra);
 
                 ffi::lua_close(self.state);
@@ -613,13 +613,13 @@ impl Lua {
     pub fn expire_registry_values(&self) {
         unsafe {
             let unref_list = mem::replace(
-                &mut *(*extra_data(self.state))
-                    .registry_unref_list
-                    .lock()
-                    .unwrap(),
+                &mut *rlua_expect!(
+                    (*extra_data(self.state)).registry_unref_list.lock(),
+                    "unref list poisoned"
+                ),
                 Some(Vec::new()),
             );
-            for id in unref_list.unwrap() {
+            for id in rlua_expect!(unref_list, "unref list not set") {
                 ffi::luaL_unref(self.state, ffi::LUA_REGISTRYINDEX, id);
             }
         }
