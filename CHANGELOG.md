@@ -50,13 +50,13 @@
 
 ## [0.14.0]
 - Lots of performance improvements, including one major change: Lua handles no
-  longer use the registry, they now instead are stored in an auxillary thread
+  longer use the registry, they now instead are stored in an auxiliary thread
   stack created solely for the purpose of holding ref values.  This may seem
   extremely weird, but it is vastly faster than using the registry or raw tables
   for this purpose.  The first attempt here was to use the same stack and to do
   a lot of complex bookkeeping to manage the references, and this DOES work, but
   it comes with a lot of complexity and downsides along with it.  The second
-  approach of using an auxillary thread turned out to be equally fast and with
+  approach of using an auxiliary thread turned out to be equally fast and with
   no real downsides over the previous approach.  With all the performance
   improvements together, you can expect (VERY rough estimate) somewhere on the
   order of 30%-60% CPU time reduction in the cost of bindings, depending on

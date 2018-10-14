@@ -568,7 +568,10 @@ pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
 
                 Ok(1)
             } else {
-                panic!("userdata mismatch in Error metamethod");
+                // TODO: I'm not sure whether this is possible to trigger without bugs in rlua,
+                // could replace with:
+                // rlua_panic!("userdata mismatch in Error __tostring metamethod")
+                Err(Error::UserDataTypeMismatch)
             }
         })
     }

@@ -733,7 +733,7 @@ impl Lua {
     pub(crate) unsafe fn push_ref<'lua>(&'lua self, lref: &LuaRef<'lua>) {
         assert!(
             lref.lua.main_state == self.main_state,
-            "Lua instance passed Value created from a different main Lua state"
+            "rlua::Lua instance passed Value created from a different main Lua state"
         );
         let extra = extra_data(self.state);
         ffi::lua_pushvalue((*extra).ref_thread, lref.index);
@@ -743,7 +743,7 @@ impl Lua {
     // Pops the topmost element of the stack and stores a reference to it.  This pins the object,
     // preventing garbage collection until the returned `LuaRef` is dropped.
     //
-    // References are stored in the stack of a specially created auxillary thread that exists only
+    // References are stored in the stack of a specially created auxiliary thread that exists only
     // to store reference values.  This is much faster than storing these in the registry, and also
     // much more flexible and requires less bookkeeping than storing them directly in the currently
     // used stack.  The implementation is somewhat biased towards the use case of a relatively small
@@ -953,7 +953,7 @@ unsafe fn create_lua(load_debug: bool) -> Lua {
                 // not really a huge loss.  Importantly, this allows us to turn off the gc, and
                 // then know that calling Lua API functions marked as 'm' will not result in a
                 // 'longjmp' error while the gc is off.
-                abort!("out of memory in Lua allocation, aborting!");
+                abort!("out of memory in rlua::Lua allocation, aborting!");
             } else {
                 p as *mut c_void
             }
@@ -1060,7 +1060,7 @@ unsafe fn ref_stack_pop(extra: *mut ExtraData) -> c_int {
             // It is a user error to create enough references to exhaust the Lua max stack size for
             // the ref thread.
             if ffi::lua_checkstack((*extra).ref_thread, (*extra).ref_stack_size) == 0 {
-                panic!("cannot create a Lua reference, out of auxillary stack space");
+                rlua_panic!("cannot create a Lua reference, out of auxiliary stack space");
             }
             (*extra).ref_stack_size *= 2;
         }
