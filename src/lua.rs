@@ -652,7 +652,8 @@ impl Lua {
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::{Lua, HookTriggers, Debug};
+    /// # use rlua::{Lua, HookTriggers};
+    /// # use rlua::hook::Debug;
     /// # fn main() {
     /// let code = r#"local x = 2 + 3
     /// local y = x * 63

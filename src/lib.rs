@@ -26,7 +26,7 @@
 //!
 //! # Hooks
 //!
-//! The [`Lua`] struct provides you with a [`hook`] setter method which you may call to gain
+//! The [`Lua`] struct provides you with a [hook] setter method which you may call to gain
 //! information about your script or simply to control it.
 //!
 //! You are safe to use an `FnMut` function as Lua will never call your hook if you are executing
@@ -69,7 +69,7 @@ mod types;
 mod userdata;
 mod util;
 mod value;
-mod hook;
+pub mod hook;
 
 pub use error::{Error, ExternalError, ExternalResult, Result};
 pub use function::Function;
@@ -82,6 +82,6 @@ pub use thread::{Thread, ThreadStatus};
 pub use types::{Integer, LightUserData, Number, RegistryKey};
 pub use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 pub use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-pub use hook::{HookTriggers, Debug};
+pub use hook::HookTriggers;
 
 pub mod prelude;
