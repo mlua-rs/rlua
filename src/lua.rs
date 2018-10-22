@@ -1,10 +1,10 @@
 use std::any::TypeId;
 use std::cell::{RefCell, UnsafeCell};
-use std::rc::Rc;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_int, c_void};
+use std::rc::Rc;
 use std::string::String as StdString;
 use std::sync::{Arc, Mutex};
 use std::{mem, ptr, str};
@@ -14,6 +14,7 @@ use libc;
 use error::{Error, Result};
 use ffi;
 use function::Function;
+use hook::{hook_proc, Debug, HookTriggers};
 use scope::Scope;
 use string::String;
 use table::Table;
@@ -27,7 +28,6 @@ use util::{
     userdata_destructor, StackGuard,
 };
 use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-use hook::{Debug, HookTriggers, hook_proc};
 
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
@@ -80,7 +80,7 @@ impl Lua {
             state,
             main_state: main_state(state),
             ephemeral: true,
-            _phantom: PhantomData
+            _phantom: PhantomData,
         }
     }
 
@@ -667,16 +667,18 @@ impl Lua {
     /// let _ = lua.exec::<_, ()>(code, None);
     /// # }
     /// ```
-    pub fn set_hook<F>(
-        &self,
-        triggers: HookTriggers,
-        callback: F)
+    pub fn set_hook<F>(&self, triggers: HookTriggers, callback: F)
     where
-        F: 'static + Send + FnMut(&Lua, &Debug) -> Result<()>
+        F: 'static + Send + FnMut(&Lua, &Debug) -> Result<()>,
     {
         unsafe {
             (*extra_data(self.state)).hook_callback = Some(Rc::new(RefCell::new(callback)));
-            ffi::lua_sethook(self.state, Some(hook_proc), triggers.mask(), triggers.count());
+            ffi::lua_sethook(
+                self.state,
+                Some(hook_proc),
+                triggers.mask(),
+                triggers.count(),
+            );
         }
     }
 
@@ -1022,7 +1024,7 @@ pub(crate) struct ExtraData {
     ref_stack_max: c_int,
     ref_free: Vec<c_int>,
 
-    pub hook_callback: Option<Rc<RefCell<FnMut(&Lua, &Debug) -> Result<()>>>>
+    pub hook_callback: Option<Rc<RefCell<FnMut(&Lua, &Debug) -> Result<()>>>>,
 }
 
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
@@ -1134,7 +1136,7 @@ unsafe fn create_lua(load_debug: bool) -> Lua {
         ref_stack_size: ffi::LUA_MINSTACK - 1,
         ref_stack_max: 0,
         ref_free: Vec::new(),
-        hook_callback: None
+        hook_callback: None,
     }));
     *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra;
 

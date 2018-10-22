@@ -59,6 +59,7 @@ mod ffi;
 mod macros;
 mod conversion;
 mod function;
+pub mod hook;
 mod lua;
 mod multi;
 mod scope;
@@ -69,10 +70,10 @@ mod types;
 mod userdata;
 mod util;
 mod value;
-pub mod hook;
 
 pub use error::{Error, ExternalError, ExternalResult, Result};
 pub use function::Function;
+pub use hook::HookTriggers;
 pub use lua::Lua;
 pub use multi::Variadic;
 pub use scope::Scope;
@@ -82,6 +83,5 @@ pub use thread::{Thread, ThreadStatus};
 pub use types::{Integer, LightUserData, Number, RegistryKey};
 pub use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 pub use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
-pub use hook::HookTriggers;
 
 pub mod prelude;

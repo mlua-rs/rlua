@@ -1,8 +1,8 @@
-use std::{slice, ptr, str};
-use std::marker::PhantomData;
+use ffi::{self, lua_Debug, lua_State};
 use libc::{self, c_int};
-use ffi::{self, lua_State, lua_Debug};
-use lua::{Lua, extra_data};
+use lua::{extra_data, Lua};
+use std::marker::PhantomData;
+use std::{ptr, slice, str};
 use util::callback_error;
 
 /// Contains information about the running code at the moments specified when setting the hook.
@@ -29,7 +29,7 @@ use util::callback_error;
 pub struct Debug<'a> {
     ar: *mut lua_Debug,
     state: *mut lua_State,
-    _phantom: PhantomData<&'a ()>
+    _phantom: PhantomData<&'a ()>,
 }
 
 impl<'a> Debug<'a> {
@@ -41,7 +41,7 @@ impl<'a> Debug<'a> {
             } else {
                 Names {
                     name: ptr_to_str((*self.ar).name as *const i8),
-                    name_what: ptr_to_str((*self.ar).namewhat as *const i8)
+                    name_what: ptr_to_str((*self.ar).namewhat as *const i8),
                 }
             }
         }
@@ -96,7 +96,7 @@ impl<'a> Debug<'a> {
                 Stack {
                     num_ups: (*self.ar).nups as i32,
                     num_params: (*self.ar).nparams as i32,
-                    is_vararg: (*self.ar).isvararg != 0
+                    is_vararg: (*self.ar).isvararg != 0,
                 }
             }
         }
@@ -106,7 +106,7 @@ impl<'a> Debug<'a> {
 #[derive(Clone, Debug)]
 pub struct Names<'a> {
     pub name: Option<&'a str>,
-    pub name_what: Option<&'a str>
+    pub name_what: Option<&'a str>,
 }
 
 #[derive(Clone, Debug)]
@@ -115,14 +115,14 @@ pub struct Source<'a> {
     pub short_src: Option<&'a str>,
     pub line_defined: i32,
     pub last_line_defined: i32,
-    pub what: Option<&'a str>
+    pub what: Option<&'a str>,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct Stack {
     pub num_ups: i32,
     pub num_params: i32,
-    pub is_vararg: bool
+    pub is_vararg: bool,
 }
 
 /// Indicate in which circumstances the hook should be called by Lua.
@@ -173,10 +173,18 @@ impl HookTriggers {
     /// Compute the mask to pass to `lua_sethook`.
     pub(crate) fn mask(&self) -> c_int {
         let mut mask: c_int = 0;
-        if self.on_calls { mask |= ffi::LUA_MASKCALL }
-        if self.on_returns { mask |= ffi::LUA_MASKRET }
-        if self.every_line { mask |= ffi::LUA_MASKLINE }
-        if self.every_nth_instruction.is_some() { mask |= ffi::LUA_MASKCOUNT }
+        if self.on_calls {
+            mask |= ffi::LUA_MASKCALL
+        }
+        if self.on_returns {
+            mask |= ffi::LUA_MASKRET
+        }
+        if self.every_line {
+            mask |= ffi::LUA_MASKLINE
+        }
+        if self.every_nth_instruction.is_some() {
+            mask |= ffi::LUA_MASKCOUNT
+        }
         mask
     }
 
@@ -193,7 +201,7 @@ impl Default for HookTriggers {
             on_calls: false,
             on_returns: false,
             every_line: false,
-            every_nth_instruction: None
+            every_nth_instruction: None,
         }
     }
 }
@@ -203,17 +211,22 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
     callback_error(state, || {
         let lua = Lua::make_ephemeral(state);
         let debug = Debug {
-            ar, state, _phantom: PhantomData
+            ar,
+            state,
+            _phantom: PhantomData,
         };
 
-        let cb = (&*extra_data(state)).hook_callback
+        let cb = (&*extra_data(state))
+            .hook_callback
             .as_ref()
             .map(|rc| rc.clone())
             .expect("rlua internal error: no hooks previously set; this is a bug");
         let outcome = match cb.try_borrow_mut() {
             Ok(mut b) => (&mut *b)(&lua, &debug),
-            Err(_) => rlua_panic!("Lua should not allow hooks to be called within another hook;\
-                please make an issue")
+            Err(_) => rlua_panic!(
+                "Lua should not allow hooks to be called within another hook;\
+                 please make an issue"
+            ),
         };
         outcome
     });
