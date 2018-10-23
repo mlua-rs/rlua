@@ -279,8 +279,10 @@ impl<'scope> Scope<'scope> {
         }
     }
 
-    // Unsafe, because the callback (since it is non-'static) can capture any value with 'callback
-    // scope, such as improperly holding onto an argument. So in order for this to be safe, the
+    // Unsafe, because the callback can improperly capture any value with 'callback scope, such as
+    // improperly holding onto an argument. Since the 'callback lifetime is chosen by the user and
+    // the lifetime of the callback itself is 'scope (non-'static), the borrow checker will happily
+    // pick a 'callback that outlives 'scope to allow this.  In order for this to be safe, the
     // callback must NOT capture any arguments.
     unsafe fn create_callback<'lua, 'callback>(
         &'lua self,
