@@ -147,6 +147,7 @@ pub struct Stack {
 /// # let _ = triggers;
 /// # }
 /// ```
+#[derive(Clone, Display)]
 pub struct HookTriggers {
     /// Before a function call.
     pub on_calls: bool,
@@ -184,17 +185,6 @@ impl HookTriggers {
     /// returned.
     pub(crate) fn count(&self) -> c_int {
         self.every_nth_instruction.unwrap_or(0) as c_int
-    }
-}
-
-impl Default for HookTriggers {
-    fn default() -> Self {
-        HookTriggers {
-            on_calls: false,
-            on_returns: false,
-            every_line: false,
-            every_nth_instruction: None
-        }
     }
 }
 
