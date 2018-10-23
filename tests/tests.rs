@@ -609,7 +609,7 @@ fn test_drop_registry_value() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "reference created from a different main Lua state")]
 fn test_mismatched_lua_ref() {
     let lua1 = Lua::new();
     let lua2 = Lua::new();

@@ -730,7 +730,7 @@ impl Lua {
     pub(crate) unsafe fn push_ref<'lua>(&'lua self, lref: &LuaRef<'lua>) {
         assert!(
             lref.lua.main_state == self.main_state,
-            "rlua::Lua instance passed Value created from a different main Lua state"
+            "rlua::Lua instance passed reference created from a different main Lua state"
         );
         let extra = extra_data(self.state);
         ffi::lua_pushvalue((*extra).ref_thread, lref.index);
