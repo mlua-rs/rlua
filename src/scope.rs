@@ -288,7 +288,7 @@ impl<'scope> Scope<'scope> {
         &'lua self,
         f: Callback<'callback, 'scope>,
     ) -> Result<Function<'lua>> {
-        let f = mem::transmute::<Callback<'callback, 'scope>, Callback<'callback, 'static>>(f);
+        let f = mem::transmute::<Callback<'callback, 'scope>, Callback<'scope, 'static>>(f);
         let f = self.lua.create_callback(f)?;
 
         let mut destructors = self.destructors.borrow_mut();

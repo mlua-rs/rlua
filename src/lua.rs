@@ -275,11 +275,11 @@ impl Lua {
     ///
     /// [`ToLua`]: trait.ToLua.html
     /// [`ToLuaMulti`]: trait.ToLuaMulti.html
-    pub fn create_function<'lua, 'callback, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
+    pub fn create_function<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'callback>,
-        R: ToLuaMulti<'callback>,
-        F: 'static + Send + Fn(&'callback Lua, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
     {
         self.create_callback(Box::new(move |lua, args| {
             func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
@@ -292,14 +292,11 @@ impl Lua {
     /// [`create_function`] for more information about the implementation.
     ///
     /// [`create_function`]: #method.create_function
-    pub fn create_function_mut<'lua, 'callback, A, R, F>(
-        &'lua self,
-        func: F,
-    ) -> Result<Function<'lua>>
+    pub fn create_function_mut<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'callback>,
-        R: ToLuaMulti<'callback>,
-        F: 'static + Send + FnMut(&'callback Lua, A) -> Result<R>,
+        A: FromLuaMulti<'lua>,
+        R: ToLuaMulti<'lua>,
+        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
     {
         let func = RefCell::new(func);
         self.create_function(move |lua, args| {
@@ -827,17 +824,50 @@ impl Lua {
         Ok(id)
     }
 
-    // Creates a Function out of a Callback containing a 'static Fn.  This is safe ONLY because the
-    // Fn is 'static, otherwise it could capture 'callback arguments improperly.  Without ATCs, we
-    // cannot easily deal with the "correct" callback type of:
+    // This function is safe for two reason: 1) the lifetime of the callback itself is 'static, and
+    // 2) the lifetime of the callback parameters is 'lua.  If either of these restrictions is
+    // lifted, this function would become unsound.  The lifetime of the callback parameters is a
+    // convenient lie to get around the fact that without ATCs, we cannot easily deal with the
+    // "correct" type of `Callback`, which is:
     //
     // Box<for<'lua> Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>)>
     //
-    // So we instead use a caller provided lifetime, which without the 'static requirement would be
-    // unsafe.
-    pub(crate) fn create_callback<'lua, 'callback>(
+    // You might decide that you could lift the 'static restriction and simply require that
+    // callbacks outlive 'lua, but this would allow the callback to capture parameters inside its
+    // own owned values, which could lead to unsafety.  The reason for this is that the &Lua that is
+    // given to callbacks is a reference to an ephemeral Lua and does not live as long as 'lua, and
+    // all the other arguments given also reference this ephemeral Lua.
+    //
+    // You might decide that, since the 'lua lifetime is a lie anyway, you could just create a new
+    // lifetime called 'callback and use that as the lifetime for the callback instead of 'lua.
+    // However since this lifetime is unbounded, the borrow checker will happily enlarge it as large
+    // as necessary, all the way to simply being 'static, and this would allow the callback to
+    // unsafely capture parameters inside thread local static variables.
+    //
+    // You could also require that such a 'callback lifetime is outlived by 'lua, but again since
+    // this 'callback lifetime is otherwise unbounded, there is no real difference between that and
+    // simply using the 'lua lifetime for the callback.  The 'lua lifetime here is simply a
+    // convenient, available lifetime that is definitely not 'static.
+    //
+    // You might say "aha, but *why* can't the provided 'lua be 'static?"  Well, I believe this is
+    // actually *almost* but *not quite* possible.  You can't place Lua directly in a rust static
+    // because Lua is not sync, and *mercifully*, you cannot get a &'static Lua by storing a Lua
+    // inside thread local storage.  The best you could do is to either put `Mutex<Lua>` inside a
+    // static or put a Lua inside a TLS `LocalKey`, but both of those still cannot get you to a
+    // `&'static Lua`.
+    //
+    // This is the one fact that seemingly *barely* saves this method from being unsound, that it is
+    // currently impossible to safely get a `&'static Lua`.  I do NOT consider this acceptable, and
+    // this is a blocking issue for any kind of approach to 1.0.  In order to fix this, rlua MUST
+    // eventually use the correct internal callback type, and thus the API for creating callbacks
+    // MUST be changed.  Without ATCs, the only other viable option that I am aware of is to use
+    // some kind of "function creation macro" to get around the fact that you can't write the type
+    // for the otherwise wokring code, but there may be other ways I don't know about yet.
+    //
+    // See: https://github.com/kyren/rlua/issues/97 for more details.
+    pub(crate) fn create_callback<'lua>(
         &'lua self,
-        func: Callback<'callback, 'static>,
+        func: Callback<'lua, 'static>,
     ) -> Result<Function<'lua>> {
         unsafe extern "C" fn call_callback(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, || {
