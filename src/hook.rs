@@ -47,7 +47,7 @@ impl<'a> Debug<'a> {
         }
     }
 
-    /// Corresponds to the `n` what mask.
+    /// Corresponds to the `S` what mask.
     pub fn source(&self) -> Source<'a> {
         unsafe {
             if ffi::lua_getinfo(self.state, cstr!("S"), self.ar) == 0 {
