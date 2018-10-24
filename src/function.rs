@@ -62,7 +62,7 @@ impl<'lua> Function<'lua> {
     /// #     try_main().unwrap();
     /// # }
     /// ```
-    pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
+    pub fn call<A: ToLuaMulti, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
         let lua = self.0.lua;
 
         let args = args.to_lua_multi(lua)?;
@@ -125,7 +125,7 @@ impl<'lua> Function<'lua> {
     /// #     try_main().unwrap();
     /// # }
     /// ```
-    pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> Result<Function<'lua>> {
+    pub fn bind<A: ToLuaMulti>(&self, args: A) -> Result<Function<'lua>> {
         unsafe extern "C" fn bind_call_impl(state: *mut ffi::lua_State) -> c_int {
             let nargs = ffi::lua_gettop(state);
             let nbinds = ffi::lua_tointeger(state, ffi::lua_upvalueindex(2)) as c_int;

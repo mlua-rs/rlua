@@ -16,8 +16,8 @@ pub type Number = ffi::lua_Number;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LightUserData(pub *mut c_void);
 
-pub(crate) type Callback<'lua, 'a> =
-    Box<Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'a>;
+pub(crate) type Callback<'a> =
+    Box<for<'lua> Fn(&'lua Lua, MultiValue) -> Result<MultiValue<'lua>> + 'a>;
 
 /// An auto generated key into the Lua registry.
 ///
@@ -59,13 +59,13 @@ impl Drop for RegistryKey {
 }
 
 impl RegistryKey {
-    // Destroys the RegistryKey without adding to the drop list
+    // Destroys the RegistryKey without adding to the drop list, returning the registry index.
     pub(crate) fn take(self) -> c_int {
         let registry_id = self.registry_id;
         unsafe {
             ptr::read(&self.unref_list);
-            mem::forget(self);
         }
+        mem::forget(self);
         registry_id
     }
 }
@@ -90,5 +90,14 @@ impl<'lua> Clone for LuaRef<'lua> {
 impl<'lua> Drop for LuaRef<'lua> {
     fn drop(&mut self) {
         self.lua.drop_ref(self)
+    }
+}
+
+impl<'lua> LuaRef<'lua> {
+    // Destroys the LuaRef without dropping it, returning the index.
+    pub(crate) fn take(self) -> c_int {
+        let index = self.index;
+        mem::forget(self);
+        index
     }
 }

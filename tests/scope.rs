@@ -41,7 +41,7 @@ fn scope_drop() {
 
     struct MyUserdata(Rc<()>);
     impl UserData for MyUserdata {
-        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
             methods.add_method("method", |_, _, ()| Ok(()));
         }
     }
@@ -104,7 +104,7 @@ fn scope_userdata_methods() {
     struct MyUserData<'a>(&'a Cell<i64>);
 
     impl<'a> UserData for MyUserData<'a> {
-        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
             methods.add_method("inc", |_, data, ()| {
                 data.0.set(data.0.get() + 1);
                 Ok(())
@@ -146,7 +146,7 @@ fn scope_userdata_functions() {
     struct MyUserData<'a>(&'a i64);
 
     impl<'a> UserData for MyUserData<'a> {
-        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
             methods.add_meta_function(MetaMethod::Add, |lua, ()| {
                 let globals = lua.globals();
                 globals.set("i", globals.get::<_, i64>("i")? + 1)?;
@@ -188,7 +188,7 @@ fn scope_userdata_mismatch() {
     struct MyUserData<'a>(&'a Cell<i64>);
 
     impl<'a> UserData for MyUserData<'a> {
-        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
             methods.add_method("inc", |_, data, ()| {
                 data.0.set(data.0.get() + 1);
                 Ok(())

@@ -73,7 +73,7 @@ impl<'lua> Thread<'lua> {
     /// ```
     pub fn resume<A, R>(&self, args: A) -> Result<R>
     where
-        A: ToLuaMulti<'lua>,
+        A: ToLuaMulti,
         R: FromLuaMulti<'lua>,
     {
         let lua = self.0.lua;

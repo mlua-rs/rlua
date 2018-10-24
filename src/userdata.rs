@@ -98,7 +98,7 @@ impl MetaMethod {
 /// Method registry for [`UserData`] implementors.
 ///
 /// [`UserData`]: trait.UserData.html
-pub trait UserDataMethods<'lua, T: UserData> {
+pub trait UserDataMethods<T: UserData> {
     /// Add a method which accepts a `&T` as the first parameter.
     ///
     /// Regular methods are implemented by overriding the `__index` metamethod and returning the
@@ -108,9 +108,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// be used as a fall-back if no regular method is found.
     fn add_method<A, R, M>(&mut self, name: &str, method: M)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>;
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        M: 'static + Send + Fn(&Lua, &T, A) -> Result<R>;
 
     /// Add a regular method which accepts a `&mut T` as the first parameter.
     ///
@@ -119,9 +119,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// [`add_method`]: #method.add_method
     fn add_method_mut<A, R, M>(&mut self, name: &str, method: M)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>;
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        M: 'static + Send + FnMut(&Lua, &mut T, A) -> Result<R>;
 
     /// Add a regular method as a function which accepts generic arguments, the first argument will
     /// always be a `UserData` of type T.
@@ -132,9 +132,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// [`add_method_mut`]: #method.add_method_mut
     fn add_function<A, R, F>(&mut self, name: &str, function: F)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>;
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        F: 'static + Send + Fn(&Lua, A) -> Result<R>;
 
     /// Add a regular method as a mutable function which accepts generic arguments, the first
     /// argument will always be a `UserData` of type T.
@@ -144,9 +144,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// [`add_function`]: #method.add_function
     fn add_function_mut<A, R, F>(&mut self, name: &str, function: F)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>;
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        F: 'static + Send + FnMut(&Lua, A) -> Result<R>;
 
     /// Add a metamethod which accepts a `&T` as the first parameter.
     ///
@@ -158,9 +158,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// [`add_meta_function`]: #method.add_meta_function
     fn add_meta_method<A, R, M>(&mut self, meta: MetaMethod, method: M)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>;
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        M: 'static + Send + Fn(&Lua, &T, A) -> Result<R>;
 
     /// Add a metamethod as a function which accepts a `&mut T` as the first parameter.
     ///
@@ -172,9 +172,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// [`add_meta_function`]: #method.add_meta_function
     fn add_meta_method_mut<A, R, M>(&mut self, meta: MetaMethod, method: M)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>;
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        M: 'static + Send + FnMut(&Lua, &mut T, A) -> Result<R>;
 
     /// Add a metamethod which accepts generic arguments.
     ///
@@ -183,9 +183,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// userdata of type `T`.
     fn add_meta_function<A, R, F>(&mut self, meta: MetaMethod, function: F)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>;
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        F: 'static + Send + Fn(&Lua, A) -> Result<R>;
 
     /// Add a metamethod as a mutable function which accepts generic arguments.
     ///
@@ -194,9 +194,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// [`add_meta_function`]: #method.add_meta_function
     fn add_meta_function_mut<A, R, F>(&mut self, meta: MetaMethod, function: F)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>;
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        F: 'static + Send + FnMut(&Lua, A) -> Result<R>;
 }
 
 /// Trait for custom userdata types.
@@ -275,7 +275,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
 /// [`UserDataMethods`]: trait.UserDataMethods.html
 pub trait UserData: Sized {
     /// Adds custom methods and operators specific to this userdata.
-    fn add_methods<'lua, T: UserDataMethods<'lua, Self>>(_methods: &mut T) {}
+    fn add_methods<T: UserDataMethods<Self>>(_methods: &mut T) {}
 }
 
 /// Handle to an internal Lua userdata for any type that implements [`UserData`].
@@ -336,7 +336,7 @@ impl<'lua> AnyUserData<'lua> {
     /// The value may be any Lua value whatsoever, and can be retrieved with [`get_user_value`].
     ///
     /// [`get_user_value`]: #method.get_user_value
-    pub fn set_user_value<V: ToLua<'lua>>(&self, v: V) -> Result<()> {
+    pub fn set_user_value<V: ToLua>(&self, v: V) -> Result<()> {
         let lua = self.0.lua;
         let v = v.to_lua(lua)?;
         unsafe {

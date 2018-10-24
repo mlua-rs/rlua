@@ -49,7 +49,7 @@ impl<'lua> Table<'lua> {
     /// ```
     ///
     /// [`raw_set`]: #method.raw_set
-    pub fn set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
+    pub fn set<K: ToLua, V: ToLua>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         let value = value.to_lua(lua)?;
@@ -97,7 +97,7 @@ impl<'lua> Table<'lua> {
     /// ```
     ///
     /// [`raw_get`]: #method.raw_get
-    pub fn get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
+    pub fn get<K: ToLua, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         let value = unsafe {
@@ -118,7 +118,7 @@ impl<'lua> Table<'lua> {
     }
 
     /// Checks whether the table contains a non-nil value for `key`.
-    pub fn contains_key<K: ToLua<'lua>>(&self, key: K) -> Result<bool> {
+    pub fn contains_key<K: ToLua>(&self, key: K) -> Result<bool> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
 
@@ -141,7 +141,7 @@ impl<'lua> Table<'lua> {
     }
 
     /// Sets a key-value pair without invoking metamethods.
-    pub fn raw_set<K: ToLua<'lua>, V: ToLua<'lua>>(&self, key: K, value: V) -> Result<()> {
+    pub fn raw_set<K: ToLua, V: ToLua>(&self, key: K, value: V) -> Result<()> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         let value = value.to_lua(lua)?;
@@ -165,7 +165,7 @@ impl<'lua> Table<'lua> {
     }
 
     /// Gets the value associated to `key` without invoking metamethods.
-    pub fn raw_get<K: ToLua<'lua>, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
+    pub fn raw_get<K: ToLua, V: FromLua<'lua>>(&self, key: K) -> Result<V> {
         let lua = self.0.lua;
         let key = key.to_lua(lua)?;
         let value = unsafe {

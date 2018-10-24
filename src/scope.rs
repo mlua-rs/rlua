@@ -50,9 +50,9 @@ impl<'scope> Scope<'scope> {
     /// [`Lua::scope`]: struct.Lua.html#method.scope
     pub fn create_function<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'scope + Fn(&'lua Lua, A) -> Result<R>,
+        A: for<'a> FromLuaMulti<'a>,
+        R: ToLuaMulti,
+        F: 'scope + Fn(&Lua, A) -> Result<R>,
     {
         // Safe, because 'scope must outlive 'lua (due to Self containing 'scope), however the
         // callback itself must be 'scope lifetime, so the function should not be able to capture
@@ -80,9 +80,9 @@ impl<'scope> Scope<'scope> {
     /// [`Scope::create_function`]: #method.create_function
     pub fn create_function_mut<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'scope + FnMut(&'lua Lua, A) -> Result<R>,
+        A: for<'a> FromLuaMulti<'a>,
+        R: ToLuaMulti,
+        F: 'scope + FnMut(&Lua, A) -> Result<R>,
     {
         let func = RefCell::new(func);
         self.create_function(move |lua, args| {
@@ -154,10 +154,10 @@ impl<'scope> Scope<'scope> {
         // inability to work with the "correct" universally quantified callback type.  This is safe
         // though, because actual method callbacks are all 'static so they can't capture 'callback
         // handles anyway.
-        fn wrap_method<'scope, 'lua, 'callback: 'scope, T: 'scope>(
+        fn wrap_method<'scope, 'lua, T: 'scope>(
             scope: &'lua Scope<'scope>,
             data: Rc<RefCell<T>>,
-            method: NonStaticMethod<'callback, T>,
+            method: NonStaticMethod<T>,
         ) -> Result<Function<'lua>> {
             // On methods that actually receive the userdata, we fake a type check on the passed in
             // userdata, where we pretend there is a unique type per call to
@@ -167,7 +167,7 @@ impl<'scope> Scope<'scope> {
             // called the method on the original value (since we otherwise completely ignore the
             // first argument).
             let check_data = data.clone();
-            let check_ud_type = move |lua: &Lua, value| {
+            let check_ud_type = move |lua: &Lua, value: Option<Value>| {
                 if let Some(value) = value {
                     if let Value::UserData(u) = value {
                         unsafe {
@@ -187,7 +187,7 @@ impl<'scope> Scope<'scope> {
             match method {
                 NonStaticMethod::Method(method) => {
                     let method_data = data.clone();
-                    let f = Box::new(move |lua, mut args: MultiValue<'callback>| {
+                    let f: Callback<'scope> = Box::new(move |lua, mut args: MultiValue| {
                         if !check_ud_type(lua, args.pop_front()) {
                             return Err(Error::UserDataTypeMismatch);
                         }
@@ -201,7 +201,7 @@ impl<'scope> Scope<'scope> {
                 NonStaticMethod::MethodMut(method) => {
                     let method = RefCell::new(method);
                     let method_data = data.clone();
-                    let f = Box::new(move |lua, mut args: MultiValue<'callback>| {
+                    let f: Callback<'scope> = Box::new(move |lua, mut args: MultiValue| {
                         if !check_ud_type(lua, args.pop_front()) {
                             return Err(Error::UserDataTypeMismatch);
                         }
@@ -218,7 +218,7 @@ impl<'scope> Scope<'scope> {
                 NonStaticMethod::Function(function) => unsafe { scope.create_callback(function) },
                 NonStaticMethod::FunctionMut(function) => {
                     let function = RefCell::new(function);
-                    let f = Box::new(move |lua, args| {
+                    let f: Callback<'static> = Box::new(move |lua, args| {
                         (&mut *function
                             .try_borrow_mut()
                             .map_err(|_| Error::RecursiveMutCallback)?)(
@@ -284,11 +284,8 @@ impl<'scope> Scope<'scope> {
     // the lifetime of the callback itself is 'scope (non-'static), the borrow checker will happily
     // pick a 'callback that outlives 'scope to allow this.  In order for this to be safe, the
     // callback must NOT capture any arguments.
-    unsafe fn create_callback<'lua, 'callback>(
-        &'lua self,
-        f: Callback<'callback, 'scope>,
-    ) -> Result<Function<'lua>> {
-        let f = mem::transmute::<Callback<'callback, 'scope>, Callback<'scope, 'static>>(f);
+    unsafe fn create_callback<'lua>(&'lua self, f: Callback<'scope>) -> Result<Function<'lua>> {
+        let f = mem::transmute::<Callback<'scope>, Callback<'static>>(f);
         let f = self.lua.create_callback(f)?;
 
         let mut destructors = self.destructors.borrow_mut();
@@ -328,20 +325,20 @@ impl<'scope> Drop for Scope<'scope> {
     }
 }
 
-enum NonStaticMethod<'lua, T> {
-    Method(Box<Fn(&'lua Lua, &T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
-    MethodMut(Box<FnMut(&'lua Lua, &mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
-    Function(Box<Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
-    FunctionMut(Box<FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
+enum NonStaticMethod<T> {
+    Method(Box<for<'lua> Fn(&'lua Lua, &T, MultiValue) -> Result<MultiValue<'lua>>>),
+    MethodMut(Box<for<'lua> FnMut(&'lua Lua, &mut T, MultiValue) -> Result<MultiValue<'lua>>>),
+    Function(Box<for<'lua> Fn(&'lua Lua, MultiValue) -> Result<MultiValue<'lua>>>),
+    FunctionMut(Box<for<'lua> FnMut(&'lua Lua, MultiValue) -> Result<MultiValue<'lua>>>),
 }
 
-struct NonStaticUserDataMethods<'lua, T: UserData> {
-    methods: HashMap<StdString, NonStaticMethod<'lua, T>>,
-    meta_methods: HashMap<MetaMethod, NonStaticMethod<'lua, T>>,
+struct NonStaticUserDataMethods<T: UserData> {
+    methods: HashMap<StdString, NonStaticMethod<T>>,
+    meta_methods: HashMap<MetaMethod, NonStaticMethod<T>>,
 }
 
-impl<'lua, T: UserData> Default for NonStaticUserDataMethods<'lua, T> {
-    fn default() -> NonStaticUserDataMethods<'lua, T> {
+impl<T: UserData> Default for NonStaticUserDataMethods<T> {
+    fn default() -> NonStaticUserDataMethods<T> {
         NonStaticUserDataMethods {
             methods: HashMap::new(),
             meta_methods: HashMap::new(),
@@ -349,12 +346,12 @@ impl<'lua, T: UserData> Default for NonStaticUserDataMethods<'lua, T> {
     }
 }
 
-impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'lua, T> {
+impl<T: UserData> UserDataMethods<T> for NonStaticUserDataMethods<T> {
     fn add_method<A, R, M>(&mut self, name: &str, method: M)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        M: 'static + Send + Fn(&Lua, &T, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -366,9 +363,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
 
     fn add_method_mut<A, R, M>(&mut self, name: &str, mut method: M)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        M: 'static + Send + FnMut(&Lua, &mut T, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -380,9 +377,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
 
     fn add_function<A, R, F>(&mut self, name: &str, function: F)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        F: 'static + Send + Fn(&Lua, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -394,9 +391,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
 
     fn add_function_mut<A, R, F>(&mut self, name: &str, mut function: F)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        F: 'static + Send + FnMut(&Lua, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -408,9 +405,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
 
     fn add_meta_method<A, R, M>(&mut self, meta: MetaMethod, method: M)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        M: 'static + Send + Fn(&Lua, &T, A) -> Result<R>,
     {
         self.meta_methods.insert(
             meta,
@@ -422,9 +419,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
 
     fn add_meta_method_mut<A, R, M>(&mut self, meta: MetaMethod, mut method: M)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        M: 'static + Send + FnMut(&Lua, &mut T, A) -> Result<R>,
     {
         self.meta_methods.insert(
             meta,
@@ -436,9 +433,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
 
     fn add_meta_function<A, R, F>(&mut self, meta: MetaMethod, function: F)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        F: 'static + Send + Fn(&Lua, A) -> Result<R>,
     {
         self.meta_methods.insert(
             meta,
@@ -450,9 +447,9 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
 
     fn add_meta_function_mut<A, R, F>(&mut self, meta: MetaMethod, mut function: F)
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+        A: for<'lua> FromLuaMulti<'lua>,
+        R: ToLuaMulti,
+        F: 'static + Send + FnMut(&Lua, A) -> Result<R>,
     {
         self.meta_methods.insert(
             meta,
