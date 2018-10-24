@@ -123,9 +123,9 @@ If you encounter them, a bug report would be very welcome:
     longjmp over your Rust stack frames, this is a bug!
   * If you can somehow handle a panic in a Rust callback from Lua, this is a
     bug.
-  * If you detect that, after catching a panic, a `Lua` or handle method is
-    triggering other bugs or there is a Lua stack space leak, this is a bug.
-    `rlua` instances are supposed to remain fully usable in the face of user
-    triggered panics.  This guarantee does NOT extend to panics marked with
-    "rlua internal error" simply because that is already indicative of a
-    separate bug.
+  * If you detect that, after catching a panic or during a Drop triggered from a
+    panic, a `Lua` or handle method is triggering other bugs or there is a Lua
+    stack space leak, this is a bug.  `rlua` instances are supposed to remain
+    fully usable in the face of user triggered panics.  This guarantee does not
+    extend to panics marked with "rlua internal error" simply because that is
+    already indicative of a separate bug.
