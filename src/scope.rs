@@ -11,6 +11,7 @@ use error::{Error, Result};
 use ffi;
 use function::Function;
 use lua::Lua;
+use markers::Invariant;
 use types::{Callback, LuaRef};
 use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use util::{
@@ -28,8 +29,7 @@ use value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 pub struct Scope<'scope> {
     lua: &'scope Lua,
     destructors: RefCell<Vec<(LuaRef<'scope>, fn(LuaRef<'scope>) -> Box<Any>)>>,
-    // 'scope lifetime must be invariant
-    _scope: PhantomData<&'scope mut &'scope ()>,
+    _scope_invariant: Invariant<'scope>,
 }
 
 impl<'scope> Scope<'scope> {
@@ -37,7 +37,7 @@ impl<'scope> Scope<'scope> {
         Scope {
             lua,
             destructors: RefCell::new(Vec::new()),
-            _scope: PhantomData,
+            _scope_invariant: PhantomData,
         }
     }
 

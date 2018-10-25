@@ -1,5 +1,5 @@
 use std::any::TypeId;
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::marker::PhantomData;
@@ -13,6 +13,7 @@ use libc;
 use error::{Error, Result};
 use ffi;
 use function::Function;
+use markers::NoRefUnwindSafe;
 use scope::Scope;
 use string::String;
 use table::Table;
@@ -32,8 +33,7 @@ pub struct Lua {
     pub(crate) state: *mut ffi::lua_State,
     main_state: *mut ffi::lua_State,
     ephemeral: bool,
-    // Lua has lots of interior mutability, should not be RefUnwindSafe
-    _phantom: PhantomData<UnsafeCell<()>>,
+    _no_ref_unwind_safe: NoRefUnwindSafe,
 }
 
 unsafe impl Send for Lua {}
@@ -691,15 +691,17 @@ impl Lua {
                 ud
             }
 
-            ffi::LUA_TNUMBER => if ffi::lua_isinteger(self.state, -1) != 0 {
-                let i = Value::Integer(ffi::lua_tointeger(self.state, -1));
-                ffi::lua_pop(self.state, 1);
-                i
-            } else {
-                let n = Value::Number(ffi::lua_tonumber(self.state, -1));
-                ffi::lua_pop(self.state, 1);
-                n
-            },
+            ffi::LUA_TNUMBER => {
+                if ffi::lua_isinteger(self.state, -1) != 0 {
+                    let i = Value::Integer(ffi::lua_tointeger(self.state, -1));
+                    ffi::lua_pop(self.state, 1);
+                    i
+                } else {
+                    let n = Value::Number(ffi::lua_tonumber(self.state, -1));
+                    ffi::lua_pop(self.state, 1);
+                    n
+                }
+            }
 
             ffi::LUA_TSTRING => Value::String(String(self.pop_ref())),
 
@@ -884,7 +886,7 @@ impl Lua {
                     state: state,
                     main_state: main_state(state),
                     ephemeral: true,
-                    _phantom: PhantomData,
+                    _no_ref_unwind_safe: PhantomData,
                 };
 
                 let mut args = MultiValue::new();
@@ -1077,7 +1079,7 @@ unsafe fn create_lua(load_debug: bool) -> Lua {
         state,
         main_state: state,
         ephemeral: false,
-        _phantom: PhantomData,
+        _no_ref_unwind_safe: PhantomData,
     }
 }
 

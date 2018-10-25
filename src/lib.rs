@@ -51,6 +51,7 @@ mod macros;
 mod conversion;
 mod function;
 mod lua;
+mod markers;
 mod multi;
 mod scope;
 mod string;
