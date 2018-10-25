@@ -11,7 +11,7 @@ use error::{Error, Result};
 use ffi;
 use function::Function;
 use lua::Lua;
-use types::Callback;
+use types::{Callback, LuaRef};
 use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use util::{
     assert_stack, init_userdata_metatable, protect_lua_closure, push_string, push_userdata,
@@ -27,7 +27,7 @@ use value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 /// [`Lua::scope`]: struct.Lua.html#method.scope
 pub struct Scope<'scope> {
     lua: &'scope Lua,
-    destructors: RefCell<Vec<Box<Fn() -> Box<Any> + 'scope>>>,
+    destructors: RefCell<Vec<(LuaRef<'scope>, fn(LuaRef<'scope>) -> Box<Any>)>>,
     // 'scope lifetime must be invariant
     _scope: PhantomData<&'scope mut &'scope ()>,
 }
@@ -108,13 +108,10 @@ impl<'scope> Scope<'scope> {
         // thread while the Scope is alive (or the returned AnyUserData handle even).
         unsafe {
             let u = self.lua.make_userdata(data)?;
-            let mut destructors = self.destructors.borrow_mut();
-            let u_destruct = u.0.clone();
-            destructors.push(Box::new(move || {
-                let state = u_destruct.lua.state;
-                let _sg = StackGuard::new(state);
+            self.destructors.borrow_mut().push((u.0.clone(), |u| {
+                let state = u.lua.state;
                 assert_stack(state, 1);
-                u_destruct.lua.push_ref(&u_destruct);
+                u.lua.push_ref(&u);
                 Box::new(take_userdata::<RefCell<T>>(state))
             }));
             Ok(u)
@@ -171,7 +168,6 @@ impl<'scope> Scope<'scope> {
                 if let Some(value) = value {
                     if let Value::UserData(u) = value {
                         unsafe {
-                            let _sg = StackGuard::new(lua.state);
                             assert_stack(lua.state, 1);
                             lua.push_ref(&u.0);
                             ffi::lua_getuservalue(lua.state, -1);
@@ -292,12 +288,10 @@ impl<'scope> Scope<'scope> {
         let f = self.lua.create_callback(f)?;
 
         let mut destructors = self.destructors.borrow_mut();
-        let f_destruct = f.0.clone();
-        destructors.push(Box::new(move || {
-            let state = f_destruct.lua.state;
-            let _sg = StackGuard::new(state);
+        destructors.push((f.0.clone(), |f| {
+            let state = f.lua.state;
             assert_stack(state, 2);
-            f_destruct.lua.push_ref(&f_destruct);
+            f.lua.push_ref(&f);
 
             ffi::lua_getupvalue(state, -1, 1);
             let ud = take_userdata::<Callback>(state);
@@ -318,12 +312,14 @@ impl<'scope> Drop for Scope<'scope> {
         // userdata type into two phases.  This is so that, in the event a userdata drop panics, we
         // can be sure that all of the userdata in Lua is actually invalidated.
 
+        // All destructors are non-panicking, so this is fine
         let to_drop = self
             .destructors
             .get_mut()
             .drain(..)
-            .map(|destructor| destructor())
+            .map(|(r, dest)| dest(r))
             .collect::<Vec<_>>();
+
         drop(to_drop);
     }
 }
