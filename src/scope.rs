@@ -108,7 +108,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
         T: 'static + UserData,
     {
         // Safe even though T may not be Send, because the parent Lua cannot be sent to another
-        // thread while the current context is alive (and Scope holds a Context).
+        // thread while the current context is alive.
         unsafe {
             let u = self.lua.make_userdata(data)?;
             self.destructors.borrow_mut().push((u.0.clone(), |u| {

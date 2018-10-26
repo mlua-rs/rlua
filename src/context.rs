@@ -861,8 +861,6 @@ impl<'lua> Context<'lua> {
         Ok(AnyUserData(self.pop_ref()))
     }
 
-    // Unsafe, because the 'lua lifetime must not be chosen by the user (it must be universally
-    // quantified in a callback parameter)
     pub(crate) unsafe fn new(state: *mut ffi::lua_State) -> Context<'lua> {
         Context {
             state,
