@@ -14,18 +14,18 @@ fn test_user_data() {
     impl UserData for UserData1 {};
     impl UserData for UserData2 {};
 
-    let lua = Lua::new();
+    Lua::new().scope(|lua| {
+        let userdata1 = lua.create_userdata(UserData1(1)).unwrap();
+        let userdata2 = lua.create_userdata(UserData2(Box::new(2))).unwrap();
 
-    let userdata1 = lua.create_userdata(UserData1(1)).unwrap();
-    let userdata2 = lua.create_userdata(UserData2(Box::new(2))).unwrap();
+        assert!(userdata1.is::<UserData1>());
+        assert!(!userdata1.is::<UserData2>());
+        assert!(userdata2.is::<UserData2>());
+        assert!(!userdata2.is::<UserData1>());
 
-    assert!(userdata1.is::<UserData1>());
-    assert!(!userdata1.is::<UserData2>());
-    assert!(userdata2.is::<UserData2>());
-    assert!(!userdata2.is::<UserData1>());
-
-    assert_eq!(userdata1.borrow::<UserData1>().unwrap().0, 1);
-    assert_eq!(*userdata2.borrow::<UserData2>().unwrap().0, 2);
+        assert_eq!(userdata1.borrow::<UserData1>().unwrap().0, 1);
+        assert_eq!(*userdata2.borrow::<UserData2>().unwrap().0, 2);
+    });
 }
 
 #[test]
@@ -42,12 +42,12 @@ fn test_methods() {
         }
     }
 
-    let lua = Lua::new();
-    let globals = lua.globals();
-    let userdata = lua.create_userdata(MyUserData(42)).unwrap();
-    globals.set("userdata", userdata.clone()).unwrap();
-    lua.exec::<_, ()>(
-        r#"
+    Lua::new().scope(|lua| {
+        let globals = lua.globals();
+        let userdata = lua.create_userdata(MyUserData(42)).unwrap();
+        globals.set("userdata", userdata.clone()).unwrap();
+        lua.exec::<_, ()>(
+            r#"
             function get_it()
                 return userdata:get_value()
             end
@@ -56,15 +56,17 @@ fn test_methods() {
                 return userdata:set_value(i)
             end
         "#,
-        None,
-    ).unwrap();
-    let get = globals.get::<_, Function>("get_it").unwrap();
-    let set = globals.get::<_, Function>("set_it").unwrap();
-    assert_eq!(get.call::<_, i64>(()).unwrap(), 42);
-    userdata.borrow_mut::<MyUserData>().unwrap().0 = 64;
-    assert_eq!(get.call::<_, i64>(()).unwrap(), 64);
-    set.call::<_, ()>(100).unwrap();
-    assert_eq!(get.call::<_, i64>(()).unwrap(), 100);
+            None,
+        )
+        .unwrap();
+        let get = globals.get::<_, Function>("get_it").unwrap();
+        let set = globals.get::<_, Function>("set_it").unwrap();
+        assert_eq!(get.call::<_, i64>(()).unwrap(), 42);
+        userdata.borrow_mut::<MyUserData>().unwrap().0 = 64;
+        assert_eq!(get.call::<_, i64>(()).unwrap(), 64);
+        set.call::<_, ()>(100).unwrap();
+        assert_eq!(get.call::<_, i64>(()).unwrap(), 100);
+    });
 }
 
 #[test]
@@ -93,25 +95,26 @@ fn test_metamethods() {
         }
     }
 
-    let lua = Lua::new();
-    let globals = lua.globals();
-    globals.set("userdata1", MyUserData(7)).unwrap();
-    globals.set("userdata2", MyUserData(3)).unwrap();
-    assert_eq!(
-        lua.eval::<_, MyUserData>("userdata1 + userdata2", None)
-            .unwrap()
-            .0,
-        10
-    );
-    assert_eq!(
-        lua.eval::<_, MyUserData>("userdata1 - userdata2", None)
-            .unwrap()
-            .0,
-        4
-    );
-    assert_eq!(lua.eval::<_, i64>("userdata1:get()", None).unwrap(), 7);
-    assert_eq!(lua.eval::<_, i64>("userdata2.inner", None).unwrap(), 3);
-    assert!(lua.eval::<_, ()>("userdata2.nonexist_field", None).is_err());
+    Lua::new().scope(|lua| {
+        let globals = lua.globals();
+        globals.set("userdata1", MyUserData(7)).unwrap();
+        globals.set("userdata2", MyUserData(3)).unwrap();
+        assert_eq!(
+            lua.eval::<_, MyUserData>("userdata1 + userdata2", None)
+                .unwrap()
+                .0,
+            10
+        );
+        assert_eq!(
+            lua.eval::<_, MyUserData>("userdata1 - userdata2", None)
+                .unwrap()
+                .0,
+            4
+        );
+        assert_eq!(lua.eval::<_, i64>("userdata1:get()", None).unwrap(), 7);
+        assert_eq!(lua.eval::<_, i64>("userdata2.inner", None).unwrap(), 3);
+        assert!(lua.eval::<_, ()>("userdata2.nonexist_field", None).is_err());
+    });
 }
 
 #[test]
@@ -129,15 +132,14 @@ fn test_gc_userdata() {
         }
     }
 
-    let lua = Lua::new();
-    {
-        let globals = lua.globals();
-        globals.set("userdata", MyUserdata { id: 123 }).unwrap();
-    }
+    Lua::new().scope(|lua| {
+        lua.globals()
+            .set("userdata", MyUserdata { id: 123 })
+            .unwrap();
 
-    assert!(
-        lua.eval::<_, ()>(
-            r#"
+        assert!(
+            lua.eval::<_, ()>(
+                r#"
                 local tbl = setmetatable({
                     userdata = userdata
                 }, { __gc = function(self)
@@ -150,9 +152,11 @@ fn test_gc_userdata() {
                 collectgarbage("collect")
                 hatch:access()
             "#,
-            None
-        ).is_err()
-    );
+                None
+            )
+            .is_err()
+        );
+    });
 }
 
 #[test]
@@ -164,10 +168,11 @@ fn detroys_userdata() {
     let rc = Arc::new(());
 
     let lua = Lua::new();
-    {
-        let globals = lua.globals();
-        globals.set("userdata", MyUserdata(rc.clone())).unwrap();
-    }
+    lua.scope(|lua| {
+        lua.globals()
+            .set("userdata", MyUserdata(rc.clone()))
+            .unwrap();
+    });
 
     assert_eq!(Arc::strong_count(&rc), 2);
     drop(lua); // should destroy all objects
@@ -176,13 +181,13 @@ fn detroys_userdata() {
 
 #[test]
 fn user_value() {
-    let lua = Lua::new();
-
     struct MyUserData;
     impl UserData for MyUserData {}
 
-    let ud = lua.create_userdata(MyUserData).unwrap();
-    ud.set_user_value("hello").unwrap();
-    assert_eq!(ud.get_user_value::<String>().unwrap(), "hello");
-    assert!(ud.get_user_value::<u32>().is_err());
+    Lua::new().scope(|lua| {
+        let ud = lua.create_userdata(MyUserData).unwrap();
+        ud.set_user_value("hello").unwrap();
+        assert_eq!(ud.get_user_value::<String>().unwrap(), "hello");
+        assert!(ud.get_user_value::<u32>().is_err());
+    });
 }

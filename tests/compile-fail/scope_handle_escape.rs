@@ -10,8 +10,8 @@ fn main() {
     let lua = Lua::new();
     let mut outer: Option<Function> = None;
     lua.scope(|scope| {
-        let f = scope.create_function_mut(|_, ()| Ok(())).unwrap();
-        outer = Some(scope.create_function_mut(|_, ()| Ok(())).unwrap());
+        let f = scope.create_scoped_function_mut(|_, ()| Ok(())).unwrap();
+        outer = Some(scope.create_scoped_function_mut(|_, ()| Ok(())).unwrap());
         //~^ error: borrowed data cannot be stored outside of its closure
     });
 }

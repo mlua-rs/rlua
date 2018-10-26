@@ -1,9 +1,9 @@
 use std::iter::{self, FromIterator};
 use std::{slice, str, vec};
 
+use context::Context;
 use error::{Error, Result};
 use function::Function;
-use lua::Lua;
 use string::String;
 use table::Table;
 use thread::Thread;
@@ -66,13 +66,13 @@ impl<'lua> Value<'lua> {
 /// Trait for types convertible to `Value`.
 pub trait ToLua<'lua> {
     /// Performs the conversion.
-    fn to_lua(self, lua: &'lua Lua) -> Result<Value<'lua>>;
+    fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>>;
 }
 
 /// Trait for types convertible from `Value`.
 pub trait FromLua<'lua>: Sized {
     /// Performs the conversion.
-    fn from_lua(lua_value: Value<'lua>, lua: &'lua Lua) -> Result<Self>;
+    fn from_lua(lua_value: Value<'lua>, lua: Context<'lua>) -> Result<Self>;
 }
 
 /// Multiple Lua values used for both argument passing and also for multiple return values.
@@ -149,7 +149,7 @@ impl<'lua> MultiValue<'lua> {
 /// one. Any type that implements `ToLua` will automatically implement this trait.
 pub trait ToLuaMulti<'lua> {
     /// Performs the conversion.
-    fn to_lua_multi(self, lua: &'lua Lua) -> Result<MultiValue<'lua>>;
+    fn to_lua_multi(self, lua: Context<'lua>) -> Result<MultiValue<'lua>>;
 }
 
 /// Trait for types that can be created from an arbitrary number of Lua values.
@@ -163,5 +163,5 @@ pub trait FromLuaMulti<'lua>: Sized {
     /// values should be ignored. This reflects the semantics of Lua when calling a function or
     /// assigning values. Similarly, if not enough values are given, conversions should assume that
     /// any missing values are nil.
-    fn from_lua_multi(values: MultiValue<'lua>, lua: &'lua Lua) -> Result<Self>;
+    fn from_lua_multi(values: MultiValue<'lua>, lua: Context<'lua>) -> Result<Self>;
 }

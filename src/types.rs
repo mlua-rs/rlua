@@ -2,9 +2,9 @@ use std::os::raw::{c_int, c_void};
 use std::sync::{Arc, Mutex};
 use std::{fmt, mem, ptr};
 
+use context::Context;
 use error::Result;
 use ffi;
-use lua::Lua;
 use value::MultiValue;
 
 /// Type of Lua integer numbers.
@@ -17,7 +17,7 @@ pub type Number = ffi::lua_Number;
 pub struct LightUserData(pub *mut c_void);
 
 pub(crate) type Callback<'lua, 'a> =
-    Box<Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'a>;
+    Box<Fn(Context<'lua>, MultiValue<'lua>) -> Result<MultiValue<'lua>> + 'a>;
 
 /// An auto generated key into the Lua registry.
 ///
@@ -71,7 +71,7 @@ impl RegistryKey {
 }
 
 pub(crate) struct LuaRef<'lua> {
-    pub(crate) lua: &'lua Lua,
+    pub(crate) lua: Context<'lua>,
     pub(crate) index: c_int,
 }
 

@@ -48,6 +48,7 @@ mod error;
 mod ffi;
 #[macro_use]
 mod macros;
+mod context;
 mod conversion;
 mod function;
 mod lua;
@@ -62,6 +63,7 @@ mod userdata;
 mod util;
 mod value;
 
+pub use context::Context;
 pub use error::{Error, ExternalError, ExternalResult, Result};
 pub use function::Function;
 pub use lua::Lua;
