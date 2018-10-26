@@ -13,7 +13,7 @@ use rlua::{
 
 #[test]
 fn test_load() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let func = lua.load("return 1+2", None).unwrap();
         let result: i32 = func.call(()).unwrap();
         assert_eq!(result, 3);
@@ -25,7 +25,7 @@ fn test_load() {
 #[test]
 fn test_debug() {
     let lua = unsafe { Lua::new_with_debug() };
-    lua.scope(|lua| {
+    lua.context(|lua| {
         match lua.eval("debug", None).unwrap() {
             Value::Table(_) => {}
             val => panic!("Expected table for debug library, got {:#?}", val),
@@ -40,7 +40,7 @@ fn test_debug() {
 
 #[test]
 fn test_exec() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"
@@ -77,7 +77,7 @@ fn test_exec() {
 
 #[test]
 fn test_eval() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         assert_eq!(lua.eval::<_, i32>("1 + 1", None).unwrap(), 2);
         assert_eq!(lua.eval::<_, bool>("false == false", None).unwrap(), true);
         assert_eq!(lua.eval::<_, i32>("return 1 + 2", None).unwrap(), 3);
@@ -96,7 +96,7 @@ fn test_eval() {
 
 #[test]
 fn test_lua_multi() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"
@@ -125,7 +125,7 @@ fn test_lua_multi() {
 
 #[test]
 fn test_coercion() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"
@@ -163,7 +163,7 @@ fn test_error() {
         }
     }
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"
@@ -275,7 +275,7 @@ fn test_error() {
     });
 
     match catch_unwind(|| -> Result<()> {
-        Lua::new().scope(|lua| {
+        Lua::new().context(|lua| {
             let globals = lua.globals();
 
             lua.exec::<_, ()>(
@@ -302,7 +302,7 @@ fn test_error() {
     };
 
     match catch_unwind(|| -> Result<()> {
-        Lua::new().scope(|lua| {
+        Lua::new().context(|lua| {
             let globals = lua.globals();
 
             lua.exec::<_, ()>(
@@ -331,7 +331,7 @@ fn test_error() {
 
 #[test]
 fn test_result_conversions() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
 
         let err = lua
@@ -364,7 +364,7 @@ fn test_result_conversions() {
 
 #[test]
 fn test_num_conversion() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         assert_eq!(
             lua.coerce_integer(Value::String(lua.create_string("1").unwrap())),
             Some(1)
@@ -420,7 +420,7 @@ fn test_num_conversion() {
 
 #[test]
 fn test_pcall_xpcall() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
 
         // make sure that we handle not enough arguments
@@ -486,7 +486,7 @@ fn test_pcall_xpcall() {
 
 #[test]
 fn test_recursive_mut_callback_error() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let mut v = Some(Box::new(123));
         let f = lua
             .create_function_mut::<_, (), _>(move |lua, mutate: bool| {
@@ -525,7 +525,7 @@ fn test_recursive_mut_callback_error() {
 
 #[test]
 fn test_set_metatable_nil() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         lua.exec::<_, ()>(
             r#"
         a = {}
@@ -538,7 +538,7 @@ fn test_set_metatable_nil() {
 
 #[test]
 fn test_gc_error() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         match lua.exec::<_, ()>(
             r#"
                 val = nil
@@ -562,7 +562,7 @@ fn test_gc_error() {
 
 #[test]
 fn test_named_registry_value() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         lua.set_named_registry_value::<i32>("test", 42).unwrap();
         let f = lua
             .create_function(move |lua, ()| {
@@ -582,7 +582,7 @@ fn test_named_registry_value() {
 
 #[test]
 fn test_registry_value() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let mut r = Some(lua.create_registry_value::<i32>(42).unwrap());
         let f = lua
             .create_function_mut(move |lua, ()| {
@@ -605,7 +605,7 @@ fn test_drop_registry_value() {
 
     impl UserData for MyUserdata {}
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let rc = Arc::new(());
 
         let r = lua.create_registry_value(MyUserdata(rc.clone())).unwrap();
@@ -623,8 +623,8 @@ fn test_drop_registry_value() {
 
 #[test]
 fn test_lua_registry_ownership() {
-    Lua::new().scope(|lua1| {
-        Lua::new().scope(|lua2| {
+    Lua::new().context(|lua1| {
+        Lua::new().context(|lua2| {
             let r1 = lua1.create_registry_value("hello").unwrap();
             let r2 = lua2.create_registry_value("hello").unwrap();
 
@@ -638,8 +638,8 @@ fn test_lua_registry_ownership() {
 
 #[test]
 fn test_mismatched_registry_key() {
-    Lua::new().scope(|lua1| {
-        Lua::new().scope(|lua2| {
+    Lua::new().context(|lua1| {
+        Lua::new().context(|lua2| {
             let r = lua1.create_registry_value("hello").unwrap();
             match lua2.remove_registry_value(r) {
                 Err(Error::MismatchedRegistryKey) => {}
@@ -651,7 +651,7 @@ fn test_mismatched_registry_key() {
 
 #[test]
 fn too_many_returns() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let f = lua
             .create_function(|_, ()| Ok(Variadic::from_iter(1..1000000)))
             .unwrap();
@@ -661,7 +661,7 @@ fn too_many_returns() {
 
 #[test]
 fn too_many_arguments() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         lua.exec::<_, ()>("function test(...) end", None).unwrap();
         let args = Variadic::from_iter(1..1000000);
         assert!(
@@ -676,7 +676,7 @@ fn too_many_arguments() {
 
 #[test]
 fn too_many_recursions() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let f = lua
             .create_function(move |lua, ()| {
                 lua.globals().get::<_, Function>("f")?.call::<_, ()>(())
@@ -695,7 +695,7 @@ fn too_many_recursions() {
 
 #[test]
 fn too_many_binds() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"
@@ -717,7 +717,7 @@ fn too_many_binds() {
 
 #[test]
 fn large_args() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
 
         globals
@@ -753,7 +753,7 @@ fn large_args() {
 
 #[test]
 fn large_args_ref() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let f = lua
             .create_function(|_, args: Variadic<String>| {
                 for i in 0..args.len() {

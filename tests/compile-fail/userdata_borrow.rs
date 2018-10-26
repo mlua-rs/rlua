@@ -3,7 +3,7 @@ extern crate rlua;
 use rlua::{AnyUserData, Lua, Table, UserData};
 
 fn main() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
 
         // Should not allow userdata borrow to outlive lifetime of AnyUserData handle

@@ -8,7 +8,7 @@ fn with_str<F>(s: &str, f: F)
 where
     F: FnOnce(String),
 {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let string = lua.create_string(s).unwrap();
         f(string);
     });
@@ -30,7 +30,7 @@ fn compare() {
 
 #[test]
 fn string_views() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         lua.eval::<_, ()>(
             r#"
             ok = "null bytes are valid utf-8, wh\0 knew?"
@@ -65,7 +65,7 @@ fn string_views() {
 
 #[test]
 fn raw_string() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let rs = lua.create_string(&[0, 1, 2, 3, 0, 1, 2, 3]).unwrap();
         assert_eq!(rs.as_bytes(), &[0, 1, 2, 3, 0, 1, 2, 3]);
     });

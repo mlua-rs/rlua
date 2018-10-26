@@ -6,7 +6,7 @@ use rlua::{Function, LightUserData, Lua};
 
 #[test]
 fn test_lightuserdata() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"

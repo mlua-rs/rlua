@@ -7,12 +7,12 @@ use rlua::{Error, Function, Lua, MetaMethod, String, UserData, UserDataMethods};
 
 #[test]
 fn scope_func() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let rc = Rc::new(Cell::new(0));
-        lua.scope(|lua| {
+        lua.scope(|scope| {
             let r = rc.clone();
-            let f = lua
-                .create_scoped_function(move |_, ()| {
+            let f = scope
+                .create_function(move |_, ()| {
                     r.set(42);
                     Ok(())
                 }).unwrap();
@@ -37,7 +37,7 @@ fn scope_func() {
 
 #[test]
 fn scope_drop() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         struct MyUserdata(Rc<()>);
         impl UserData for MyUserdata {
             fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
@@ -47,11 +47,12 @@ fn scope_drop() {
 
         let rc = Rc::new(());
 
-        lua.scope(|lua| {
+        lua.scope(|scope| {
             lua.globals()
                 .set(
                     "test",
-                    lua.create_scoped_static_userdata(MyUserdata(rc.clone()))
+                    scope
+                        .create_static_userdata(MyUserdata(rc.clone()))
                         .unwrap(),
                 ).unwrap();
             assert_eq!(Rc::strong_count(&rc), 2);
@@ -70,28 +71,32 @@ fn scope_capture() {
     let lua = Lua::new();
 
     let mut i = 0;
-    lua.scope(|lua| {
-        lua.create_scoped_function_mut(|_, ()| {
-            i = 42;
-            Ok(())
-        }).unwrap()
-        .call::<_, ()>(())
-        .unwrap();
+    lua.context(|lua| {
+        lua.scope(|scope| {
+            scope
+                .create_function_mut(|_, ()| {
+                    i = 42;
+                    Ok(())
+                }).unwrap()
+                .call::<_, ()>(())
+                .unwrap();
+        });
     });
     assert_eq!(i, 42);
 }
 
 #[test]
 fn outer_lua_access() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let table = lua.create_table().unwrap();
-        lua.scope(|lua| {
-            lua.create_scoped_function_mut(|_, ()| {
-                table.set("a", "b").unwrap();
-                Ok(())
-            }).unwrap()
-            .call::<_, ()>(())
-            .unwrap();
+        lua.scope(|scope| {
+            scope
+                .create_function_mut(|_, ()| {
+                    table.set("a", "b").unwrap();
+                    Ok(())
+                }).unwrap()
+                .call::<_, ()>(())
+                .unwrap();
         });
         assert_eq!(table.get::<_, String>("a").unwrap(), "b");
     });
@@ -118,7 +123,7 @@ fn scope_userdata_methods() {
     let lua = Lua::new();
 
     let i = Cell::new(42);
-    lua.scope(|lua| {
+    lua.context(|lua| {
         let f: Function = lua
             .eval(
                 r#"
@@ -132,10 +137,10 @@ fn scope_userdata_methods() {
                 None,
             ).unwrap();
 
-        f.call::<_, ()>(
-            lua.create_scoped_nonstatic_userdata(MyUserData(&i))
-                .unwrap(),
-        ).unwrap();
+        lua.scope(|scope| {
+            f.call::<_, ()>(scope.create_nonstatic_userdata(MyUserData(&i)).unwrap())
+                .unwrap();
+        });
     });
 
     assert_eq!(i.get(), 44);
@@ -161,7 +166,7 @@ fn scope_userdata_functions() {
     }
 
     let dummy = 0;
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let f = lua
             .exec::<_, Function>(
                 r#"
@@ -175,10 +180,10 @@ fn scope_userdata_functions() {
                 None,
             ).unwrap();
 
-        f.call::<_, ()>(
-            lua.create_scoped_nonstatic_userdata(MyUserData(&dummy))
-                .unwrap(),
-        ).unwrap();
+        lua.scope(|scope| {
+            f.call::<_, ()>(scope.create_nonstatic_userdata(MyUserData(&dummy)).unwrap())
+                .unwrap();
+        });
 
         assert_eq!(lua.globals().get::<_, i64>("i").unwrap(), 3);
     });
@@ -197,7 +202,7 @@ fn scope_userdata_mismatch() {
         }
     }
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         lua.exec::<_, ()>(
             r#"
             function okay(a, b)
@@ -215,16 +220,12 @@ fn scope_userdata_mismatch() {
         let a = Cell::new(1);
         let b = Cell::new(1);
 
-        lua.scope(|lua| {
-            let okay: Function = lua.globals().get("okay").unwrap();
-            let bad: Function = lua.globals().get("bad").unwrap();
+        let okay: Function = lua.globals().get("okay").unwrap();
+        let bad: Function = lua.globals().get("bad").unwrap();
 
-            let au = lua
-                .create_scoped_nonstatic_userdata(MyUserData(&a))
-                .unwrap();
-            let bu = lua
-                .create_scoped_nonstatic_userdata(MyUserData(&b))
-                .unwrap();
+        lua.scope(|scope| {
+            let au = scope.create_nonstatic_userdata(MyUserData(&a)).unwrap();
+            let bu = scope.create_nonstatic_userdata(MyUserData(&b)).unwrap();
             assert!(okay.call::<_, ()>((au.clone(), bu.clone())).is_ok());
             match bad.call::<_, ()>((au, bu)) {
                 Err(Error::CallbackError { ref cause, .. }) => match *cause.as_ref() {

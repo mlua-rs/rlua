@@ -5,7 +5,7 @@ use rlua::{Function, Lua, Result};
 fn main() {
     struct Test(i32);
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let test = Test(0);
 
         let func = lua.create_function(|_, ()| -> Result<i32> {

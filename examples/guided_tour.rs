@@ -10,7 +10,7 @@ fn main() -> Result<()> {
     // lua std library, and will specifically allow limiting Lua to a subset of "safe"
     // functionality.
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         // You can get and set global variables.  Notice that the globals table here is a permanent
         // reference to _G, and it is mutated behind the scenes as lua code is loaded.  This API is
         // based heavily around internal mutation (just like lua itself).
@@ -159,13 +159,13 @@ fn main() -> Result<()> {
         {
             let mut rust_val = 0;
 
-            lua.scope(|lua| {
+            lua.scope(|scope| {
                 // We create a 'sketchy' lua callback that modifies the variable `rust_val`.  Outside of a
                 // `Lua::scope` call, this would not be allowed because it could be unsafe.
 
                 lua.globals().set(
                     "sketchy",
-                    lua.create_scoped_function_mut(|_, ()| {
+                    scope.create_function_mut(|_, ()| {
                         rust_val = 42;
                         Ok(())
                     })?,

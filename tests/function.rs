@@ -4,7 +4,7 @@ use rlua::{Function, Lua, String};
 
 #[test]
 fn test_function() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"
@@ -22,7 +22,7 @@ fn test_function() {
 
 #[test]
 fn test_bind() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"
@@ -50,7 +50,7 @@ fn test_bind() {
 
 #[test]
 fn test_rust_function() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"

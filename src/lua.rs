@@ -10,7 +10,6 @@ use libc;
 use context::Context;
 use ffi;
 use markers::NoRefUnwindSafe;
-use scope::Scope;
 use types::Callback;
 use util::{
     assert_stack, init_error_metatables, protect_lua_closure, safe_pcall, safe_xpcall,
@@ -63,35 +62,32 @@ impl Lua {
     /// state via the `Context` type, and there is a `'lua` lifetime associated with these.
     ///
     /// This `'lua` lifetime is somewhat special.  It is what is sometimes called a "generative"
-    /// lifetime or a "branding" lifetime, which is unique for each call to `Lua::scope` and
-    /// invariant.
+    /// lifetime or a "branding" lifetime, which is unique for each call to `Lua::context` and
+    /// is invariant.
     ///
     /// The reason this entry point must be a callback is so that this unique lifetime can be
     /// generated as part of the callback's parameters.  Even though this callback API is somewhat
     /// inconvenient, it has several advantages:
     ///
-    /// - Inside calls to `Lua::scope`, we know that all instances of the 'lua lifetime are the
-    ///   same unique lifetime, because it is invariant.  Thus, it is impossible for the user to
-    ///   accidentally mix handle types between different instances of `Lua`.
-    /// - Handle types cannot escape the scope call and the `'lua` context lifetime is in general
-    ///   very limited, preventing it from being stored in unexpected places.  This sounds like a
-    ///   disadvantage, but it is actually a benefit as it helps ensure the soundness of the API.
-    /// - The `Scope` type parameter here has the ability to create certian special "scoped"
-    ///   function and userdata types whose lifetimes are guaranteed to end at the end of the scope
-    ///   call.  Since their lifetime is known and limited, these special "scoped" types are not
-    ///   restricted to being `Send` and `'static`.  Since Lua has no concept of lifetimes, these
-    ///   types can always be smuggled through Lua to live arbitrarily long, but they are always
-    ///   "invalidated" at the end of the scope call (it is a Lua script error to call them).
+    /// - Inside calls to `Lua::context`, we know that all instances of the 'lua lifetime are the
+    ///   same unique lifetime.  Thus, it is impossible for the user to accidentally mix handle
+    ///   types between different instances of `Lua`.
+    /// - Because we know at compile time that handles cannot be mixed from different instances of
+    ///   `Lua`, we do not need to do runtime checks to make sure that handles are from the same
+    ///   state.
+    /// - Handle types cannot escape the context call and the `'lua` context lifetime is in general
+    ///   very limited, preventing it from being stored in unexpected places.  This is a benefit as
+    ///   it helps ensure the soundness of the API.
     ///
     /// It is not possible to return types with this `'lua` context lifetime from the given
     /// callback, or store them long-term in any way.  There is an escape hatch here, though: if you
     /// need to keep references to internal Lua values long-term, you can use the Lua registry via
     /// `Lua::set_named_registry_value` and `Lua::create_registry_value`.
-    pub fn scope<'scope, F, R>(&self, f: F) -> R
+    pub fn context<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&Scope<'_, 'scope>) -> R,
+        F: FnOnce(Context) -> R,
     {
-        f(&Scope::new(unsafe { Context::new(self.main_state) }))
+        f(unsafe { Context::new(self.main_state) })
     }
 }
 

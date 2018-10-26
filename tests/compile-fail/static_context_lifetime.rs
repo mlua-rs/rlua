@@ -10,7 +10,7 @@ fn main() {
     }
 
     let lua = Box::leak(Box::new(Lua::new()));
-    lua.scope(|lua| {
+    lua.context(|lua| {
         lua.create_function(|_, table: Table| {
             //~^ error: cannot infer an appropriate lifetime for lifetime parameter `'lua` due to
             // conflicting requirements
@@ -18,7 +18,8 @@ fn main() {
                 *bt.borrow_mut() = Some(table);
             });
             Ok(())
-        }).unwrap()
+        })
+        .unwrap()
         .call::<_, ()>(lua.create_table().unwrap())
         .unwrap();
     });

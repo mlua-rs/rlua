@@ -8,13 +8,12 @@ fn main() {
     }
 
     Lua::new().context(|lua| {
+        let mut outer: Option<Table> = None;
         lua.scope(|scope| {
-            let mut inner: Option<Table> = None;
             let f = scope
                 .create_function_mut(|_, t: Table| {
-                    //~^ error: cannot infer an appropriate lifetime for autoref due to conflicting
-                    // requirements
-                    inner = Some(t);
+                    //~^^ error: borrowed data cannot be stored outside of its closure
+                    outer = Some(t);
                     Ok(())
                 })
                 .unwrap();

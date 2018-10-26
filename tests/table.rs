@@ -4,7 +4,7 @@ use rlua::{Lua, Nil, Result, Table, Value};
 
 #[test]
 fn test_set_get() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         globals.set("foo", "bar").unwrap();
         globals.set("baz", "baf").unwrap();
@@ -15,7 +15,7 @@ fn test_set_get() {
 
 #[test]
 fn test_table() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
 
         globals.set("table", lua.create_table().unwrap()).unwrap();
@@ -100,7 +100,7 @@ fn test_table() {
 
 #[test]
 fn test_table_scope() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"
@@ -126,7 +126,7 @@ fn test_table_scope() {
 
 #[test]
 fn test_metatable() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let table = lua.create_table().unwrap();
         let metatable = lua.create_table().unwrap();
         metatable
@@ -150,7 +150,7 @@ fn test_metatable() {
 
 #[test]
 fn test_table_error() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         lua.exec::<_, ()>(
             r#"

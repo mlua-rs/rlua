@@ -14,7 +14,7 @@ fn test_user_data() {
     impl UserData for UserData1 {};
     impl UserData for UserData2 {};
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let userdata1 = lua.create_userdata(UserData1(1)).unwrap();
         let userdata2 = lua.create_userdata(UserData2(Box::new(2))).unwrap();
 
@@ -42,7 +42,7 @@ fn test_methods() {
         }
     }
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         let userdata = lua.create_userdata(MyUserData(42)).unwrap();
         globals.set("userdata", userdata.clone()).unwrap();
@@ -94,7 +94,7 @@ fn test_metamethods() {
         }
     }
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let globals = lua.globals();
         globals.set("userdata1", MyUserData(7)).unwrap();
         globals.set("userdata2", MyUserData(3)).unwrap();
@@ -131,7 +131,7 @@ fn test_gc_userdata() {
         }
     }
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         lua.globals()
             .set("userdata", MyUserdata { id: 123 })
             .unwrap();
@@ -166,7 +166,7 @@ fn detroys_userdata() {
     let rc = Arc::new(());
 
     let lua = Lua::new();
-    lua.scope(|lua| {
+    lua.context(|lua| {
         lua.globals()
             .set("userdata", MyUserdata(rc.clone()))
             .unwrap();
@@ -182,7 +182,7 @@ fn user_value() {
     struct MyUserData;
     impl UserData for MyUserData {}
 
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let ud = lua.create_userdata(MyUserData).unwrap();
         ud.set_user_value("hello").unwrap();
         assert_eq!(ud.get_user_value::<String>().unwrap(), "hello");

@@ -7,7 +7,7 @@ use rlua::{Error, Lua, MultiValue};
 use rustyline::Editor;
 
 fn main() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let mut editor = Editor::<()>::new();
 
         loop {

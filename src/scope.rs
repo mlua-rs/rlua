@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem;
-use std::ops::Deref;
 use std::os::raw::c_void;
 use std::rc::Rc;
 use std::string::String as StdString;
@@ -33,19 +32,7 @@ pub struct Scope<'lua, 'scope> {
     _scope_invariant: Invariant<'scope>,
 }
 
-impl<'lua, 'scope> Deref for Scope<'lua, 'scope> {
-    type Target = Context<'lua>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.lua
-    }
-}
-
 impl<'lua, 'scope> Scope<'lua, 'scope> {
-    pub fn context(&self) -> Context<'lua> {
-        self.lua
-    }
-
     pub(crate) fn new(lua: Context<'lua>) -> Scope<'lua, 'scope> {
         Scope {
             lua,
@@ -61,14 +48,21 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
     ///
     /// [`Lua::create_function`]: struct.Lua.html#method.create_function
     /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_scoped_function<A, R, F>(&self, func: F) -> Result<Function<'lua>>
+    pub fn create_function<'callback, A, R, F>(&'callback self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'scope + Fn(Context<'lua>, A) -> Result<R>,
+        A: FromLuaMulti<'callback>,
+        R: ToLuaMulti<'callback>,
+        F: 'scope + Fn(Context<'callback>, A) -> Result<R>,
     {
-        // Safe, because 'scope and 'lua cannot be unified due to being invariant, so F cannot
-        // capture any parameters of 'lua lifetime.
+        // Safe, because 'scope must outlive 'callback (due to Self containing 'scope), however the
+        // callback itself must be 'scope lifetime, so the function should not be able to capture
+        // anything of 'callback lifetime.  'scope can't be shortened due to being invariant, and
+        // the 'callback lifetime here can't be enlarged due to coming from a universal
+        // quantification in Context::scope.
+        //
+        // I hope I got this explanation right, but in any case this is tested with compiletest_rs
+        // to make sure callbacks can't capture handles with lifetime outside the scope, inside the
+        // scope, and owned inside the callback itself.
         unsafe {
             self.create_callback(Box::new(move |lua, args| {
                 func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
@@ -84,14 +78,17 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
     /// [`Lua::create_function_mut`]: struct.Lua.html#method.create_function_mut
     /// [`Lua::scope`]: struct.Lua.html#method.scope
     /// [`Scope::create_function`]: #method.create_function
-    pub fn create_scoped_function_mut<A, R, F>(&self, func: F) -> Result<Function<'lua>>
+    pub fn create_function_mut<'callback, A, R, F>(
+        &'callback self,
+        func: F,
+    ) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'scope + FnMut(Context<'lua>, A) -> Result<R>,
+        A: FromLuaMulti<'callback>,
+        R: ToLuaMulti<'callback>,
+        F: 'scope + FnMut(Context<'callback>, A) -> Result<R>,
     {
         let func = RefCell::new(func);
-        self.create_scoped_function(move |lua, args| {
+        self.create_function(move |lua, args| {
             (&mut *func
                 .try_borrow_mut()
                 .map_err(|_| Error::RecursiveMutCallback)?)(lua, args)
@@ -106,7 +103,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
     ///
     /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
     /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_scoped_static_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
+    pub fn create_static_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: 'static + UserData,
     {
@@ -147,7 +144,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
     /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
     /// [`Lua::scope`]: struct.Lua.html#method.scope
     /// [`UserDataMethods`]: trait.UserDataMethods.html
-    pub fn create_scoped_nonstatic_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
+    pub fn create_nonstatic_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: 'scope + UserData,
     {

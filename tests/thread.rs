@@ -6,7 +6,7 @@ use rlua::{Error, Function, Lua, Result, Thread, ThreadStatus};
 
 #[test]
 fn test_thread() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let thread = lua
             .create_thread(
                 lua.eval::<_, Function>(
@@ -97,7 +97,7 @@ fn test_thread() {
 
 #[test]
 fn coroutine_from_closure() {
-    Lua::new().scope(|lua| {
+    Lua::new().context(|lua| {
         let thrd_main = lua.create_function(|_, ()| Ok(())).unwrap();
         lua.globals().set("main", thrd_main).unwrap();
         let thrd: Thread = lua.eval("coroutine.create(main)", None).unwrap();
@@ -109,7 +109,7 @@ fn coroutine_from_closure() {
 fn coroutine_panic() {
     match catch_unwind(|| -> Result<()> {
         // check that coroutines propagate panics correctly
-        Lua::new().scope(|lua| {
+        Lua::new().context(|lua| {
             let thrd_main = lua.create_function(|_, ()| -> Result<()> {
                 panic!("test_panic");
             })?;
