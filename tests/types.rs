@@ -15,8 +15,7 @@ fn test_lightuserdata() {
                 end
             "#,
             None,
-        )
-        .unwrap();
+        ).unwrap();
         let res = globals
             .get::<_, Function>("id")
             .unwrap()

@@ -20,10 +20,8 @@ fn test_thread() {
                 end
             "#,
                     None,
-                )
-                .unwrap(),
-            )
-            .unwrap();
+                ).unwrap(),
+            ).unwrap();
 
         assert_eq!(thread.status(), ThreadStatus::Resumable);
         assert_eq!(thread.resume::<_, i64>(0).unwrap(), 0);
@@ -48,10 +46,8 @@ fn test_thread() {
                 end
             "#,
                     None,
-                )
-                .unwrap(),
-            )
-            .unwrap();
+                ).unwrap(),
+            ).unwrap();
 
         for i in 0..4 {
             accumulate.resume::<_, ()>(i).unwrap();
@@ -71,8 +67,7 @@ fn test_thread() {
                 end)
             "#,
                 None,
-            )
-            .unwrap();
+            ).unwrap();
         assert_eq!(thread.status(), ThreadStatus::Resumable);
         assert_eq!(thread.resume::<_, i64>(()).unwrap(), 42);
 
@@ -87,8 +82,7 @@ fn test_thread() {
                 end)
             "#,
                 None,
-            )
-            .unwrap();
+            ).unwrap();
 
         assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);
         assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);

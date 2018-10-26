@@ -66,8 +66,7 @@ fn call_add_function(c: &mut Criterion) {
                             end
                         "#,
                             None,
-                        )
-                        .unwrap();
+                        ).unwrap();
                     lua.create_registry_value(f).unwrap()
                 };
                 (lua, f)
@@ -105,8 +104,7 @@ fn call_add_callback(c: &mut Criterion) {
                             end
                         "#,
                             None,
-                        )
-                        .unwrap();
+                        ).unwrap();
                     lua.create_registry_value(f).unwrap()
                 };
                 (lua, f)
@@ -131,8 +129,7 @@ fn call_append_callback(c: &mut Criterion) {
                     let c: LuaFunction = lua
                         .create_function(|_, (a, b): (LuaString, LuaString)| {
                             Ok(format!("{}{}", a.to_str()?, b.to_str()?))
-                        })
-                        .unwrap();
+                        }).unwrap();
                     lua.globals().set("callback", c).unwrap();
                     let f: LuaFunction = lua
                         .eval(
@@ -144,8 +141,7 @@ fn call_append_callback(c: &mut Criterion) {
                             end
                         "#,
                             None,
-                        )
-                        .unwrap();
+                        ).unwrap();
                     lua.create_registry_value(f).unwrap()
                 };
                 (lua, f)
