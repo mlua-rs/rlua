@@ -492,8 +492,7 @@ fn test_recursive_mut_callback_error() {
             }
 
             Ok(())
-        })
-        .unwrap();
+        }).unwrap();
     lua.globals().set("f", f).unwrap();
     match lua
         .globals()
