@@ -197,18 +197,15 @@ impl<'lua> Context<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    ///
-    /// let greet = lua.create_function(|_, name: String| {
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let greet = lua_context.create_function(|_, name: String| {
     ///     println!("Hello, {}!", name);
     ///     Ok(())
     /// });
     /// # let _ = greet;    // used
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     ///
@@ -217,18 +214,15 @@ impl<'lua> Context<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    ///
-    /// let print_person = lua.create_function(|_, (name, age): (String, u8)| {
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let print_person = lua_context.create_function(|_, (name, age): (String, u8)| {
     ///     println!("{} is {} years old!", name, age);
     ///     Ok(())
     /// });
     /// # let _ = print_person;    // used
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     ///

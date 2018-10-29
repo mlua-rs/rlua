@@ -64,18 +64,15 @@ impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
 /// ```
 /// # extern crate rlua;
 /// # use rlua::{Lua, Variadic, Result};
-/// # fn try_main() -> Result<()> {
-/// let lua = Lua::new();
-///
-/// let add = lua.create_function(|_, vals: Variadic<f64>| -> Result<f64> {
+/// # fn main() -> Result<()> {
+/// # Lua::new().context(|lua_context| {
+/// let add = lua_context.create_function(|_, vals: Variadic<f64>| -> Result<f64> {
 ///     Ok(vals.iter().sum())
 /// }).unwrap();
-/// lua.globals().set("add", add)?;
-/// assert_eq!(lua.eval::<_, f64>("add(3, 2, 5)", None)?, 10.0);
+/// lua_context.globals().set("add", add)?;
+/// assert_eq!(lua_context.eval::<_, f64>("add(3, 2, 5)", None)?, 10.0);
 /// # Ok(())
-/// # }
-/// # fn main() {
-/// #     try_main().unwrap();
+/// # })
 /// # }
 /// ```
 ///

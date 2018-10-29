@@ -25,18 +25,16 @@ impl<'lua> Function<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, Function, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    /// let globals = lua.globals();
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let globals = lua_context.globals();
     ///
     /// let tostring: Function = globals.get("tostring")?;
     ///
     /// assert_eq!(tostring.call::<_, String>(123)?, "123");
     ///
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     ///
@@ -45,10 +43,9 @@ impl<'lua> Function<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, Function, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    ///
-    /// let sum: Function = lua.eval(r#"
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let sum: Function = lua_context.eval(r#"
     ///     function(a, b)
     ///         return a + b
     ///     end
@@ -57,9 +54,7 @@ impl<'lua> Function<'lua> {
     /// assert_eq!(sum.call::<_, u32>((3, 4))?, 3 + 4);
     ///
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     pub fn call<A: ToLuaMulti<'lua>, R: FromLuaMulti<'lua>>(&self, args: A) -> Result<R> {
@@ -104,10 +99,9 @@ impl<'lua> Function<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, Function, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    ///
-    /// let sum: Function = lua.eval(r#"
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let sum: Function = lua_context.eval(r#"
     ///     function(a, b)
     ///         return a + b
     ///     end
@@ -120,9 +114,7 @@ impl<'lua> Function<'lua> {
     /// assert_eq!(bound_a_and_b.call::<_, u32>(())?, 13 + 57);
     ///
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     pub fn bind<A: ToLuaMulti<'lua>>(&self, args: A) -> Result<Function<'lua>> {

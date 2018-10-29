@@ -209,21 +209,18 @@ pub trait UserDataMethods<'lua, T: UserData> {
 /// ```
 /// # extern crate rlua;
 /// # use rlua::{Lua, UserData, Result};
-/// # fn try_main() -> Result<()> {
+/// # fn main() -> Result<()> {
+/// # Lua::new().context(|lua_context| {
 /// struct MyUserData(i32);
 ///
 /// impl UserData for MyUserData {}
 ///
-/// let lua = Lua::new();
-///
 /// // `MyUserData` now implements `ToLua`:
-/// lua.globals().set("myobject", MyUserData(123))?;
+/// lua_context.globals().set("myobject", MyUserData(123))?;
 ///
-/// lua.exec::<_, ()>("assert(type(myobject) == 'userdata')", None)?;
+/// lua_context.exec::<_, ()>("assert(type(myobject) == 'userdata')", None)?;
 /// # Ok(())
-/// # }
-/// # fn main() {
-/// #     try_main().unwrap();
+/// # })
 /// # }
 /// ```
 ///
@@ -233,7 +230,8 @@ pub trait UserDataMethods<'lua, T: UserData> {
 /// ```
 /// # extern crate rlua;
 /// # use rlua::{Lua, MetaMethod, UserData, UserDataMethods, Result};
-/// # fn try_main() -> Result<()> {
+/// # fn main() -> Result<()> {
+/// # Lua::new().context(|lua_context| {
 /// struct MyUserData(i32);
 ///
 /// impl UserData for MyUserData {
@@ -253,20 +251,16 @@ pub trait UserDataMethods<'lua, T: UserData> {
 ///     }
 /// }
 ///
-/// let lua = Lua::new();
+/// lua_context.globals().set("myobject", MyUserData(123))?;
 ///
-/// lua.globals().set("myobject", MyUserData(123))?;
-///
-/// lua.exec::<_, ()>(r#"
+/// lua_context.exec::<_, ()>(r#"
 ///     assert(myobject:get() == 123)
 ///     myobject:add(7)
 ///     assert(myobject:get() == 130)
 ///     assert(myobject + 10 == 140)
 /// "#, None)?;
 /// # Ok(())
-/// # }
-/// # fn main() {
-/// #     try_main().unwrap();
+/// # })
 /// # }
 /// ```
 ///

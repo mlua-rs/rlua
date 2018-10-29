@@ -45,10 +45,10 @@ impl<'lua> Thread<'lua> {
     ///
     /// ```
     /// # extern crate rlua;
-    /// # use rlua::{Lua, Thread, Error, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    /// let thread: Thread = lua.eval(r#"
+    /// # use rlua::{Lua, Thread, Error};
+    /// # fn main() {
+    /// # Lua::new().context(|lua_context| {
+    /// let thread: Thread = lua_context.eval(r#"
     ///     coroutine.create(function(arg)
     ///         assert(arg == 42)
     ///         local yieldarg = coroutine.yield(123)
@@ -65,10 +65,7 @@ impl<'lua> Thread<'lua> {
     ///     Err(Error::CoroutineInactive) => {},
     ///     unexpected => panic!("unexpected result {:?}", unexpected),
     /// }
-    /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     pub fn resume<A, R>(&self, args: A) -> Result<R>

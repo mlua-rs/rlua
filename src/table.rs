@@ -26,13 +26,13 @@ impl<'lua> Table<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    /// let globals = lua.globals();
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let globals = lua_context.globals();
     ///
     /// globals.set("assertions", cfg!(debug_assertions))?;
     ///
-    /// lua.exec::<_, ()>(r#"
+    /// lua_context.exec::<_, ()>(r#"
     ///     if assertions == true then
     ///         -- ...
     ///     elseif assertions == false then
@@ -42,9 +42,7 @@ impl<'lua> Table<'lua> {
     ///     end
     /// "#, None)?;
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     ///
@@ -83,16 +81,14 @@ impl<'lua> Table<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    /// let globals = lua.globals();
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let globals = lua_context.globals();
     ///
     /// let version: String = globals.get("_VERSION")?;
     /// println!("Lua version: {}", version);
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     ///
@@ -263,9 +259,9 @@ impl<'lua> Table<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, Result, Value};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    /// let globals = lua.globals();
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let globals = lua_context.globals();
     ///
     /// for pair in globals.pairs::<Value, Value>() {
     ///     let (key, value) = pair?;
@@ -273,9 +269,7 @@ impl<'lua> Table<'lua> {
     ///     // ...
     /// }
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     ///
@@ -309,18 +303,16 @@ impl<'lua> Table<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, Result, Table};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    /// let my_table: Table = lua.eval("{ [1] = 4, [2] = 5, [4] = 7, key = 2 }", None)?;
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let my_table: Table = lua_context.eval("{ [1] = 4, [2] = 5, [4] = 7, key = 2 }", None)?;
     ///
     /// let expected = [4, 5];
     /// for (&expected, got) in expected.iter().zip(my_table.sequence_values::<u32>()) {
     ///     assert_eq!(expected, got?);
     /// }
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     ///
