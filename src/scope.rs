@@ -20,12 +20,12 @@ use util::{
 };
 use value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 
-/// Constructed by the [`Lua::scope`] method, allows temporarily passing to Lua userdata that is
+/// Constructed by the [`Context::scope`] method, allows temporarily passing to Lua userdata that is
 /// !Send, and callbacks that are !Send and not 'static.
 ///
-/// See [`Lua::scope`] for more details.
+/// See [`Context::scope`] for more details.
 ///
-/// [`Lua::scope`]: struct.Lua.html#method.scope
+/// [`Context::scope`]: struct.Context.html#method.scope
 pub struct Scope<'lua, 'scope> {
     lua: Context<'lua>,
     destructors: RefCell<Vec<(LuaRef<'lua>, fn(LuaRef<'lua>) -> Box<Any>)>>,
@@ -43,11 +43,11 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
 
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
     ///
-    /// This is a version of [`Lua::create_function`] that creates a callback which expires on scope
-    /// drop.  See [`Lua::scope`] for more details.
+    /// This is a version of [`Context::create_function`] that creates a callback which expires on
+    /// scope drop.  See [`Context::scope`] for more details.
     ///
-    /// [`Lua::create_function`]: struct.Lua.html#method.create_function
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
+    /// [`Context::create_function`]: struct.Context.html#method.create_function
+    /// [`Context::scope`]: struct.Context.html#method.scope
     pub fn create_function<'callback, A, R, F>(&'callback self, func: F) -> Result<Function<'lua>>
     where
         A: FromLuaMulti<'callback>,
@@ -72,11 +72,11 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
 
     /// Wraps a Rust mutable closure, creating a callable Lua function handle to it.
     ///
-    /// This is a version of [`Lua::create_function_mut`] that creates a callback which expires on
-    /// scope drop.  See [`Lua::scope`] and [`Scope::create_function`] for more details.
+    /// This is a version of [`Context::create_function_mut`] that creates a callback which expires
+    /// on scope drop.  See [`Context::scope`] and [`Scope::create_function`] for more details.
     ///
-    /// [`Lua::create_function_mut`]: struct.Lua.html#method.create_function_mut
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
+    /// [`Context::create_function_mut`]: struct.Context.html#method.create_function_mut
+    /// [`Context::scope`]: struct.Context.html#method.scope
     /// [`Scope::create_function`]: #method.create_function
     pub fn create_function_mut<'callback, A, R, F>(
         &'callback self,
@@ -97,12 +97,12 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
 
     /// Create a Lua userdata object from a custom userdata type.
     ///
-    /// This is a version of [`Lua::create_userdata`] that creates a userdata which expires on scope
-    /// drop, and does not require that the userdata type be Send (but still requires that the
-    /// UserData be 'static).  See [`Lua::scope`] for more details.
+    /// This is a version of [`Context::create_userdata`] that creates a userdata which expires on
+    /// scope drop, and does not require that the userdata type be Send (but still requires that the
+    /// UserData be 'static).  See [`Context::scope`] for more details.
     ///
-    /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
+    /// [`Context::create_userdata`]: struct.Context.html#method.create_userdata
+    /// [`Context::scope`]: struct.Context.html#method.scope
     pub fn create_static_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: 'static + UserData,
@@ -123,9 +123,9 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
 
     /// Create a Lua userdata object from a custom userdata type.
     ///
-    /// This is a version of [`Lua::create_userdata`] that creates a userdata which expires on scope
-    /// drop, and does not require that the userdata type be Send or 'static. See [`Lua::scope`] for
-    /// more details.
+    /// This is a version of [`Context::create_userdata`] that creates a userdata which expires on
+    /// scope drop, and does not require that the userdata type be Send or 'static. See
+    /// [`Context::scope`] for more details.
     ///
     /// Lifting the requirement that the UserData type be 'static comes with some important
     /// limitations, so if you only need to eliminate the Send requirement, it is probably better to
@@ -141,8 +141,8 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
     /// creating the userdata metatable each time a new userdata is created.
     ///
     /// [`create_static_userdata`]: #method.create_static_userdata
-    /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
+    /// [`Context::create_userdata`]: struct.Context.html#method.create_userdata
+    /// [`Context::scope`]: struct.Context.html#method.scope
     /// [`UserDataMethods`]: trait.UserDataMethods.html
     pub fn create_nonstatic_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
     where

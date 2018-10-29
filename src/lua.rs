@@ -57,9 +57,13 @@ impl Lua {
 
     /// The main entry point of the rlua API.
     ///
-    /// rlua has reference types like `String` and `Table` which reference shared data in the Lua
+    /// In order to create Lua values, load and execute Lua code, or otherwise interact with the Lua
+    /// state in any way, you must first call `Lua::context` and then call methods on the provided
+    /// [`Context]` parameter.
+    ///
+    /// rlua uses reference types like `String` and `Table` which reference shared data in the Lua
     /// state.  These are special reference counted types that contain pointers to the main Lua
-    /// state via the `Context` type, and there is a `'lua` lifetime associated with these.
+    /// state via the [`Context`] type, and there is a `'lua` lifetime associated with these.
     ///
     /// This `'lua` lifetime is somewhat special.  It is what is sometimes called a "generative"
     /// lifetime or a "branding" lifetime, which is unique for each call to `Lua::context` and
@@ -80,9 +84,26 @@ impl Lua {
     ///   it helps ensure the soundness of the API.
     ///
     /// It is not possible to return types with this `'lua` context lifetime from the given
-    /// callback, or store them long-term in any way.  There is an escape hatch here, though: if you
-    /// need to keep references to internal Lua values long-term, you can use the Lua registry via
-    /// `Lua::set_named_registry_value` and `Lua::create_registry_value`.
+    /// callback, or store them outside of the callback in any way.  There is an escape hatch here,
+    /// though: if you need to keep references to internal Lua values long-term, you can use the Lua
+    /// registry via `Lua::set_named_registry_value` and `Lua::create_registry_value`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua};
+    /// # fn main() {
+    /// let lua = Lua::new();
+    /// lua.context(|lua_context| {
+    ///    lua_context.exec::<_, ()>(r#"
+    ///        print("hello world!")
+    ///    "#, None).unwrap();
+    /// });
+    /// # }
+    /// ```
+    ///
+    /// [`Context`]: struct.Context.html
     pub fn context<F, R>(&self, f: F) -> R
     where
         F: FnOnce(Context) -> R,

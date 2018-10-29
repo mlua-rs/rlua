@@ -25,18 +25,18 @@ pub(crate) type Callback<'lua, 'a> =
 /// `Table` or `Function` handle types, but since it doesn't hold a reference to a parent Lua and is
 /// Send + Sync + 'static, it is much more flexible and can be used in many situations where it is
 /// impossible to directly store a normal handle type.  It is not automatically garbage collected on
-/// Drop, but it can be removed with [`Lua::remove_registry_value`], and instances not manually
-/// removed can be garbage collected with [`Lua::expire_registry_values`].
+/// Drop, but it can be removed with [`Context::remove_registry_value`], and instances not manually
+/// removed can be garbage collected with [`Context::expire_registry_values`].
 ///
 /// Be warned, If you place this into Lua via a `UserData` type or a rust callback, it is *very
 /// easy* to accidentally cause reference cycles that the Lua garbage collector cannot resolve.
 /// Instead of placing a `RegistryKey` into a `UserData` type, prefer instead to use
 /// [`UserData::set_user_value`] / [`UserData::get_user_value`], and instead of moving a RegistryKey
-/// into a callback, prefer [`Lua::scope`].
+/// into a callback, prefer [`Context::scope`].
 ///
-/// [`Lua::remove_registry_value`]: struct.Lua.html#method.remove_registry_value
-/// [`Lua::expire_registry_values`]: struct.Lua.html#method.expire_registry_values
-/// [`Lua::scope`]: struct.Lua.html#method.scope
+/// [`Context::remove_registry_value`]: struct.Context.html#method.remove_registry_value
+/// [`Context::expire_registry_values`]: struct.Context.html#method.expire_registry_values
+/// [`Context::scope`]: struct.Context.html#method.scope
 /// [`UserData::set_user_value`]: struct.UserData.html#method.set_user_value
 /// [`UserData::get_user_value`]: struct.UserData.html#method.get_user_value
 pub struct RegistryKey {
