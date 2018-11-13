@@ -26,9 +26,9 @@
 //!
 //! [Lua programming language]: https://www.lua.org/
 //! [`Lua`]: struct.Lua.html
-//! [executing]: struct.Lua.html#method.exec
-//! [evaluating]: struct.Lua.html#method.eval
-//! [globals]: struct.Lua.html#method.globals
+//! [executing]: struct.Context.html#method.exec
+//! [evaluating]: struct.Context.html#method.eval
+//! [globals]: struct.Context.html#method.globals
 //! [`ToLua`]: trait.ToLua.html
 //! [`FromLua`]: trait.FromLua.html
 //! [`ToLuaMulti`]: trait.ToLuaMulti.html
@@ -48,6 +48,7 @@ mod error;
 mod ffi;
 #[macro_use]
 mod macros;
+mod context;
 mod conversion;
 mod function;
 mod lua;
@@ -62,6 +63,7 @@ mod userdata;
 mod util;
 mod value;
 
+pub use context::Context;
 pub use error::{Error, ExternalError, ExternalResult, Result};
 pub use function::Function;
 pub use lua::Lua;

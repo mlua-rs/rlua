@@ -7,10 +7,10 @@ use std::os::raw::c_void;
 use std::rc::Rc;
 use std::string::String as StdString;
 
+use context::Context;
 use error::{Error, Result};
 use ffi;
 use function::Function;
-use lua::Lua;
 use markers::Invariant;
 use types::{Callback, LuaRef};
 use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
@@ -20,20 +20,20 @@ use util::{
 };
 use value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 
-/// Constructed by the [`Lua::scope`] method, allows temporarily passing to Lua userdata that is
+/// Constructed by the [`Context::scope`] method, allows temporarily passing to Lua userdata that is
 /// !Send, and callbacks that are !Send and not 'static.
 ///
-/// See [`Lua::scope`] for more details.
+/// See [`Context::scope`] for more details.
 ///
-/// [`Lua::scope`]: struct.Lua.html#method.scope
-pub struct Scope<'scope> {
-    lua: &'scope Lua,
-    destructors: RefCell<Vec<(LuaRef<'scope>, fn(LuaRef<'scope>) -> Box<Any>)>>,
+/// [`Context::scope`]: struct.Context.html#method.scope
+pub struct Scope<'lua, 'scope> {
+    lua: Context<'lua>,
+    destructors: RefCell<Vec<(LuaRef<'lua>, fn(LuaRef<'lua>) -> Box<Any>)>>,
     _scope_invariant: Invariant<'scope>,
 }
 
-impl<'scope> Scope<'scope> {
-    pub(crate) fn new(lua: &'scope Lua) -> Scope {
+impl<'lua, 'scope> Scope<'lua, 'scope> {
+    pub(crate) fn new(lua: Context<'lua>) -> Scope<'lua, 'scope> {
         Scope {
             lua,
             destructors: RefCell::new(Vec::new()),
@@ -43,25 +43,25 @@ impl<'scope> Scope<'scope> {
 
     /// Wraps a Rust function or closure, creating a callable Lua function handle to it.
     ///
-    /// This is a version of [`Lua::create_function`] that creates a callback which expires on scope
-    /// drop.  See [`Lua::scope`] for more details.
+    /// This is a version of [`Context::create_function`] that creates a callback which expires on
+    /// scope drop.  See [`Context::scope`] for more details.
     ///
-    /// [`Lua::create_function`]: struct.Lua.html#method.create_function
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_function<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
+    /// [`Context::create_function`]: struct.Context.html#method.create_function
+    /// [`Context::scope`]: struct.Context.html#method.scope
+    pub fn create_function<'callback, A, R, F>(&'callback self, func: F) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'scope + Fn(&'lua Lua, A) -> Result<R>,
+        A: FromLuaMulti<'callback>,
+        R: ToLuaMulti<'callback>,
+        F: 'scope + Fn(Context<'callback>, A) -> Result<R>,
     {
-        // Safe, because 'scope must outlive 'lua (due to Self containing 'scope), however the
+        // Safe, because 'scope must outlive 'callback (due to Self containing 'scope), however the
         // callback itself must be 'scope lifetime, so the function should not be able to capture
-        // anything of 'lua lifetime.  'scope can't be shortened due to being invariant, and the
-        // 'lua lifetime here can't be enlarged due to coming from a universal quantification in
-        // Lua::scope.
+        // anything of 'callback lifetime.  'scope can't be shortened due to being invariant, and
+        // the 'callback lifetime here can't be enlarged due to coming from a universal
+        // quantification in Context::scope.
         //
         // I hope I got this explanation right, but in any case this is tested with compiletest_rs
-        // to make sure callbacks can't capture handles with lifetimes outside the scope, inside the
+        // to make sure callbacks can't capture handles with lifetime outside the scope, inside the
         // scope, and owned inside the callback itself.
         unsafe {
             self.create_callback(Box::new(move |lua, args| {
@@ -72,17 +72,20 @@ impl<'scope> Scope<'scope> {
 
     /// Wraps a Rust mutable closure, creating a callable Lua function handle to it.
     ///
-    /// This is a version of [`Lua::create_function_mut`] that creates a callback which expires on
-    /// scope drop.  See [`Lua::scope`] and [`Scope::create_function`] for more details.
+    /// This is a version of [`Context::create_function_mut`] that creates a callback which expires
+    /// on scope drop.  See [`Context::scope`] and [`Scope::create_function`] for more details.
     ///
-    /// [`Lua::create_function_mut`]: struct.Lua.html#method.create_function_mut
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
+    /// [`Context::create_function_mut`]: struct.Context.html#method.create_function_mut
+    /// [`Context::scope`]: struct.Context.html#method.scope
     /// [`Scope::create_function`]: #method.create_function
-    pub fn create_function_mut<'lua, A, R, F>(&'lua self, func: F) -> Result<Function<'lua>>
+    pub fn create_function_mut<'callback, A, R, F>(
+        &'callback self,
+        func: F,
+    ) -> Result<Function<'lua>>
     where
-        A: FromLuaMulti<'lua>,
-        R: ToLuaMulti<'lua>,
-        F: 'scope + FnMut(&'lua Lua, A) -> Result<R>,
+        A: FromLuaMulti<'callback>,
+        R: ToLuaMulti<'callback>,
+        F: 'scope + FnMut(Context<'callback>, A) -> Result<R>,
     {
         let func = RefCell::new(func);
         self.create_function(move |lua, args| {
@@ -94,18 +97,18 @@ impl<'scope> Scope<'scope> {
 
     /// Create a Lua userdata object from a custom userdata type.
     ///
-    /// This is a version of [`Lua::create_userdata`] that creates a userdata which expires on scope
-    /// drop, and does not require that the userdata type be Send (but still requires that the
-    /// UserData be 'static).  See [`Lua::scope`] for more details.
+    /// This is a version of [`Context::create_userdata`] that creates a userdata which expires on
+    /// scope drop, and does not require that the userdata type be Send (but still requires that the
+    /// UserData be 'static).  See [`Context::scope`] for more details.
     ///
-    /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
-    pub fn create_static_userdata<'lua, T>(&'lua self, data: T) -> Result<AnyUserData<'lua>>
+    /// [`Context::create_userdata`]: struct.Context.html#method.create_userdata
+    /// [`Context::scope`]: struct.Context.html#method.scope
+    pub fn create_static_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: 'static + UserData,
     {
         // Safe even though T may not be Send, because the parent Lua cannot be sent to another
-        // thread while the Scope is alive (or the returned AnyUserData handle even).
+        // thread while the current context is alive.
         unsafe {
             let u = self.lua.make_userdata(data)?;
             self.destructors.borrow_mut().push((u.0.clone(), |u| {
@@ -120,9 +123,9 @@ impl<'scope> Scope<'scope> {
 
     /// Create a Lua userdata object from a custom userdata type.
     ///
-    /// This is a version of [`Lua::create_userdata`] that creates a userdata which expires on scope
-    /// drop, and does not require that the userdata type be Send or 'static. See [`Lua::scope`] for
-    /// more details.
+    /// This is a version of [`Context::create_userdata`] that creates a userdata which expires on
+    /// scope drop, and does not require that the userdata type be Send or 'static. See
+    /// [`Context::scope`] for more details.
     ///
     /// Lifting the requirement that the UserData type be 'static comes with some important
     /// limitations, so if you only need to eliminate the Send requirement, it is probably better to
@@ -138,33 +141,34 @@ impl<'scope> Scope<'scope> {
     /// creating the userdata metatable each time a new userdata is created.
     ///
     /// [`create_static_userdata`]: #method.create_static_userdata
-    /// [`Lua::create_userdata`]: struct.Lua.html#method.create_userdata
-    /// [`Lua::scope`]: struct.Lua.html#method.scope
+    /// [`Context::create_userdata`]: struct.Context.html#method.create_userdata
+    /// [`Context::scope`]: struct.Context.html#method.scope
     /// [`UserDataMethods`]: trait.UserDataMethods.html
-    pub fn create_nonstatic_userdata<'lua, T>(&'lua self, data: T) -> Result<AnyUserData<'lua>>
+    pub fn create_nonstatic_userdata<T>(&self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: 'scope + UserData,
     {
         let data = Rc::new(RefCell::new(data));
 
         // 'callback outliving 'scope is a lie to make the types work out, required due to the
-        // inability to work with the "correct" universally quantified callback type.  This is safe
-        // though, because actual method callbacks are all 'static so they can't capture 'callback
-        // handles anyway.
+        // inability to work with the more correct callback type that is universally quantified over
+        // 'lua.  This is safe though, because `UserData::add_methods` does not get to pick the 'lua
+        // lifetime, so none of the static methods UserData types can add can possibly capture
+        // parameters.
         fn wrap_method<'scope, 'lua, 'callback: 'scope, T: 'scope>(
-            scope: &'lua Scope<'scope>,
+            scope: &Scope<'lua, 'scope>,
             data: Rc<RefCell<T>>,
             method: NonStaticMethod<'callback, T>,
         ) -> Result<Function<'lua>> {
             // On methods that actually receive the userdata, we fake a type check on the passed in
             // userdata, where we pretend there is a unique type per call to
-            // Scope::create_nonstatic_userdata.  You can grab a method from a userdata and call it
-            // on a mismatched userdata type, which when using normal 'static userdata will fail
+            // `Scope::create_nonstatic_userdata`.  You can grab a method from a userdata and call
+            // it on a mismatched userdata type, which when using normal 'static userdata will fail
             // with a type mismatch, but here without this check would proceed as though you had
             // called the method on the original value (since we otherwise completely ignore the
             // first argument).
             let check_data = data.clone();
-            let check_ud_type = move |lua: &Lua, value| {
+            let check_ud_type = move |lua: Context<'callback>, value| {
                 if let Some(value) = value {
                     if let Value::UserData(u) = value {
                         unsafe {
@@ -276,15 +280,15 @@ impl<'scope> Scope<'scope> {
     }
 
     // Unsafe, because the callback can improperly capture any value with 'callback scope, such as
-    // improperly holding onto an argument. Since the 'callback lifetime is chosen by the user and
-    // the lifetime of the callback itself is 'scope (non-'static), the borrow checker will happily
-    // pick a 'callback that outlives 'scope to allow this.  In order for this to be safe, the
-    // callback must NOT capture any arguments.
-    unsafe fn create_callback<'lua, 'callback>(
-        &'lua self,
+    // improperly capturing an argument. Since the 'callback lifetime is chosen by the user and the
+    // lifetime of the callback itself is 'scope (non-'static), the borrow checker will happily pick
+    // a 'callback that outlives 'scope to allow this.  In order for this to be safe, the callback
+    // must NOT capture any parameters.
+    unsafe fn create_callback<'callback>(
+        &self,
         f: Callback<'callback, 'scope>,
     ) -> Result<Function<'lua>> {
-        let f = mem::transmute::<Callback<'callback, 'scope>, Callback<'scope, 'static>>(f);
+        let f = mem::transmute::<Callback<'callback, 'scope>, Callback<'lua, 'static>>(f);
         let f = self.lua.create_callback(f)?;
 
         let mut destructors = self.destructors.borrow_mut();
@@ -306,7 +310,7 @@ impl<'scope> Scope<'scope> {
     }
 }
 
-impl<'scope> Drop for Scope<'scope> {
+impl<'lua, 'scope> Drop for Scope<'lua, 'scope> {
     fn drop(&mut self) {
         // We separate the action of invalidating the userdata in Lua and actually dropping the
         // userdata type into two phases.  This is so that, in the event a userdata drop panics, we
@@ -325,10 +329,10 @@ impl<'scope> Drop for Scope<'scope> {
 }
 
 enum NonStaticMethod<'lua, T> {
-    Method(Box<Fn(&'lua Lua, &T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
-    MethodMut(Box<FnMut(&'lua Lua, &mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
-    Function(Box<Fn(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
-    FunctionMut(Box<FnMut(&'lua Lua, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
+    Method(Box<Fn(Context<'lua>, &T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
+    MethodMut(Box<FnMut(Context<'lua>, &mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
+    Function(Box<Fn(Context<'lua>, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
+    FunctionMut(Box<FnMut(Context<'lua>, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
 }
 
 struct NonStaticUserDataMethods<'lua, T: UserData> {
@@ -350,7 +354,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
+        M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -364,7 +368,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
+        M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -378,7 +382,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -392,7 +396,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>,
     {
         self.methods.insert(
             name.to_owned(),
@@ -406,7 +410,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>,
+        M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>,
     {
         self.meta_methods.insert(
             meta,
@@ -420,7 +424,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>,
+        M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>,
     {
         self.meta_methods.insert(
             meta,
@@ -434,7 +438,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
         self.meta_methods.insert(
             meta,
@@ -448,7 +452,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>,
+        F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>,
     {
         self.meta_methods.insert(
             meta,

@@ -1,8 +1,8 @@
 use std::cell::{Ref, RefCell, RefMut};
 
+use context::Context;
 use error::{Error, Result};
 use ffi;
-use lua::Lua;
 use types::LuaRef;
 use util::{assert_stack, get_userdata, StackGuard};
 use value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
@@ -110,7 +110,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>;
+        M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>;
 
     /// Add a regular method which accepts a `&mut T` as the first parameter.
     ///
@@ -121,7 +121,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>;
+        M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>;
 
     /// Add a regular method as a function which accepts generic arguments, the first argument will
     /// always be a `UserData` of type T.
@@ -134,7 +134,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>;
+        F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>;
 
     /// Add a regular method as a mutable function which accepts generic arguments, the first
     /// argument will always be a `UserData` of type T.
@@ -146,7 +146,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>;
+        F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>;
 
     /// Add a metamethod which accepts a `&T` as the first parameter.
     ///
@@ -160,7 +160,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + Fn(&'lua Lua, &T, A) -> Result<R>;
+        M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>;
 
     /// Add a metamethod as a function which accepts a `&mut T` as the first parameter.
     ///
@@ -174,7 +174,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        M: 'static + Send + FnMut(&'lua Lua, &mut T, A) -> Result<R>;
+        M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>;
 
     /// Add a metamethod which accepts generic arguments.
     ///
@@ -185,7 +185,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + Fn(&'lua Lua, A) -> Result<R>;
+        F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>;
 
     /// Add a metamethod as a mutable function which accepts generic arguments.
     ///
@@ -196,7 +196,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
     where
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
-        F: 'static + Send + FnMut(&'lua Lua, A) -> Result<R>;
+        F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>;
 }
 
 /// Trait for custom userdata types.
@@ -209,21 +209,18 @@ pub trait UserDataMethods<'lua, T: UserData> {
 /// ```
 /// # extern crate rlua;
 /// # use rlua::{Lua, UserData, Result};
-/// # fn try_main() -> Result<()> {
+/// # fn main() -> Result<()> {
+/// # Lua::new().context(|lua_context| {
 /// struct MyUserData(i32);
 ///
 /// impl UserData for MyUserData {}
 ///
-/// let lua = Lua::new();
-///
 /// // `MyUserData` now implements `ToLua`:
-/// lua.globals().set("myobject", MyUserData(123))?;
+/// lua_context.globals().set("myobject", MyUserData(123))?;
 ///
-/// lua.exec::<_, ()>("assert(type(myobject) == 'userdata')", None)?;
+/// lua_context.exec::<_, ()>("assert(type(myobject) == 'userdata')", None)?;
 /// # Ok(())
-/// # }
-/// # fn main() {
-/// #     try_main().unwrap();
+/// # })
 /// # }
 /// ```
 ///
@@ -233,7 +230,8 @@ pub trait UserDataMethods<'lua, T: UserData> {
 /// ```
 /// # extern crate rlua;
 /// # use rlua::{Lua, MetaMethod, UserData, UserDataMethods, Result};
-/// # fn try_main() -> Result<()> {
+/// # fn main() -> Result<()> {
+/// # Lua::new().context(|lua_context| {
 /// struct MyUserData(i32);
 ///
 /// impl UserData for MyUserData {
@@ -253,20 +251,16 @@ pub trait UserDataMethods<'lua, T: UserData> {
 ///     }
 /// }
 ///
-/// let lua = Lua::new();
+/// lua_context.globals().set("myobject", MyUserData(123))?;
 ///
-/// lua.globals().set("myobject", MyUserData(123))?;
-///
-/// lua.exec::<_, ()>(r#"
+/// lua_context.exec::<_, ()>(r#"
 ///     assert(myobject:get() == 123)
 ///     myobject:add(7)
 ///     assert(myobject:get() == 130)
 ///     assert(myobject + 10 == 140)
 /// "#, None)?;
 /// # Ok(())
-/// # }
-/// # fn main() {
-/// #     try_main().unwrap();
+/// # })
 /// # }
 /// ```
 ///

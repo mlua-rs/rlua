@@ -19,19 +19,17 @@ impl<'lua> String<'lua> {
     /// ```
     /// # extern crate rlua;
     /// # use rlua::{Lua, String, Result};
-    /// # fn try_main() -> Result<()> {
-    /// let lua = Lua::new();
-    /// let globals = lua.globals();
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let globals = lua_context.globals();
     ///
     /// let version: String = globals.get("_VERSION")?;
     /// assert!(version.to_str().unwrap().contains("Lua"));
     ///
-    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None)?;
+    /// let non_utf8: String = lua_context.eval(r#"  "test\xff"  "#, None)?;
     /// assert!(non_utf8.to_str().is_err());
     /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// #     try_main().unwrap();
+    /// # })
     /// # }
     /// ```
     pub fn to_str(&self) -> Result<&str> {
@@ -53,11 +51,11 @@ impl<'lua> String<'lua> {
     /// # extern crate rlua;
     /// # use rlua::{Lua, String};
     /// # fn main() {
-    /// let lua = Lua::new();
-    ///
-    /// let non_utf8: String = lua.eval(r#"  "test\xff"  "#, None).unwrap();
+    /// # Lua::new().context(|lua_context| {
+    /// let non_utf8: String = lua_context.eval(r#"  "test\xff"  "#, None).unwrap();
     /// assert!(non_utf8.to_str().is_err());    // oh no :(
     /// assert_eq!(non_utf8.as_bytes(), &b"test\xff"[..]);
+    /// # })
     /// # }
     /// ```
     pub fn as_bytes(&self) -> &[u8] {
