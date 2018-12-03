@@ -379,7 +379,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
 
     if ffi::lua_checkstack(state, 2) == 0 {
         // If we don't have enough stack space to even check the error type, do nothing
-    } else if let Some(error) = get_wrapped_error(state, 1).as_ref() {
+    } else if let Some(error) = get_wrapped_error(state, -1).as_ref() {
         let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             gc_guard(state, || {
                 ffi::luaL_traceback(state, state, ptr::null(), 0);
@@ -403,10 +403,10 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
                 cause: Arc::new(error),
             },
         );
-    } else if !is_wrapped_panic(state, 1) {
+    } else if !is_wrapped_panic(state, -1) {
         if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             gc_guard(state, || {
-                let s = ffi::lua_tostring(state, 1);
+                let s = ffi::lua_tostring(state, -1);
                 let s = if s.is_null() {
                     cstr!("<unprintable lua error>")
                 } else {
