@@ -35,7 +35,6 @@ system-lua = ["pkg-config"]
 libc = { version = "0.2" }
 failure = { version = "0.1.2" }
 num-traits = { version = "0.2.6" }
-compiletest_rs = { version = "0.3", optional = true }
 
 [build-dependencies]
 cc = { version = "1.0", optional = true }
@@ -44,6 +43,7 @@ pkg-config = { version = "0.3.11", optional = true }
 [dev-dependencies]
 rustyline = "2.0.0"
 criterion = "0.2.0"
+compiletest_rs = { version = "0.3", features = ["stable"] }
 
 [[bench]]
 name = "benchmark"

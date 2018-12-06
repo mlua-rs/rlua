@@ -12,6 +12,6 @@ matrix:
     - rust: beta
       script: cargo test --all --verbose
     - rust: nightly 
-      script: cargo test --all --verbose --features compiletest_rs
+      script: cargo test --all --verbose
   allow_failures:
     - rust: nightly
