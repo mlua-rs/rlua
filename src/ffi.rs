@@ -10,9 +10,12 @@ pub type lua_Integer = c_longlong;
 pub type lua_Number = c_double;
 
 pub enum lua_State {}
-pub type lua_Alloc =
-    unsafe extern "C" fn(ud: *mut c_void, ptr: *mut c_void, osize: usize, nsize: usize)
-        -> *mut c_void;
+pub type lua_Alloc = unsafe extern "C" fn(
+    ud: *mut c_void,
+    ptr: *mut c_void,
+    osize: usize,
+    nsize: usize,
+) -> *mut c_void;
 pub type lua_KContext = *mut c_void;
 pub type lua_KFunction =
     unsafe extern "C" fn(state: *mut lua_State, status: c_int, ctx: lua_KContext) -> c_int;

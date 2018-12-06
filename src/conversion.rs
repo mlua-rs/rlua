@@ -208,7 +208,8 @@ impl<'lua> FromLua<'lua> for StdString {
                 from: ty,
                 to: "String",
                 message: Some("expected string or number".to_string()),
-            })?.to_str()?
+            })?
+            .to_str()?
             .to_owned())
     }
 }
@@ -231,7 +232,8 @@ macro_rules! lua_convert_int {
                             from: stringify!($x),
                             to: "number",
                             message: Some("out of range".to_owned()),
-                        }).map(Value::Number)
+                        })
+                        .map(Value::Number)
                 }
             }
         }
@@ -252,7 +254,8 @@ macro_rules! lua_convert_int {
                                 ),
                             })?,
                     )
-                }).ok_or_else(|| Error::FromLuaConversionError {
+                })
+                .ok_or_else(|| Error::FromLuaConversionError {
                     from: ty,
                     to: stringify!($x),
                     message: Some("out of range".to_owned()),
@@ -291,7 +294,8 @@ macro_rules! lua_convert_float {
                         from: ty,
                         to: stringify!($x),
                         message: Some("expected number or string coercible to number".to_string()),
-                    }).and_then(|n| {
+                    })
+                    .and_then(|n| {
                         cast(n).ok_or_else(|| Error::FromLuaConversionError {
                             from: ty,
                             to: stringify!($x),

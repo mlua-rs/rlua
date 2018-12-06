@@ -38,7 +38,8 @@ fn string_views() {
             empty = ""
         "#,
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         let globals = lua.globals();
         let ok: String = globals.get("ok").unwrap();

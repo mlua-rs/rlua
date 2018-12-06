@@ -57,7 +57,8 @@ fn test_methods() {
             end
         "#,
             None,
-        ).unwrap();
+        )
+        .unwrap();
         let get = globals.get::<_, Function>("get_it").unwrap();
         let set = globals.get::<_, Function>("set_it").unwrap();
         assert_eq!(get.call::<_, i64>(()).unwrap(), 42);
@@ -136,8 +137,8 @@ fn test_gc_userdata() {
             .set("userdata", MyUserdata { id: 123 })
             .unwrap();
 
-        assert!(
-            lua.eval::<_, ()>(
+        assert!(lua
+            .eval::<_, ()>(
                 r#"
                 local tbl = setmetatable({
                     userdata = userdata
@@ -152,8 +153,8 @@ fn test_gc_userdata() {
                 hatch:access()
             "#,
                 None
-            ).is_err()
-        );
+            )
+            .is_err());
     });
 }
 
