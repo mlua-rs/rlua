@@ -6,7 +6,7 @@ before_script:
 script:
   - cargo fmt --all -- --check
   - cargo test --all --verbose
-rust
+rust:
   - stable
   - beta
   - nightly
