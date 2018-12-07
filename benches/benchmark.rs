@@ -1,7 +1,3 @@
-#[macro_use]
-extern crate criterion;
-extern crate rlua;
-
 use criterion::Criterion;
 use rlua::prelude::*;
 

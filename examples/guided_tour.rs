@@ -1,5 +1,3 @@
-extern crate rlua;
-
 use std::f32;
 use std::iter::FromIterator;
 

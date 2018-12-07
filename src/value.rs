@@ -1,14 +1,14 @@
 use std::iter::{self, FromIterator};
 use std::{slice, str, vec};
 
-use context::Context;
-use error::{Error, Result};
-use function::Function;
-use string::String;
-use table::Table;
-use thread::Thread;
-use types::{Integer, LightUserData, Number};
-use userdata::AnyUserData;
+use crate::context::Context;
+use crate::error::{Error, Result};
+use crate::function::Function;
+use crate::string::String;
+use crate::table::Table;
+use crate::thread::Thread;
+use crate::types::{Integer, LightUserData, Number};
+use crate::userdata::AnyUserData;
 
 /// A dynamically typed Lua value.  The `String`, `Table`, `Function`, `Thread`, and `UserData`
 /// variants contain handle types into the internal Lua state.  It is a logic error to mix handle

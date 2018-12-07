@@ -1,5 +1,3 @@
-extern crate rlua;
-
 use rlua::{Lua, Nil, Result, Table, Value};
 
 #[test]

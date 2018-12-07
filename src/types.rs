@@ -2,10 +2,10 @@ use std::os::raw::{c_int, c_void};
 use std::sync::{Arc, Mutex};
 use std::{fmt, mem, ptr};
 
-use context::Context;
-use error::Result;
-use ffi;
-use value::MultiValue;
+use crate::context::Context;
+use crate::error::Result;
+use crate::ffi;
+use crate::value::MultiValue;
 
 /// Type of Lua integer numbers.
 pub type Integer = ffi::lua_Integer;

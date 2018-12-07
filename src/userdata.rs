@@ -1,11 +1,11 @@
 use std::cell::{Ref, RefCell, RefMut};
 
-use context::Context;
-use error::{Error, Result};
-use ffi;
-use types::LuaRef;
-use util::{assert_stack, get_userdata, StackGuard};
-use value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
+use crate::context::Context;
+use crate::error::{Error, Result};
+use crate::ffi;
+use crate::types::LuaRef;
+use crate::util::{assert_stack, get_userdata, StackGuard};
+use crate::value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
 
 /// Kinds of metamethods that can be overridden.
 ///
@@ -207,7 +207,6 @@ pub trait UserDataMethods<'lua, T: UserData> {
 /// # Examples
 ///
 /// ```
-/// # extern crate rlua;
 /// # use rlua::{Lua, UserData, Result};
 /// # fn main() -> Result<()> {
 /// # Lua::new().context(|lua_context| {
@@ -228,7 +227,6 @@ pub trait UserDataMethods<'lua, T: UserData> {
 /// [`UserDataMethods`] for more information):
 ///
 /// ```
-/// # extern crate rlua;
 /// # use rlua::{Lua, MetaMethod, UserData, UserDataMethods, Result};
 /// # fn main() -> Result<()> {
 /// # Lua::new().context(|lua_context| {

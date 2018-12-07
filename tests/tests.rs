@@ -1,6 +1,3 @@
-extern crate failure;
-extern crate rlua;
-
 use std::iter::FromIterator;
 use std::panic::catch_unwind;
 use std::sync::Arc;

@@ -2,6 +2,7 @@
 name = "rlua"
 version = "0.15.4-alpha.0"
 authors = ["kyren <catherine@chucklefish.org>"]
+edition = "2018"
 description = "High level bindings to Lua 5.3"
 repository = "https://github.com/chucklefish/rlua"
 documentation = "https://docs.rs/rlua"

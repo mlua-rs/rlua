@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
 use std::os::raw::c_int;
 
-use error::Result;
-use ffi;
-use types::{Integer, LuaRef};
-use util::{assert_stack, protect_lua, protect_lua_closure, StackGuard};
-use value::{FromLua, Nil, ToLua, Value};
+use crate::error::Result;
+use crate::ffi;
+use crate::types::{Integer, LuaRef};
+use crate::util::{assert_stack, protect_lua, protect_lua_closure, StackGuard};
+use crate::value::{FromLua, Nil, ToLua, Value};
 
 /// Handle to an internal Lua table.
 #[derive(Clone, Debug)]
@@ -24,7 +24,6 @@ impl<'lua> Table<'lua> {
     /// Export a value as a global to make it usable from Lua:
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
@@ -79,7 +78,6 @@ impl<'lua> Table<'lua> {
     /// Query the version of the Lua interpreter:
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
@@ -257,7 +255,6 @@ impl<'lua> Table<'lua> {
     /// Iterate over all globals:
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Result, Value};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
@@ -301,7 +298,6 @@ impl<'lua> Table<'lua> {
     /// # Examples
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Result, Table};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {

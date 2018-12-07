@@ -1,10 +1,10 @@
 use std::os::raw::c_int;
 
-use error::{Error, Result};
-use ffi;
-use types::LuaRef;
-use util::{assert_stack, check_stack, error_traceback, pop_error, StackGuard};
-use value::{FromLuaMulti, MultiValue, ToLuaMulti};
+use crate::error::{Error, Result};
+use crate::ffi;
+use crate::types::LuaRef;
+use crate::util::{assert_stack, check_stack, error_traceback, pop_error, StackGuard};
+use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
 /// Status of a Lua thread (or coroutine).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -44,7 +44,6 @@ impl<'lua> Thread<'lua> {
     /// # Examples
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Thread, Error};
     /// # fn main() {
     /// # Lua::new().context(|lua_context| {

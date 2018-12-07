@@ -1,5 +1,3 @@
-extern crate rlua;
-
 use std::borrow::Cow;
 
 use rlua::{Lua, String};

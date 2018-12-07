@@ -7,11 +7,11 @@ use std::{ptr, str};
 
 use libc;
 
-use context::Context;
-use ffi;
-use markers::NoRefUnwindSafe;
-use types::Callback;
-use util::{
+use crate::context::Context;
+use crate::ffi;
+use crate::markers::NoRefUnwindSafe;
+use crate::types::Callback;
+use crate::util::{
     assert_stack, init_error_metatables, protect_lua_closure, safe_pcall, safe_xpcall,
     userdata_destructor,
 };
@@ -91,7 +91,6 @@ impl Lua {
     /// # Examples
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua};
     /// # fn main() {
     /// let lua = Lua::new();

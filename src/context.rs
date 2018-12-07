@@ -8,23 +8,23 @@ use std::string::String as StdString;
 use std::sync::Arc;
 use std::{mem, ptr, str};
 
-use error::{Error, Result};
-use ffi;
-use function::Function;
-use lua::{extra_data, ExtraData, FUNCTION_METATABLE_REGISTRY_KEY};
-use markers::{Invariant, NoUnwindSafe};
-use scope::Scope;
-use string::String;
-use table::Table;
-use thread::Thread;
-use types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
-use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
-use util::{
+use crate::error::{Error, Result};
+use crate::ffi;
+use crate::function::Function;
+use crate::lua::{extra_data, ExtraData, FUNCTION_METATABLE_REGISTRY_KEY};
+use crate::markers::{Invariant, NoUnwindSafe};
+use crate::scope::Scope;
+use crate::string::String;
+use crate::table::Table;
+use crate::thread::Thread;
+use crate::types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
+use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
+use crate::util::{
     assert_stack, callback_error, check_stack, gc_guard, get_userdata, get_wrapped_error,
     init_userdata_metatable, pop_error, protect_lua, protect_lua_closure, push_string,
     push_userdata, push_wrapped_error, StackGuard,
 };
-use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
+use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
 #[derive(Copy, Clone)]
 pub struct Context<'lua> {
@@ -195,7 +195,6 @@ impl<'lua> Context<'lua> {
     /// Create a function which prints its argument:
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
@@ -212,7 +211,6 @@ impl<'lua> Context<'lua> {
     /// Use tuples to accept multiple arguments:
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {

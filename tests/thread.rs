@@ -1,5 +1,3 @@
-extern crate rlua;
-
 use std::panic::catch_unwind;
 
 use rlua::{Error, Function, Lua, Result, Thread, ThreadStatus};

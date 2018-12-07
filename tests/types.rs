@@ -1,5 +1,3 @@
-extern crate rlua;
-
 use std::os::raw::c_void;
 
 use rlua::{Function, LightUserData, Lua};

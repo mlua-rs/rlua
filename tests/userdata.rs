@@ -1,6 +1,3 @@
-extern crate failure;
-extern crate rlua;
-
 use std::sync::Arc;
 
 use failure::err_msg;

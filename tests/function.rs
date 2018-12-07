@@ -1,5 +1,3 @@
-extern crate rlua;
-
 use rlua::{Function, Lua, String};
 
 #[test]

@@ -5,8 +5,8 @@ use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::{mem, ptr};
 
-use error::{Error, Result};
-use ffi;
+use crate::error::{Error, Result};
+use crate::ffi;
 
 // Checks that Lua has enough free stack space for future stack operations.  On failure, this will
 // panic with an internal error message.

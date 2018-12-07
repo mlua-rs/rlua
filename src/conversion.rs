@@ -4,15 +4,15 @@ use std::string::String as StdString;
 
 use num_traits::cast;
 
-use context::Context;
-use error::{Error, Result};
-use function::Function;
-use string::String;
-use table::Table;
-use thread::Thread;
-use types::{LightUserData, Number};
-use userdata::{AnyUserData, UserData};
-use value::{FromLua, Nil, ToLua, Value};
+use crate::context::Context;
+use crate::error::{Error, Result};
+use crate::function::Function;
+use crate::string::String;
+use crate::table::Table;
+use crate::thread::Thread;
+use crate::types::{LightUserData, Number};
+use crate::userdata::{AnyUserData, UserData};
+use crate::value::{FromLua, Nil, ToLua, Value};
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: Context<'lua>) -> Result<Value<'lua>> {

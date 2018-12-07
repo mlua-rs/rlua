@@ -1,6 +1,6 @@
 //! Re-exports most types with an extra `Lua*` prefix to prevent name clashes.
 
-pub use {
+pub use crate::{
     AnyUserData as LuaAnyUserData, Context as LuaContext, Error as LuaError,
     ExternalError as LuaExternalError, ExternalResult as LuaExternalResult, FromLua, FromLuaMulti,
     Function as LuaFunction, Integer as LuaInteger, LightUserData as LuaLightUserData, Lua,

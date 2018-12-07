@@ -40,10 +40,6 @@
 // warnings at all.
 #![doc(test(attr(deny(warnings))))]
 
-extern crate failure;
-extern crate libc;
-extern crate num_traits;
-
 mod error;
 mod ffi;
 #[macro_use]
@@ -63,17 +59,17 @@ mod userdata;
 mod util;
 mod value;
 
-pub use context::Context;
-pub use error::{Error, ExternalError, ExternalResult, Result};
-pub use function::Function;
-pub use lua::Lua;
-pub use multi::Variadic;
-pub use scope::Scope;
-pub use string::String;
-pub use table::{Table, TablePairs, TableSequence};
-pub use thread::{Thread, ThreadStatus};
-pub use types::{Integer, LightUserData, Number, RegistryKey};
-pub use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
-pub use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
+pub use crate::context::Context;
+pub use crate::error::{Error, ExternalError, ExternalResult, Result};
+pub use crate::function::Function;
+pub use crate::lua::Lua;
+pub use crate::multi::Variadic;
+pub use crate::scope::Scope;
+pub use crate::string::String;
+pub use crate::table::{Table, TablePairs, TableSequence};
+pub use crate::thread::{Thread, ThreadStatus};
+pub use crate::types::{Integer, LightUserData, Number, RegistryKey};
+pub use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
+pub use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
 pub mod prelude;

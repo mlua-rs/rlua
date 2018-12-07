@@ -2,9 +2,9 @@ use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
 use std::result::Result as StdResult;
 
-use context::Context;
-use error::Result;
-use value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti};
+use crate::context::Context;
+use crate::error::Result;
+use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti};
 
 /// Result is convertible to `MultiValue` following the common Lua idiom of returning the result
 /// on success, or in the case of an error, returning `nil` and an error message.
@@ -62,7 +62,6 @@ impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
 /// # Examples
 ///
 /// ```
-/// # extern crate rlua;
 /// # use rlua::{Lua, Variadic, Result};
 /// # fn main() -> Result<()> {
 /// # Lua::new().context(|lua_context| {

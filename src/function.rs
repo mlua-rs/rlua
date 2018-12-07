@@ -1,13 +1,13 @@
 use std::os::raw::c_int;
 use std::ptr;
 
-use error::{Error, Result};
-use ffi;
-use types::LuaRef;
-use util::{
+use crate::error::{Error, Result};
+use crate::ffi;
+use crate::types::LuaRef;
+use crate::util::{
     assert_stack, check_stack, error_traceback, pop_error, protect_lua_closure, StackGuard,
 };
-use value::{FromLuaMulti, MultiValue, ToLuaMulti};
+use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
 /// Handle to an internal Lua function.
 #[derive(Clone, Debug)]
@@ -23,7 +23,6 @@ impl<'lua> Function<'lua> {
     /// Call Lua's built-in `tostring` function:
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Function, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
@@ -41,7 +40,6 @@ impl<'lua> Function<'lua> {
     /// Call a function with multiple arguments:
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Function, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
@@ -97,7 +95,6 @@ impl<'lua> Function<'lua> {
     /// # Examples
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, Function, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {

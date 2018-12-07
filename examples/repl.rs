@@ -1,8 +1,5 @@
 //! This example shows a simple read-evaluate-print-loop (REPL).
 
-extern crate rlua;
-extern crate rustyline;
-
 use rlua::{Error, Lua, MultiValue};
 use rustyline::Editor;
 

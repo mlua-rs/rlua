@@ -1,9 +1,9 @@
 use std::{slice, str};
 
-use error::{Error, Result};
-use ffi;
-use types::LuaRef;
-use util::{assert_stack, StackGuard};
+use crate::error::{Error, Result};
+use crate::ffi;
+use crate::types::LuaRef;
+use crate::util::{assert_stack, StackGuard};
 
 /// Handle to an internal Lua string.
 ///
@@ -17,7 +17,6 @@ impl<'lua> String<'lua> {
     /// # Examples
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, String, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
@@ -48,7 +47,6 @@ impl<'lua> String<'lua> {
     /// # Examples
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, String};
     /// # fn main() {
     /// # Lua::new().context(|lua_context| {

@@ -7,18 +7,18 @@ use std::os::raw::c_void;
 use std::rc::Rc;
 use std::string::String as StdString;
 
-use context::Context;
-use error::{Error, Result};
-use ffi;
-use function::Function;
-use markers::Invariant;
-use types::{Callback, LuaRef};
-use userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
-use util::{
+use crate::context::Context;
+use crate::error::{Error, Result};
+use crate::ffi;
+use crate::function::Function;
+use crate::markers::Invariant;
+use crate::types::{Callback, LuaRef};
+use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
+use crate::util::{
     assert_stack, init_userdata_metatable, protect_lua_closure, push_string, push_userdata,
     take_userdata, StackGuard,
 };
-use value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
+use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 
 /// Constructed by the [`Context::scope`] method, allows temporarily passing to Lua userdata that is
 /// !Send, and callbacks that are !Send and not 'static.
