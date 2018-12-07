@@ -119,6 +119,7 @@ extern "C" {
     pub fn lua_tonumberx(state: *mut lua_State, index: c_int, isnum: *mut c_int) -> lua_Number;
     pub fn lua_touserdata(state: *mut lua_State, index: c_int) -> *mut c_void;
     pub fn lua_tothread(state: *mut lua_State, index: c_int) -> *mut lua_State;
+    pub fn lua_topointer(state: *mut lua_State, index: c_int) -> *const c_void;
 
     pub fn lua_gettop(state: *const lua_State) -> c_int;
     pub fn lua_settop(state: *mut lua_State, n: c_int);
@@ -202,6 +203,7 @@ extern "C" {
         level: c_int,
     );
     pub fn luaL_len(push_state: *mut lua_State, index: c_int) -> lua_Integer;
+    pub fn luaL_tolstring(state: *mut lua_State, index: c_int, len: *mut usize) -> *const c_char;
 }
 
 // The following are re-implementations of what are macros in the Lua C API
@@ -328,4 +330,8 @@ pub unsafe fn luaL_loadbuffer(
     name: *const c_char,
 ) -> c_int {
     luaL_loadbufferx(state, buf, size, name, ptr::null())
+}
+
+pub unsafe fn luaL_tostring(state: *mut lua_State, index: c_int) -> *const c_char {
+    luaL_tolstring(state, index, ptr::null_mut())
 }

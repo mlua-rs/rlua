@@ -1,9 +1,9 @@
 use std::any::Any;
-use std::ffi::CStr;
+use std::borrow::Cow;
 use std::os::raw::{c_char, c_int, c_void};
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 use std::sync::Arc;
-use std::{mem, ptr};
+use std::{mem, ptr, slice};
 
 use crate::error::{Error, Result};
 use crate::ffi;
@@ -182,13 +182,7 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
             rlua_panic!("panic was resumed twice")
         }
     } else {
-        let err_string = gc_guard(state, || {
-            if let Some(s) = ffi::lua_tostring(state, -1).as_ref() {
-                CStr::from_ptr(s).to_string_lossy().into_owned()
-            } else {
-                "<unprintable error>".to_owned()
-            }
-        });
+        let err_string = to_string(state, -1).into_owned();
         ffi::lua_pop(state, 1);
 
         match err_code {
@@ -228,6 +222,38 @@ pub unsafe fn push_string<S: ?Sized + AsRef<[u8]>>(
         let s = s.as_ref();
         ffi::lua_pushlstring(state, s.as_ptr() as *const c_char, s.len());
     })
+}
+
+// Converts the given lua value to a string in a reasonable format without causing a Lua error or
+// panicking.
+pub unsafe fn to_string<'a>(state: *mut ffi::lua_State, index: c_int) -> Cow<'a, str> {
+    match ffi::lua_type(state, index) {
+        ffi::LUA_TNONE => "<none>".into(),
+        ffi::LUA_TNIL => "<nil>".into(),
+        ffi::LUA_TBOOLEAN => (ffi::lua_toboolean(state, index) != 1).to_string().into(),
+        ffi::LUA_TLIGHTUSERDATA => {
+            format!("<lightuserdata {:?}>", ffi::lua_topointer(state, index)).into()
+        }
+        ffi::LUA_TNUMBER => {
+            let mut isint = 0;
+            let i = ffi::lua_tointegerx(state, -1, &mut isint);
+            if isint == 0 {
+                ffi::lua_tonumber(state, index).to_string().into()
+            } else {
+                i.to_string().into()
+            }
+        }
+        ffi::LUA_TSTRING => {
+            let mut size = 0;
+            let data = ffi::lua_tolstring(state, index, &mut size);
+            String::from_utf8_lossy(slice::from_raw_parts(data as *const u8, size))
+        }
+        ffi::LUA_TTABLE => format!("<table {:?}>", ffi::lua_topointer(state, index)).into(),
+        ffi::LUA_TFUNCTION => format!("<function {:?}>", ffi::lua_topointer(state, index)).into(),
+        ffi::LUA_TUSERDATA => format!("<userdata {:?}>", ffi::lua_topointer(state, index)).into(),
+        ffi::LUA_TTHREAD => format!("<thread {:?}>", ffi::lua_topointer(state, index)).into(),
+        _ => "<unknown>".into(),
+    }
 }
 
 // Internally uses 4 stack spaces, does not call checkstack
@@ -384,13 +410,11 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
             gc_guard(state, || {
                 ffi::luaL_traceback(state, state, ptr::null(), 0);
             });
-            let traceback = CStr::from_ptr(ffi::lua_tostring(state, -1))
-                .to_string_lossy()
-                .into_owned();
+            let traceback = to_string(state, -1).into_owned();
             ffi::lua_pop(state, 1);
             traceback
         } else {
-            "not enough stack space for traceback".to_owned()
+            "<not enough stack space for traceback>".to_owned()
         };
 
         let error = error.clone();
@@ -405,16 +429,17 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         );
     } else if !is_wrapped_panic(state, -1) {
         if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
+            // ensure that 's' has a trailing NUL byte, but if it has internal NUL bytes already
+            // just use the string up to the first NUL byte.
+            let mut s: Vec<u8> = to_string(state, -1).into_owned().into();
+            s.reserve_exact(1);
+            s.push(0);
+            let s = s.as_ptr() as *const c_char;
+
             gc_guard(state, || {
-                let s = ffi::lua_tostring(state, -1);
-                let s = if s.is_null() {
-                    cstr!("<unprintable lua error>")
-                } else {
-                    s
-                };
                 ffi::luaL_traceback(state, state, s, 0);
-                ffi::lua_remove(state, -2);
             });
+            ffi::lua_remove(state, -2);
         }
     }
     1
