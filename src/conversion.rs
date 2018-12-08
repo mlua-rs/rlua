@@ -220,6 +220,12 @@ impl<'lua, 'a> ToLua<'lua> for &'a str {
     }
 }
 
+impl<'lua, 'a> ToLua<'lua> for &'a [u8] {
+    fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
+        Ok(Value::String(lua.create_string(self)?))
+    }
+}
+
 macro_rules! lua_convert_int {
     ($x:ty) => {
         impl<'lua> ToLua<'lua> for $x {
