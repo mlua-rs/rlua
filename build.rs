@@ -1,9 +1,3 @@
-#[cfg(feature = "builtin-lua")]
-extern crate cc;
-
-#[cfg(feature = "system-lua")]
-extern crate pkg_config;
-
 fn main() {
     if cfg!(all(feature = "builtin-lua", feature = "system-lua")) {
         panic!("cannot enable both builtin-lua and system-lua features when building rlua");
