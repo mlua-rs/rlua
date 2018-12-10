@@ -4,30 +4,50 @@ use std::iter::FromIterator;
 use rlua::{Function, Lua, MetaMethod, Result, UserData, UserDataMethods, Variadic};
 
 fn main() -> Result<()> {
-    // Create a Lua context with `Lua::new()`.  Eventually, this will allow further control on the
-    // lua std library, and will specifically allow limiting Lua to a subset of "safe"
-    // functionality.
+    // You can create a new Lua state with `Lua::new()`.  Eventually, this will allow further
+    // control on the lua std library, and will specifically allow limiting Lua to a subset of
+    // "safe" functionality.
+    let lua = Lua::new();
 
-    Lua::new().context(|lua| {
+    // In order to interact with Lua values at all, you must do so inside a callback given to the
+    // `Lua::context` method.  This provides some extra safety and allows the rlua API to avoid some
+    // extra runtime checks.
+    lua.context(|lua| {
         // You can get and set global variables.  Notice that the globals table here is a permanent
         // reference to _G, and it is mutated behind the scenes as lua code is loaded.  This API is
-        // based heavily around internal mutation (just like lua itself).
+        // based heavily around sharing and internal mutation (just like Lua itself).
 
         let globals = lua.globals();
 
         globals.set("string_var", "hello")?;
         globals.set("int_var", 42)?;
 
+        Ok(())
+    })?;
+
+    lua.context(|lua| {
+        // The Lua state lives inside the top-level `Lua` value, and all state changes persist
+        // between `Lua::context` calls.  This is another table reference in another context call,
+        // but it refers to the same table _G.
+
+        let globals = lua.globals();
+
         assert_eq!(globals.get::<_, String>("string_var")?, "hello");
         assert_eq!(globals.get::<_, i64>("int_var")?, 42);
+
+        Ok(())
+    })?;
+
+    lua.context(|lua| {
+        let globals = lua.globals();
 
         // You can load and evaluate lua code.  The second parameter here gives the chunk a better name
         // when lua error messages are printed.
 
         lua.exec::<_, ()>(
             r#"
-            global = 'foo'..'bar'
-        "#,
+                global = 'foo'..'bar'
+            "#,
             Some("example code"),
         )?;
         assert_eq!(globals.get::<_, String>("global")?, "foobar");
@@ -58,14 +78,14 @@ fn main() -> Result<()> {
 
         lua.eval::<_, ()>(
             r#"
-        for k, v in pairs(array_table) do
-            print(k, v)
-        end
+                for k, v in pairs(array_table) do
+                    print(k, v)
+                end
 
-        for k, v in pairs(map_table) do
-            print(k, v)
-        end
-        "#,
+                for k, v in pairs(map_table) do
+                    print(k, v)
+                end
+            "#,
             None,
         )?;
 
@@ -85,9 +105,9 @@ fn main() -> Result<()> {
             ["hello", "yet", "again", "from", "rust"].iter().cloned(),
         ))?;
 
-        // You can bind rust functions to lua as well.  Callbacks receive the Lua state itself as their
-        // first parameter, and the arguments given to the function as the second parameter.  The type
-        // of the arguments can be anything that is convertible from the parameters given by Lua, in
+        // You can bind rust functions to lua as well.  Callbacks receive a `Context` as their first
+        // parameter, and the arguments given to the function as the second parameter.  The type of
+        // the arguments can be anything that is convertible from the parameters given by Lua, in
         // this case, the function expects two string sequences.
 
         let check_equal =
@@ -119,6 +139,20 @@ fn main() -> Result<()> {
             lua.eval::<_, String>(r#"join("a", "b", "c")"#, None)?,
             "abc"
         );
+
+        // Callbacks receive a context value as their first parameter so that they can use it to
+        // create new lua values, if necessary.  Often times this is not necessary and the context
+        // parameter can be ignored.
+
+        let create_table = lua.create_function(|lua, ()| {
+            let t = lua.create_table()?;
+            t.set(1, 1)?;
+            t.set(2, 2)?;
+            Ok(t)
+        })?;
+        globals.set("create_table", create_table)?;
+
+        assert_eq!(lua.eval::<_, i32>(r#"create_table()[2]"#, None)?, 2);
 
         // You can create userdata with methods and metamethods defined on them.
         // Here's a worked example that shows many of the features of this API
