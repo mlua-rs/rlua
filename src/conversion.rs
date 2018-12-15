@@ -237,9 +237,15 @@ impl<'lua> FromLua<'lua> for CString {
                 to: "CString",
                 message: Some("expected string or number".to_string()),
             })?;
-        Ok(CStr::from_bytes_with_nul(string.as_bytes_with_nul())
-            .expect("Lua strings are proper nul-terminated strings")
-            .into())
+
+        match CStr::from_bytes_with_nul(string.as_bytes_with_nul()) {
+            Ok(s) => Ok(s.into()),
+            Err(_) => Err(Error::FromLuaConversionError {
+                from: ty,
+                to: "CString",
+                message: Some("invalid C-style string".to_string()),
+            }),
+        }
     }
 }
 
