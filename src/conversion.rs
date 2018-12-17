@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::ffi::{CStr, CString};
 use std::hash::{BuildHasher, Hash};
 use std::string::String as StdString;
 
@@ -217,6 +218,40 @@ impl<'lua> FromLua<'lua> for StdString {
 impl<'lua, 'a> ToLua<'lua> for &'a str {
     fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
         Ok(Value::String(lua.create_string(self)?))
+    }
+}
+
+impl<'lua> ToLua<'lua> for CString {
+    fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
+        Ok(Value::String(lua.create_string(self.as_bytes())?))
+    }
+}
+
+impl<'lua> FromLua<'lua> for CString {
+    fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<Self> {
+        let ty = value.type_name();
+        let string = lua
+            .coerce_string(value)
+            .ok_or_else(|| Error::FromLuaConversionError {
+                from: ty,
+                to: "CString",
+                message: Some("expected string or number".to_string()),
+            })?;
+
+        match CStr::from_bytes_with_nul(string.as_bytes_with_nul()) {
+            Ok(s) => Ok(s.into()),
+            Err(_) => Err(Error::FromLuaConversionError {
+                from: ty,
+                to: "CString",
+                message: Some("invalid C-style string".to_string()),
+            }),
+        }
+    }
+}
+
+impl<'lua, 'a> ToLua<'lua> for &'a CStr {
+    fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
+        Ok(Value::String(lua.create_string(self.to_bytes())?))
     }
 }
 
