@@ -16,6 +16,43 @@ use crate::util::{
     userdata_destructor,
 };
 
+bitflags! {
+    /// Flags describing the set of lua modules to load.
+    pub struct LuaMod: u32 {
+        const BASE = 0x1;
+        const COROUTINE = 0x2;
+        const TABLE = 0x4;
+        const IO = 0x8;
+        const OS = 0x10;
+        const STRING = 0x20;
+        const UTF8 = 0x40;
+        const MATH = 0x80;
+        const PACKAGE = 0x100;
+        const DEBUG = 0x200;
+
+        const ALL = LuaMod::BASE.bits
+            | LuaMod::COROUTINE.bits
+            | LuaMod::TABLE.bits
+            | LuaMod::IO.bits
+            | LuaMod::OS.bits
+            | LuaMod::STRING.bits
+            | LuaMod::UTF8.bits
+            | LuaMod::MATH.bits
+            | LuaMod::PACKAGE.bits
+            | LuaMod::DEBUG.bits;
+
+        const ALL_NO_DEBUG = LuaMod::BASE.bits
+            | LuaMod::COROUTINE.bits
+            | LuaMod::TABLE.bits
+            | LuaMod::IO.bits
+            | LuaMod::OS.bits
+            | LuaMod::STRING.bits
+            | LuaMod::UTF8.bits
+            | LuaMod::MATH.bits
+            | LuaMod::PACKAGE.bits;
+    }
+}
+
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
     main_state: *mut ffi::lua_State,
@@ -44,7 +81,7 @@ impl Drop for Lua {
 impl Lua {
     /// Creates a new Lua state and loads standard library without the `debug` library.
     pub fn new() -> Lua {
-        unsafe { create_lua(false) }
+        unsafe { create_lua(LuaMod::ALL_NO_DEBUG) }
     }
 
     /// Creates a new Lua state and loads the standard library including the `debug` library.
@@ -52,7 +89,30 @@ impl Lua {
     /// The debug library is very unsound, loading it and using it breaks all the guarantees of
     /// rlua.
     pub unsafe fn new_with_debug() -> Lua {
-        create_lua(true)
+        create_lua(LuaMod::ALL)
+    }
+
+    /// Create a new Lua state and loads a subset of the standard libraries.
+    ///
+    /// Use the [`LuaMod`] flags to specifiy the libraries you want to load.
+    ///
+    /// Note that you the `debug` library can't be loaded using this function as it breaks all the
+    /// safety guarantees. If you really want to load it, use the sister function [`Lua::unsafe_new_with`].
+    pub fn new_with(mut lua_mod: LuaMod) -> Lua {
+        // Force disable the `debug` module to prevent unsafety.
+        lua_mod.set(LuaMod::DEBUG, false);
+
+        unsafe { create_lua(lua_mod) }
+    }
+
+    /// Create a new Lua state and loads a subset of the standard libraries.
+    ///
+    /// Use the [`LuaMod`] flags to specifiy the libraries you want to load.
+    ///
+    /// This function is unsafe because it can be used to load the `debug` library which can break
+    /// all the safety guarantees provided by rlua.
+    pub unsafe fn unsafe_new_with(lua_mod: LuaMod) -> Lua {
+        create_lua(lua_mod)
     }
 
     /// The main entry point of the rlua API.
@@ -126,7 +186,7 @@ pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
     *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
 }
 
-unsafe fn create_lua(load_debug: bool) -> Lua {
+unsafe fn create_lua(lua_mod_to_load: LuaMod) -> Lua {
     unsafe extern "C" fn allocator(
         _: *mut c_void,
         ptr: *mut c_void,
@@ -155,21 +215,49 @@ unsafe fn create_lua(load_debug: bool) -> Lua {
 
     let ref_thread = rlua_expect!(
         protect_lua_closure(state, 0, 0, |state| {
+            let mut pop_size = 0;
             // Do not open the debug library, it can be used to cause unsafety.
-            ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
-            ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
-            ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
-            ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
-            ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
-            ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
-            ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
-            ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
-            ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
-            ffi::lua_pop(state, 9);
+            if lua_mod_to_load.contains(LuaMod::BASE) {
+                ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
+                pop_size += 1;
+            }
+            if lua_mod_to_load.contains(LuaMod::COROUTINE) {
+                ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
+                pop_size += 1;
+            }
+            if lua_mod_to_load.contains(LuaMod::TABLE) {
+                ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
+                pop_size += 1;
+            }
+            if lua_mod_to_load.contains(LuaMod::IO) {
+                ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
+                pop_size += 1;
+            }
+            if lua_mod_to_load.contains(LuaMod::OS) {
+                ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
+                pop_size += 1;
+            }
+            if lua_mod_to_load.contains(LuaMod::STRING) {
+                ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
+                pop_size += 1;
+            }
+            if lua_mod_to_load.contains(LuaMod::UTF8) {
+                ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
+                pop_size += 1;
+            }
+            if lua_mod_to_load.contains(LuaMod::MATH) {
+                ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
+                pop_size += 1;
+            }
+            if lua_mod_to_load.contains(LuaMod::PACKAGE) {
+                ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
+                pop_size += 1;
+            }
+            ffi::lua_pop(state, pop_size);
 
             init_error_metatables(state);
 
-            if load_debug {
+            if lua_mod_to_load.contains(LuaMod::DEBUG) {
                 ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
                 ffi::lua_pop(state, 1);
             }

@@ -40,6 +40,9 @@
 // warnings at all.
 #![doc(test(attr(deny(warnings))))]
 
+#[macro_use]
+extern crate bitflags;
+
 mod error;
 mod ffi;
 #[macro_use]
@@ -62,7 +65,7 @@ mod value;
 pub use crate::context::Context;
 pub use crate::error::{Error, ExternalError, ExternalResult, Result};
 pub use crate::function::Function;
-pub use crate::lua::Lua;
+pub use crate::lua::{Lua, LuaMod};
 pub use crate::multi::Variadic;
 pub use crate::scope::Scope;
 pub use crate::string::String;
