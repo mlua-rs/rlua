@@ -99,9 +99,9 @@ impl Lua {
     /// Note that the `debug` library can't be loaded using this function as it breaks all the
     /// safety guarantees. If you really want to load it, use the sister function
     /// [`Lua::unsafe_new_with`].
-    pub fn new_with(mut lua_mod: LuaMod) -> Lua {
-        // Force disable the `debug` module to prevent unsafety.
-        lua_mod.set(LuaMod::DEBUG, false);
+    pub fn new_with(lua_mod: LuaMod) -> Lua {
+        assert!(!lua_mod.contains(LuaMod::DEBUG), "The lua debug module can't be loaded using `new_with`. \
+                                                   Use `unsafe_new_with` instead.");
 
         unsafe { create_lua(lua_mod) }
     }
