@@ -216,52 +216,49 @@ unsafe fn create_lua(lua_mod_to_load: LuaMod) -> Lua {
 
     let ref_thread = rlua_expect!(
         protect_lua_closure(state, 0, 0, |state| {
-            let mut pop_size = 0;
             // Do not open the debug library, it can be used to cause unsafety.
             if lua_mod_to_load.contains(LuaMod::BASE) {
                 ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
-                pop_size += 1;
+                ffi::lua_pop(state, 1);
             }
             if lua_mod_to_load.contains(LuaMod::COROUTINE) {
                 ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
-                pop_size += 1;
+                ffi::lua_pop(state, 1);
             }
             if lua_mod_to_load.contains(LuaMod::TABLE) {
                 ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
-                pop_size += 1;
+                ffi::lua_pop(state, 1);
             }
             if lua_mod_to_load.contains(LuaMod::IO) {
                 ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
-                pop_size += 1;
+                ffi::lua_pop(state, 1);
             }
             if lua_mod_to_load.contains(LuaMod::OS) {
                 ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
-                pop_size += 1;
+                ffi::lua_pop(state, 1);
             }
             if lua_mod_to_load.contains(LuaMod::STRING) {
                 ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
-                pop_size += 1;
+                ffi::lua_pop(state, 1);
             }
             if lua_mod_to_load.contains(LuaMod::UTF8) {
                 ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
-                pop_size += 1;
+                ffi::lua_pop(state, 1);
             }
             if lua_mod_to_load.contains(LuaMod::MATH) {
                 ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
-                pop_size += 1;
+                ffi::lua_pop(state, 1);
             }
             if lua_mod_to_load.contains(LuaMod::PACKAGE) {
                 ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
-                pop_size += 1;
+                ffi::lua_pop(state, 1);
             }
-            ffi::lua_pop(state, pop_size);
-
-            init_error_metatables(state);
-
             if lua_mod_to_load.contains(LuaMod::DEBUG) {
                 ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
                 ffi::lua_pop(state, 1);
             }
+
+            init_error_metatables(state);
 
             // Create the function metatable
 
