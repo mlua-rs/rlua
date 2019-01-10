@@ -5,7 +5,7 @@ use std::{error, f32, f64, fmt};
 
 use failure::err_msg;
 use rlua::{
-    Error, ExternalError, Function, Lua, LuaMod, Nil, Result, String, Table, UserData, Value,
+    Error, ExternalError, Function, Lua, Nil, Result, StdLib, String, Table, UserData, Value,
     Variadic,
 };
 
@@ -39,7 +39,7 @@ fn test_debug() {
 #[test]
 #[should_panic]
 fn test_new_with_debug_panic() {
-    let _lua = Lua::new_with(LuaMod::DEBUG);
+    let _lua = Lua::new_with(StdLib::DEBUG);
 }
 
 #[test]

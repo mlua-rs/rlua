@@ -18,7 +18,7 @@ use crate::util::{
 
 bitflags! {
     /// Flags describing the set of lua modules to load.
-    pub struct LuaMod: u32 {
+    pub struct StdLib: u32 {
         const BASE = 0x1;
         const COROUTINE = 0x2;
         const TABLE = 0x4;
@@ -30,26 +30,26 @@ bitflags! {
         const PACKAGE = 0x100;
         const DEBUG = 0x200;
 
-        const ALL = LuaMod::BASE.bits
-            | LuaMod::COROUTINE.bits
-            | LuaMod::TABLE.bits
-            | LuaMod::IO.bits
-            | LuaMod::OS.bits
-            | LuaMod::STRING.bits
-            | LuaMod::UTF8.bits
-            | LuaMod::MATH.bits
-            | LuaMod::PACKAGE.bits
-            | LuaMod::DEBUG.bits;
+        const ALL = StdLib::BASE.bits
+            | StdLib::COROUTINE.bits
+            | StdLib::TABLE.bits
+            | StdLib::IO.bits
+            | StdLib::OS.bits
+            | StdLib::STRING.bits
+            | StdLib::UTF8.bits
+            | StdLib::MATH.bits
+            | StdLib::PACKAGE.bits
+            | StdLib::DEBUG.bits;
 
-        const ALL_NO_DEBUG = LuaMod::BASE.bits
-            | LuaMod::COROUTINE.bits
-            | LuaMod::TABLE.bits
-            | LuaMod::IO.bits
-            | LuaMod::OS.bits
-            | LuaMod::STRING.bits
-            | LuaMod::UTF8.bits
-            | LuaMod::MATH.bits
-            | LuaMod::PACKAGE.bits;
+        const ALL_NO_DEBUG = StdLib::BASE.bits
+            | StdLib::COROUTINE.bits
+            | StdLib::TABLE.bits
+            | StdLib::IO.bits
+            | StdLib::OS.bits
+            | StdLib::STRING.bits
+            | StdLib::UTF8.bits
+            | StdLib::MATH.bits
+            | StdLib::PACKAGE.bits;
     }
 }
 
@@ -81,7 +81,7 @@ impl Drop for Lua {
 impl Lua {
     /// Creates a new Lua state and loads standard library without the `debug` library.
     pub fn new() -> Lua {
-        unsafe { create_lua(LuaMod::ALL_NO_DEBUG) }
+        unsafe { create_lua(StdLib::ALL_NO_DEBUG) }
     }
 
     /// Creates a new Lua state and loads the standard library including the `debug` library.
@@ -89,19 +89,19 @@ impl Lua {
     /// The debug library is very unsound, loading it and using it breaks all the guarantees of
     /// rlua.
     pub unsafe fn new_with_debug() -> Lua {
-        create_lua(LuaMod::ALL)
+        create_lua(StdLib::ALL)
     }
 
     /// Creates a new Lua state and loads a subset of the standard libraries.
     ///
-    /// Use the [`LuaMod`] flags to specifiy the libraries you want to load.
+    /// Use the [`StdLib`] flags to specifiy the libraries you want to load.
     ///
     /// Note that the `debug` library can't be loaded using this function as it breaks all the
     /// safety guarantees. If you really want to load it, use the sister function
     /// [`Lua::unsafe_new_with`].
-    pub fn new_with(lua_mod: LuaMod) -> Lua {
+    pub fn new_with(lua_mod: StdLib) -> Lua {
         assert!(
-            !lua_mod.contains(LuaMod::DEBUG),
+            !lua_mod.contains(StdLib::DEBUG),
             "The lua debug module can't be loaded using `new_with`. Use `unsafe_new_with` instead."
         );
 
@@ -110,11 +110,11 @@ impl Lua {
 
     /// Creates a new Lua state and loads a subset of the standard libraries.
     ///
-    /// Use the [`LuaMod`] flags to specifiy the libraries you want to load.
+    /// Use the [`StdLib`] flags to specifiy the libraries you want to load.
     ///
     /// This function is unsafe because it can be used to load the `debug` library which can break
     /// all the safety guarantees provided by rlua.
-    pub unsafe fn unsafe_new_with(lua_mod: LuaMod) -> Lua {
+    pub unsafe fn unsafe_new_with(lua_mod: StdLib) -> Lua {
         create_lua(lua_mod)
     }
 
@@ -189,7 +189,7 @@ pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
     *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
 }
 
-unsafe fn create_lua(lua_mod_to_load: LuaMod) -> Lua {
+unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
     unsafe extern "C" fn allocator(
         _: *mut c_void,
         ptr: *mut c_void,
@@ -219,43 +219,43 @@ unsafe fn create_lua(lua_mod_to_load: LuaMod) -> Lua {
     let ref_thread = rlua_expect!(
         protect_lua_closure(state, 0, 0, |state| {
             // Do not open the debug library, it can be used to cause unsafety.
-            if lua_mod_to_load.contains(LuaMod::BASE) {
+            if lua_mod_to_load.contains(StdLib::BASE) {
                 ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
                 ffi::lua_pop(state, 1);
             }
-            if lua_mod_to_load.contains(LuaMod::COROUTINE) {
+            if lua_mod_to_load.contains(StdLib::COROUTINE) {
                 ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
                 ffi::lua_pop(state, 1);
             }
-            if lua_mod_to_load.contains(LuaMod::TABLE) {
+            if lua_mod_to_load.contains(StdLib::TABLE) {
                 ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
                 ffi::lua_pop(state, 1);
             }
-            if lua_mod_to_load.contains(LuaMod::IO) {
+            if lua_mod_to_load.contains(StdLib::IO) {
                 ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
                 ffi::lua_pop(state, 1);
             }
-            if lua_mod_to_load.contains(LuaMod::OS) {
+            if lua_mod_to_load.contains(StdLib::OS) {
                 ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
                 ffi::lua_pop(state, 1);
             }
-            if lua_mod_to_load.contains(LuaMod::STRING) {
+            if lua_mod_to_load.contains(StdLib::STRING) {
                 ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
                 ffi::lua_pop(state, 1);
             }
-            if lua_mod_to_load.contains(LuaMod::UTF8) {
+            if lua_mod_to_load.contains(StdLib::UTF8) {
                 ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
                 ffi::lua_pop(state, 1);
             }
-            if lua_mod_to_load.contains(LuaMod::MATH) {
+            if lua_mod_to_load.contains(StdLib::MATH) {
                 ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
                 ffi::lua_pop(state, 1);
             }
-            if lua_mod_to_load.contains(LuaMod::PACKAGE) {
+            if lua_mod_to_load.contains(StdLib::PACKAGE) {
                 ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
                 ffi::lua_pop(state, 1);
             }
-            if lua_mod_to_load.contains(LuaMod::DEBUG) {
+            if lua_mod_to_load.contains(StdLib::DEBUG) {
                 ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
                 ffi::lua_pop(state, 1);
             }
