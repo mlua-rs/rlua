@@ -5,8 +5,8 @@ use std::{error, f32, f64, fmt};
 
 use failure::err_msg;
 use rlua::{
-    Error, ExternalError, Function, Lua, Nil, Result, String, Table, UserData, Value, Variadic,
-    LuaMod
+    Error, ExternalError, Function, Lua, LuaMod, Nil, Result, String, Table, UserData, Value,
+    Variadic,
 };
 
 #[test]

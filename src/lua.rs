@@ -100,8 +100,10 @@ impl Lua {
     /// safety guarantees. If you really want to load it, use the sister function
     /// [`Lua::unsafe_new_with`].
     pub fn new_with(lua_mod: LuaMod) -> Lua {
-        assert!(!lua_mod.contains(LuaMod::DEBUG), "The lua debug module can't be loaded using `new_with`. \
-                                                   Use `unsafe_new_with` instead.");
+        assert!(
+            !lua_mod.contains(LuaMod::DEBUG),
+            "The lua debug module can't be loaded using `new_with`. Use `unsafe_new_with` instead."
+        );
 
         unsafe { create_lua(lua_mod) }
     }
