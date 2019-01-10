@@ -92,12 +92,13 @@ impl Lua {
         create_lua(LuaMod::ALL)
     }
 
-    /// Create a new Lua state and loads a subset of the standard libraries.
+    /// Creates a new Lua state and loads a subset of the standard libraries.
     ///
     /// Use the [`LuaMod`] flags to specifiy the libraries you want to load.
     ///
-    /// Note that you the `debug` library can't be loaded using this function as it breaks all the
-    /// safety guarantees. If you really want to load it, use the sister function [`Lua::unsafe_new_with`].
+    /// Note that the `debug` library can't be loaded using this function as it breaks all the
+    /// safety guarantees. If you really want to load it, use the sister function
+    /// [`Lua::unsafe_new_with`].
     pub fn new_with(mut lua_mod: LuaMod) -> Lua {
         // Force disable the `debug` module to prevent unsafety.
         lua_mod.set(LuaMod::DEBUG, false);
@@ -105,7 +106,7 @@ impl Lua {
         unsafe { create_lua(lua_mod) }
     }
 
-    /// Create a new Lua state and loads a subset of the standard libraries.
+    /// Creates a new Lua state and loads a subset of the standard libraries.
     ///
     /// Use the [`LuaMod`] flags to specifiy the libraries you want to load.
     ///
