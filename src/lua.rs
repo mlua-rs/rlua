@@ -1,14 +1,18 @@
 use std::any::TypeId;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::os::raw::{c_int, c_void};
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::{ptr, str};
 
 use libc;
 
 use crate::context::Context;
+use crate::error::Result;
 use crate::ffi;
+use crate::hook::{hook_proc, Debug, HookTriggers};
 use crate::markers::NoRefUnwindSafe;
 use crate::types::Callback;
 use crate::util::{
@@ -157,14 +161,15 @@ impl Lua {
     /// # Examples
     ///
     /// ```
-    /// # use rlua::{Lua};
-    /// # fn main() {
+    /// # use rlua::{Lua, Result};
+    /// # fn main() -> Result<()> {
     /// let lua = Lua::new();
     /// lua.context(|lua_context| {
     ///    lua_context.exec::<_, ()>(r#"
     ///        print("hello world!")
-    ///    "#, None).unwrap();
-    /// });
+    ///    "#, None)
+    /// })?;
+    /// # Ok(())
     /// # }
     /// ```
     ///
@@ -174,6 +179,63 @@ impl Lua {
         F: FnOnce(Context) -> R,
     {
         f(unsafe { Context::new(self.main_state) })
+    }
+
+    /// Set a function for Lua to call on conditions configured by `triggers`. This function will
+    /// always succeed, but the hook may raise an error to be reported back to the caller when
+    /// running Lua code.
+    ///
+    /// You may use this functionality for a few reasons. You may limit yourself to viewing the
+    /// information or react to certain events. However, you can also use it to limit for how long
+    /// the script will run.
+    ///
+    /// # Example
+    ///
+    /// Shows each line number of code being executed by the Lua interpreter.
+    ///
+    /// ```
+    /// # extern crate rlua;
+    /// # use rlua::{Lua, HookTriggers, Result};
+    /// # fn main() -> Result<()> {
+    /// let lua = Lua::new();
+    /// lua.set_hook(HookTriggers {
+    ///     every_line: true, ..Default::default()
+    /// }, |_lua_context, debug| {
+    ///     println!("line {}", debug.curr_line());
+    ///     Ok(())
+    /// });
+    /// lua.context(|lua_context| {
+    ///     lua_context.exec::<_, ()>(r#"
+    ///         local x = 2 + 3
+    ///         local y = x * 63
+    ///         local z = string.len(x..", "..y)
+    ///     "#, None)
+    /// })?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_hook<F>(&self, triggers: HookTriggers, callback: F)
+    where
+        F: 'static + Send + FnMut(Context, Debug) -> Result<()>,
+    {
+        unsafe {
+            (*extra_data(self.main_state)).hook_callback = Some(Rc::new(RefCell::new(callback)));
+            ffi::lua_sethook(
+                self.main_state,
+                Some(hook_proc),
+                triggers.mask(),
+                triggers.count(),
+            );
+        }
+    }
+
+    /// Remove any hook previously set by `set_hook`. This function has no effect if no hook was
+    /// set.
+    pub fn remove_hook(&self) {
+        unsafe {
+            (*extra_data(self.main_state)).hook_callback = None;
+            ffi::lua_sethook(self.main_state, None, 0, 0);
+        }
     }
 }
 
@@ -186,6 +248,8 @@ pub(crate) struct ExtraData {
     pub ref_stack_size: c_int,
     pub ref_stack_max: c_int,
     pub ref_free: Vec<c_int>,
+
+    pub hook_callback: Option<Rc<RefCell<FnMut(Context, Debug) -> Result<()>>>>,
 }
 
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
@@ -322,6 +386,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
         ref_stack_size: ffi::LUA_MINSTACK - 1,
         ref_stack_max: 0,
         ref_free: Vec::new(),
+        hook_callback: None,
     }));
     *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra;
 
