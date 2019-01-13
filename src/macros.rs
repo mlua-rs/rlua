@@ -1,3 +1,9 @@
+macro_rules! bug_msg {
+    ($($arg:expr),*) => {
+        concat!("rlua internal error (this is a bug, please file an issue)", $($arg),*)
+    };
+}
+
 macro_rules! cstr {
     ($s:expr) => {
         concat!($s, "\0") as *const str as *const [::std::os::raw::c_char]
@@ -17,76 +23,76 @@ macro_rules! abort {
         abort!($msg);
     };
 
-    ($msg:expr, $($arg:tt)+) => {
+    ($msg:expr, $($arg:expr),+) => {
         {
-            eprintln!($msg, $($arg)+);
+            eprintln!($msg, $($arg),+);
             ::std::process::abort()
         }
     };
 
-    ($msg:expr, $($arg:tt)+,) => {
-        abort!($msg, $($arg)+);
+    ($msg:expr, $($arg:expr),+,) => {
+        abort!($msg, $($arg),+);
     };
 }
 
 macro_rules! rlua_panic {
     ($msg:expr) => {
-        panic!(concat!("rlua internal error (this is a bug): ", $msg));
+        panic!(bug_msg!(": ", $msg));
     };
 
     ($msg:expr,) => {
         rlua_panic!($msg);
     };
 
-    ($msg:expr, $($arg:tt)+) => {
-        panic!(concat!("rlua internal error (this is a bug): ", $msg), $($arg)+);
+    ($msg:expr, $($arg:expr),+) => {
+        panic!(bug_msg!(": ", $msg), $($arg),+);
     };
 
-    ($msg:expr, $($arg:tt)+,) => {
-        rlua_panic!($msg, $($arg)+);
+    ($msg:expr, $($arg:expr),+,) => {
+        rlua_panic!($msg, $($arg),+);
     };
 }
 
 macro_rules! rlua_assert {
     ($cond:expr, $msg:expr) => {
-        assert!($cond, concat!("rlua internal error (this is a bug): ", $msg));
+        assert!($cond, bug_msg!(": ", $msg));
     };
 
     ($cond:expr, $msg:expr,) => {
         rlua_assert!($cond, $msg);
     };
 
-    ($cond:expr, $msg:expr, $($arg:tt)+) => {
-        assert!($cond, concat!("rlua internal error (this is a bug): ", $msg), $($arg)+);
+    ($cond:expr, $msg:expr, $($arg:expr),+) => {
+        assert!($cond, bug_msg!(": ", $msg), $($arg),+);
     };
 
-    ($cond:expr, $msg:expr, $($arg:tt)+,) => {
-        rlua_assert!($cond, $msg, $($arg)+);
+    ($cond:expr, $msg:expr, $($arg:expr),+,) => {
+        rlua_assert!($cond, $msg, $($arg),+);
     };
 }
 
 macro_rules! rlua_debug_assert {
     ($cond:expr, $msg:expr) => {
-        debug_assert!($cond, concat!("rlua internal error (this is a bug): ", $msg));
+        debug_assert!($cond, bug_msg!(": ", $msg));
     };
 
     ($cond:expr, $msg:expr,) => {
         rlua_debug_assert!($cond, $msg);
     };
 
-    ($cond:expr, $msg:expr, $($arg:tt)+) => {
-        debug_assert!($cond, concat!("rlua internal error (this is a bug): ", $msg), $($arg)+);
+    ($cond:expr, $msg:expr, $($arg:expr),+) => {
+        debug_assert!($cond, bug_msg!(": ", $msg), $($arg),+);
     };
 
-    ($cond:expr, $msg:expr, $($arg:tt)+,) => {
-        rlua_debug_assert!($cond, $msg, $($arg)+);
+    ($cond:expr, $msg:expr, $($arg:expr),+,) => {
+        rlua_debug_assert!($cond, $msg, $($arg),+);
     };
 }
 
 macro_rules! rlua_abort {
     ($msg:expr) => {
         {
-            abort!(concat!("rlua internal error (this is a bug), aborting! ", $msg));
+            abort!(bug_msg!(", aborting! ", $msg));
         }
     };
 
@@ -94,20 +100,20 @@ macro_rules! rlua_abort {
         rlua_abort!($msg);
     };
 
-    ($msg:expr, $($arg:tt)+) => {
+    ($msg:expr, $($arg:expr),+) => {
         {
-            abort!(concat!("rlua internal error (this is a bug), aborting! ", $msg), $($arg)+);
+            abort!(bug_msg!(", aborting! ", $msg), $($arg),+);
         }
     };
 
-    ($msg:expr, $($arg:tt)+,) => {
-        rlua_abort!($msg, $($arg)+);
+    ($msg:expr, $($arg:expr),+,) => {
+        rlua_abort!($msg, $($arg),+);
     };
 }
 
 macro_rules! rlua_expect {
     ($res:expr, $msg:expr) => {
-        $res.expect(concat!("rlua internal error (this is a bug): ", $msg))
+        $res.expect(bug_msg!(": ", $msg))
     };
 
     ($res:expr, $msg:expr,) => {
