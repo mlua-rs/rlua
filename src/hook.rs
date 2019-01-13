@@ -117,7 +117,7 @@ pub struct DebugStack {
     pub is_vararg: bool,
 }
 
-/// Indicates in what circumstances the hook function should be called by Lua.
+/// Determines when a hook function will be called by Lua.
 #[derive(Clone, Debug, Default)]
 pub struct HookTriggers {
     /// Before a function call.
@@ -126,12 +126,12 @@ pub struct HookTriggers {
     pub on_returns: bool,
     /// Before executing a new line, or returning from a function call.
     pub every_line: bool,
-    /// After a certain amount of instructions. When set to `Some(count)`, `count` is the number of
-    /// instructions to execute before calling the hook.
+    /// After a certain number of VM instructions have been executed.  When set to `Some(count)`,
+    /// `count` is the number of VM instructions to execute before calling the hook.
     ///
     /// # Performance
     ///
-    /// Setting this option to a low value can have a very high overhead.
+    /// Setting this option to a low value can incur a very high overhead.
     pub every_nth_instruction: Option<u32>,
 }
 
@@ -161,11 +161,9 @@ impl HookTriggers {
     }
 }
 
-// This callback is passed to `lua_sethook` and gets called whenever debug information is received.
 pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_Debug) {
     callback_error(state, || {
         let context = Context::new(state);
-
         let debug = Debug {
             ar,
             state,
