@@ -97,17 +97,17 @@ impl<'a> Debug<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Names<'a> {
-    pub name: Option<&'a str>,
-    pub name_what: Option<&'a str>,
+    pub name: Option<&'a [u8]>,
+    pub name_what: Option<&'a [u8]>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Source<'a> {
-    pub source: Option<&'a str>,
-    pub short_src: Option<&'a str>,
+    pub source: Option<&'a [u8]>,
+    pub short_src: Option<&'a [u8]>,
     pub line_defined: i32,
     pub last_line_defined: i32,
-    pub what: Option<&'a str>,
+    pub what: Option<&'a [u8]>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -172,29 +172,23 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
             _phantom: PhantomData,
         };
 
-        let cb = (&*extra_data(state))
-            .hook_callback
-            .as_ref()
-            .map(|rc| rc.clone())
-            .expect("rlua internal error: no hooks previously set; this is a bug");
+        let cb = rlua_expect!(
+            (*extra_data(state)).hook_callback.clone(),
+            "no hook callback set in hook_proc"
+        );
         let outcome = match cb.try_borrow_mut() {
             Ok(mut b) => (&mut *b)(context, debug),
-            Err(_) => rlua_panic!(
-                "Lua should not allow hooks to be called within another hook;\
-                 please make an issue"
-            ),
+            Err(_) => rlua_panic!("Lua should not allow hooks to be called within another hook"),
         };
         outcome
     });
 }
 
-unsafe fn ptr_to_str<'a>(input: *const i8) -> Option<&'a str> {
+unsafe fn ptr_to_str<'a>(input: *const i8) -> Option<&'a [u8]> {
     if input == ptr::null() || ptr::read(input) == 0 {
-        return None;
+        None
+    } else {
+        let len = libc::strlen(input) as usize;
+        Some(slice::from_raw_parts(input as *const u8, len))
     }
-    let len = libc::strlen(input) as usize;
-    let input = slice::from_raw_parts(input as *const u8, len);
-    str::from_utf8(input)
-        .map(|s| Some(s.trim_right()))
-        .unwrap_or(None)
 }

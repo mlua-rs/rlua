@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::ops::Deref;
+use std::str;
 use std::sync::mpsc::{channel, TryRecvError};
 use std::time::{Duration, Instant};
 
@@ -50,8 +51,8 @@ fn function_calls() {
         move |_lua, debug| {
             let names = debug.names();
             let source = debug.source();
-            let name = names.name.map(|s| s.to_string());
-            let what = source.what.map(|s| s.to_string());
+            let name = names.name.map(|s| str::from_utf8(s).unwrap().to_owned());
+            let what = source.what.map(|s| str::from_utf8(s).unwrap().to_owned());
             sx.send((name, what)).unwrap();
             Ok(())
         },
