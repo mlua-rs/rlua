@@ -86,8 +86,7 @@ impl Lua {
 
     /// Creates a new Lua state and loads the standard library including the `debug` library.
     ///
-    /// The debug library is very unsound, loading it and using it breaks all the guarantees of
-    /// rlua.
+    /// The debug library is very unsound, it can be used to break the safety guarantees of rlua.
     pub unsafe fn new_with_debug() -> Lua {
         create_lua(StdLib::ALL)
     }
@@ -96,9 +95,13 @@ impl Lua {
     ///
     /// Use the [`StdLib`] flags to specifiy the libraries you want to load.
     ///
-    /// Note that the `debug` library can't be loaded using this function as it breaks all the
-    /// safety guarantees. If you really want to load it, use the sister function
+    /// Note that the `debug` library can't be loaded using this function as it can be used to break
+    /// the safety guarantees of rlua.  If you really want to load it, use the sister function
     /// [`Lua::unsafe_new_with`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `lua_mod` contains `StdLib::DEBUG`
     pub fn new_with(lua_mod: StdLib) -> Lua {
         assert!(
             !lua_mod.contains(StdLib::DEBUG),
@@ -112,8 +115,8 @@ impl Lua {
     ///
     /// Use the [`StdLib`] flags to specifiy the libraries you want to load.
     ///
-    /// This function is unsafe because it can be used to load the `debug` library which can break
-    /// all the safety guarantees provided by rlua.
+    /// This function is unsafe because it can be used to load the `debug` library which can be used
+    /// to break the safety guarantees provided by rlua.
     pub unsafe fn unsafe_new_with(lua_mod: StdLib) -> Lua {
         create_lua(lua_mod)
     }
@@ -129,8 +132,8 @@ impl Lua {
     /// state via the [`Context`] type, and there is a `'lua` lifetime associated with these.
     ///
     /// This `'lua` lifetime is somewhat special.  It is what is sometimes called a "generative"
-    /// lifetime or a "branding" lifetime, which is unique for each call to `Lua::context` and
-    /// is invariant.
+    /// lifetime or a "branding" lifetime, which is invariant, and unique for each call to
+    /// `Lua::context`.
     ///
     /// The reason this entry point must be a callback is so that this unique lifetime can be
     /// generated as part of the callback's parameters.  Even though this callback API is somewhat
