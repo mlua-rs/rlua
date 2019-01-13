@@ -26,13 +26,13 @@ pub struct Debug<'a> {
 
 impl<'a> Debug<'a> {
     /// Corresponds to the `n` what mask.
-    pub fn names(&self) -> Names<'a> {
+    pub fn names(&self) -> DebugNames<'a> {
         unsafe {
             rlua_assert!(
                 ffi::lua_getinfo(self.state, cstr!("n"), self.ar) != 0,
                 "lua_getinfo failed with `n`"
             );
-            Names {
+            DebugNames {
                 name: ptr_to_str((*self.ar).name as *const i8),
                 name_what: ptr_to_str((*self.ar).namewhat as *const i8),
             }
@@ -40,13 +40,13 @@ impl<'a> Debug<'a> {
     }
 
     /// Corresponds to the `n` what mask.
-    pub fn source(&self) -> Source<'a> {
+    pub fn source(&self) -> DebugSource<'a> {
         unsafe {
             rlua_assert!(
                 ffi::lua_getinfo(self.state, cstr!("S"), self.ar) != 0,
                 "lua_getinfo failed with `S`"
             );
-            Source {
+            DebugSource {
                 source: ptr_to_str((*self.ar).source as *const i8),
                 short_src: ptr_to_str((*self.ar).short_src.as_ptr() as *const i8),
                 line_defined: (*self.ar).linedefined as i32,
@@ -80,13 +80,13 @@ impl<'a> Debug<'a> {
     }
 
     /// Corresponds to the `u` what mask.
-    pub fn stack(&self) -> Stack {
+    pub fn stack(&self) -> DebugStack {
         unsafe {
             rlua_assert!(
                 ffi::lua_getinfo(self.state, cstr!("u"), self.ar) != 0,
                 "lua_getinfo failed with `u`"
             );
-            Stack {
+            DebugStack {
                 num_ups: (*self.ar).nups as i32,
                 num_params: (*self.ar).nparams as i32,
                 is_vararg: (*self.ar).isvararg != 0,
@@ -96,13 +96,13 @@ impl<'a> Debug<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Names<'a> {
+pub struct DebugNames<'a> {
     pub name: Option<&'a [u8]>,
     pub name_what: Option<&'a [u8]>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Source<'a> {
+pub struct DebugSource<'a> {
     pub source: Option<&'a [u8]>,
     pub short_src: Option<&'a [u8]>,
     pub line_defined: i32,
@@ -111,7 +111,7 @@ pub struct Source<'a> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Stack {
+pub struct DebugStack {
     pub num_ups: i32,
     pub num_params: i32,
     pub is_vararg: bool,

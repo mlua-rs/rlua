@@ -181,13 +181,15 @@ impl Lua {
         f(unsafe { Context::new(self.main_state) })
     }
 
-    /// Set a function for Lua to call on conditions configured by `triggers`. This function will
-    /// always succeed, but the hook may raise an error to be reported back to the caller when
-    /// running Lua code.
+    /// Sets a 'hook' function that will periodically be called as Lua code executes.
     ///
-    /// You may use this functionality for a few reasons. You may limit yourself to viewing the
-    /// information or react to certain events. However, you can also use it to limit for how long
-    /// the script will run.
+    /// When exactly the hook function is called depends on the contents of the `triggers`
+    /// parameter, see [`HookTriggers`] for more details.
+    ///
+    /// The provided hook function can error, and this error will be propagated through the Lua code
+    /// that was executing at the time the hook was triggered.  This can be used to implement a
+    /// limited form of execution limits by setting [`HookTriggers.every_nth_instruction`] and
+    /// erroring once an instruction limit has been reached.
     ///
     /// # Example
     ///
@@ -214,6 +216,9 @@ impl Lua {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// [`HookTriggers`]: struct.HookTriggers.html
+    /// [`HookTriggers.every_nth_instruction`]: struct.HookTriggers.html#field.every_nth_instruction
     pub fn set_hook<F>(&self, triggers: HookTriggers, callback: F)
     where
         F: 'static + Send + FnMut(Context, Debug) -> Result<()>,
@@ -229,8 +234,8 @@ impl Lua {
         }
     }
 
-    /// Remove any hook previously set by `set_hook`. This function has no effect if no hook was
-    /// set.
+    /// Remove any hook previously set by `set_hook`. This function has no effect if a hook was not
+    /// previously set.
     pub fn remove_hook(&self) {
         unsafe {
             (*extra_data(self.main_state)).hook_callback = None;
