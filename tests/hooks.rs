@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::ops::Deref;
 use std::str;
-use std::sync::mpsc::{channel, TryRecvError};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use rlua::HookTriggers;
@@ -15,7 +15,9 @@ fn line_counts() {
         local z = string.len(x..", "..y)
     "#;
 
-    let (sx, rx) = channel();
+    let output = Arc::new(Mutex::new(Vec::new()));
+    let hook_output = output.clone();
+
     let lua = Lua::new();
     lua.set_hook(
         HookTriggers {
@@ -23,7 +25,7 @@ fn line_counts() {
             ..Default::default()
         },
         move |_lua, debug| {
-            sx.send(debug.curr_line()).unwrap();
+            hook_output.lock().unwrap().push(debug.curr_line());
             Ok(())
         },
     );
@@ -31,17 +33,17 @@ fn line_counts() {
         lua.exec::<_, ()>(code, None).expect("exec error");
     });
 
-    assert_eq!(rx.try_recv(), Ok(2));
-    assert_eq!(rx.try_recv(), Ok(3));
-    assert_eq!(rx.try_recv(), Ok(4));
-    assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
+    let output = output.lock().unwrap();
+    assert_eq!(*output, vec![2, 3, 4]);
 }
 
 #[test]
 fn function_calls() {
     let code = r#"local v = string.len("Hello World")"#;
 
-    let (sx, rx) = channel();
+    let output = Arc::new(Mutex::new(Vec::new()));
+    let hook_output = output.clone();
+
     let lua = Lua::new();
     lua.set_hook(
         HookTriggers {
@@ -53,7 +55,7 @@ fn function_calls() {
             let source = debug.source();
             let name = names.name.map(|s| str::from_utf8(s).unwrap().to_owned());
             let what = source.what.map(|s| str::from_utf8(s).unwrap().to_owned());
-            sx.send((name, what)).unwrap();
+            hook_output.lock().unwrap().push((name, what));
             Ok(())
         },
     );
@@ -61,11 +63,14 @@ fn function_calls() {
         lua.exec::<_, ()>(code, None).expect("exec error");
     });
 
-    assert_eq!(rx.recv().unwrap(), (None, Some("main".to_string())));
+    let output = output.lock().unwrap();
     assert_eq!(
-        rx.recv().unwrap(),
-        (Some("len".to_string()), Some("C".to_string()))
-    );
+        *output,
+        vec![
+            (None, Some("main".to_string())),
+            (Some("len".to_string()), Some("C".to_string()))
+        ]
+    )
 }
 
 #[test]
