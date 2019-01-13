@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use failure::err_msg;
 use rlua::{ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods};
 
 #[test]
@@ -86,7 +85,7 @@ fn test_metamethods() {
                 if index.to_str()? == "inner" {
                     Ok(data.0)
                 } else {
-                    Err(err_msg("no such custom index").to_lua_err())
+                    Err("no such custom index".to_lua_err())
                 }
             });
         }

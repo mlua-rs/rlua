@@ -1,8 +1,7 @@
+use std::error::Error as StdError;
 use std::fmt;
 use std::result::Result as StdResult;
 use std::sync::Arc;
-
-use failure;
 
 /// Error type returned by `rlua` methods.
 #[derive(Debug, Clone)]
@@ -118,7 +117,7 @@ pub enum Error {
     /// Returning `Err(ExternalError(...))` from a Rust callback will raise the error as a Lua
     /// error. The Rust code that originally invoked the Lua code then receives a `CallbackError`,
     /// from which the original error (and a stack traceback) can be recovered.
-    ExternalError(Arc<failure::Error>),
+    ExternalError(Arc<dyn StdError + Send + Sync>),
 }
 
 /// A specialized `Result` type used by `rlua`'s API.
@@ -177,31 +176,24 @@ impl fmt::Display for Error {
             Error::CallbackError { ref traceback, .. } => {
                 write!(fmt, "callback error: {}", traceback)
             }
-            Error::ExternalError(ref err) => err.fmt(fmt),
+            Error::ExternalError(ref err) => write!(fmt, "external error: {}", err),
         }
     }
 }
 
-impl failure::Fail for Error {
-    fn cause(&self) -> Option<&failure::Fail> {
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match *self {
             Error::CallbackError { ref cause, .. } => Some(cause.as_ref()),
-            Error::ExternalError(ref err) => err.as_fail().cause(),
-            _ => None,
-        }
-    }
-
-    fn backtrace(&self) -> Option<&failure::Backtrace> {
-        match *self {
-            Error::ExternalError(ref err) => Some(err.backtrace()),
+            Error::ExternalError(ref err) => Some(err.as_ref()),
             _ => None,
         }
     }
 }
 
 impl Error {
-    pub fn external<T: Into<failure::Error>>(err: T) -> Error {
-        Error::ExternalError(Arc::new(err.into()))
+    pub fn external<T: Into<Box<dyn StdError + Send + Sync>>>(err: T) -> Error {
+        Error::ExternalError(err.into().into())
     }
 }
 
@@ -211,7 +203,7 @@ pub trait ExternalError {
 
 impl<E> ExternalError for E
 where
-    E: Into<failure::Error>,
+    E: Into<Box<dyn StdError + Send + Sync>>,
 {
     fn to_lua_err(self) -> Error {
         Error::external(self)

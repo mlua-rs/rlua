@@ -3,7 +3,6 @@ use std::panic::catch_unwind;
 use std::sync::Arc;
 use std::{error, f32, f64, fmt};
 
-use failure::err_msg;
 use rlua::{
     Error, ExternalError, Function, Lua, Nil, Result, StdLib, String, Table, UserData, Value,
     Variadic,
@@ -346,7 +345,7 @@ fn test_result_conversions() {
         let err = lua
             .create_function(|_, ()| {
                 Ok(Err::<String, _>(
-                    err_msg("only through failure can we succeed").to_lua_err(),
+                    "only through failure can we succeed".to_lua_err(),
                 ))
             })
             .unwrap();
@@ -361,7 +360,7 @@ fn test_result_conversions() {
             r#"
             local r, e = err()
             assert(r == nil)
-            assert(tostring(e) == "only through failure can we succeed")
+            assert(tostring(e):find("only through failure can we succeed") ~= nil)
 
             local r, e = ok()
             assert(r == "!")

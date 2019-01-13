@@ -34,7 +34,6 @@ system-lua = ["pkg-config"]
 
 [dependencies]
 libc = { version = "0.2" }
-failure = { version = "0.1.2" }
 num-traits = { version = "0.2.6" }
 bitflags = { version = "1.0.4" }
 
