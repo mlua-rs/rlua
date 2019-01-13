@@ -8,26 +8,15 @@ use crate::ffi::{self, lua_Debug, lua_State};
 use crate::lua::extra_data;
 use crate::util::callback_error;
 
-/// Contains information about the running code at the moments specified when setting the hook.
-/// All the documentation can be read in the [Lua 5.3 documentaton][lua_doc].
+/// Contains information about currently executing Lua code.
 ///
-/// # Usage
-///
-/// For optimal performance, the user must call the methods that return the information they need to
-/// use. Those methods return a short structure with the data in the fields. That being said,
-/// depending on where the hook is called, some methods might return zeroes and empty strings or
-/// possibly bad values.
-///
-/// This structure does not cache the data obtained; you should only call each function once and
-/// keep the reference obtained for as long as needed. However, you may not outlive the hook
-/// callback; if you need to, please clone the internals that you need and move them outside.
-///
-/// # Panics
-///
-/// This structure contains methods that will panic if there is an internal error. If this happens
-/// to you, please make an issue to rlua's repository. as this behavior isn't normal.
+/// The `Debug` structure is provided as a parameter to the hook function set with
+/// [`Lua::set_hook`].  You may call the methods on this structure to retrieve information about the
+/// Lua code executing at the time that the hook function was called.  Further information can be
+/// found in the [Lua 5.3 documentaton][lua_doc].
 ///
 /// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#lua_Debug
+/// [`Lua::set_hook`]: struct.Lua.html#method.set_hook
 #[derive(Clone)]
 pub struct Debug<'a> {
     ar: *mut lua_Debug,
@@ -39,13 +28,13 @@ impl<'a> Debug<'a> {
     /// Corresponds to the `n` what mask.
     pub fn names(&self) -> Names<'a> {
         unsafe {
-            if ffi::lua_getinfo(self.state, cstr!("n"), self.ar) == 0 {
-                rlua_panic!("lua_getinfo failed with `n`")
-            } else {
-                Names {
-                    name: ptr_to_str((*self.ar).name as *const i8),
-                    name_what: ptr_to_str((*self.ar).namewhat as *const i8),
-                }
+            rlua_assert!(
+                ffi::lua_getinfo(self.state, cstr!("n"), self.ar) != 0,
+                "lua_getinfo failed with `n`"
+            );
+            Names {
+                name: ptr_to_str((*self.ar).name as *const i8),
+                name_what: ptr_to_str((*self.ar).namewhat as *const i8),
             }
         }
     }
@@ -53,16 +42,16 @@ impl<'a> Debug<'a> {
     /// Corresponds to the `n` what mask.
     pub fn source(&self) -> Source<'a> {
         unsafe {
-            if ffi::lua_getinfo(self.state, cstr!("S"), self.ar) == 0 {
-                rlua_panic!("lua_getinfo failed with `S`")
-            } else {
-                Source {
-                    source: ptr_to_str((*self.ar).source as *const i8),
-                    short_src: ptr_to_str((*self.ar).short_src.as_ptr() as *const i8),
-                    line_defined: (*self.ar).linedefined as i32,
-                    last_line_defined: (*self.ar).lastlinedefined as i32,
-                    what: ptr_to_str((*self.ar).what as *const i8),
-                }
+            rlua_assert!(
+                ffi::lua_getinfo(self.state, cstr!("S"), self.ar) != 0,
+                "lua_getinfo failed with `S`"
+            );
+            Source {
+                source: ptr_to_str((*self.ar).source as *const i8),
+                short_src: ptr_to_str((*self.ar).short_src.as_ptr() as *const i8),
+                line_defined: (*self.ar).linedefined as i32,
+                last_line_defined: (*self.ar).lastlinedefined as i32,
+                what: ptr_to_str((*self.ar).what as *const i8),
             }
         }
     }
@@ -70,11 +59,11 @@ impl<'a> Debug<'a> {
     /// Corresponds to the `l` what mask. Returns the current line.
     pub fn curr_line(&self) -> i32 {
         unsafe {
-            if ffi::lua_getinfo(self.state, cstr!("l"), self.ar) == 0 {
-                rlua_panic!("lua_getinfo failed with `l`")
-            } else {
-                (*self.ar).currentline as i32
-            }
+            rlua_assert!(
+                ffi::lua_getinfo(self.state, cstr!("l"), self.ar) != 0,
+                "lua_getinfo failed with `l`"
+            );
+            (*self.ar).currentline as i32
         }
     }
 
@@ -82,25 +71,25 @@ impl<'a> Debug<'a> {
     /// otherwise.
     pub fn is_tail_call(&self) -> bool {
         unsafe {
-            if ffi::lua_getinfo(self.state, cstr!("t"), self.ar) == 0 {
-                rlua_panic!("lua_getinfo failed with `t`")
-            } else {
-                (*self.ar).currentline != 0
-            }
+            rlua_assert!(
+                ffi::lua_getinfo(self.state, cstr!("t"), self.ar) != 0,
+                "lua_getinfo failed with `t`"
+            );
+            (*self.ar).currentline != 0
         }
     }
 
     /// Corresponds to the `u` what mask.
     pub fn stack(&self) -> Stack {
         unsafe {
-            if ffi::lua_getinfo(self.state, cstr!("u"), self.ar) == 0 {
-                rlua_panic!("lua_getinfo failed with `u`")
-            } else {
-                Stack {
-                    num_ups: (*self.ar).nups as i32,
-                    num_params: (*self.ar).nparams as i32,
-                    is_vararg: (*self.ar).isvararg != 0,
-                }
+            rlua_assert!(
+                ffi::lua_getinfo(self.state, cstr!("u"), self.ar) != 0,
+                "lua_getinfo failed with `u`"
+            );
+            Stack {
+                num_ups: (*self.ar).nups as i32,
+                num_params: (*self.ar).nparams as i32,
+                is_vararg: (*self.ar).isvararg != 0,
             }
         }
     }
@@ -128,28 +117,7 @@ pub struct Stack {
     pub is_vararg: bool,
 }
 
-/// Indicate in which circumstances the hook should be called by Lua.
-///
-/// # Usage
-///
-/// In order to clearly show which fields you are setting to `true` or `Some`, it is highly
-/// recommended you use the `Default` trait to fill in any remaining fields. This will also cover
-/// you in case new hook features gets added to Lua.
-///
-/// # Example
-///
-/// Constructs a `HookTriggers` structure that tells Lua to call the hook after every instruction.
-/// Note the use of `Default`.
-///
-/// ```
-/// # use rlua::HookTriggers;
-/// # fn main() {
-/// let triggers = HookTriggers {
-///     every_nth_instruction: Some(1), ..Default::default()
-/// };
-/// # let _ = triggers;
-/// # }
-/// ```
+/// Indicates in what circumstances the hook function should be called by Lua.
 #[derive(Clone, Debug, Default)]
 pub struct HookTriggers {
     /// Before a function call.
@@ -163,18 +131,12 @@ pub struct HookTriggers {
     ///
     /// # Performance
     ///
-    /// Setting this to a low value will certainly result in a large overhead due to the crate's
-    /// safety layer and convenience wrapped over Lua's low-level hooks. `1` is such an example of
-    /// a high overhead choice.
-    ///
-    /// Please find a number that is high enough so it's not that bad of an issue, while still
-    /// having enough precision for your needs. Keep in mind instructions are additions, calls to
-    /// functions, assignments to variables, etc.; they are very short.
+    /// Setting this option to a low value can have a very high overhead.
     pub every_nth_instruction: Option<u32>,
 }
 
 impl HookTriggers {
-    /// Compute the mask to pass to `lua_sethook`.
+    // Compute the mask to pass to `lua_sethook`.
     pub(crate) fn mask(&self) -> c_int {
         let mut mask: c_int = 0;
         if self.on_calls {
@@ -192,14 +154,14 @@ impl HookTriggers {
         mask
     }
 
-    /// Returns the `count` parameter to pass to `lua_sethook`, if applicable. Otherwise, zero is
-    /// returned.
+    // Returns the `count` parameter to pass to `lua_sethook`, if applicable. Otherwise, zero is
+    // returned.
     pub(crate) fn count(&self) -> c_int {
         self.every_nth_instruction.unwrap_or(0) as c_int
     }
 }
 
-/// This callback is passed to `lua_sethook` and gets called whenever debug information is received.
+// This callback is passed to `lua_sethook` and gets called whenever debug information is received.
 pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_Debug) {
     callback_error(state, || {
         let context = Context::new(state);
