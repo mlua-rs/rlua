@@ -244,6 +244,12 @@ impl Lua {
     }
 }
 
+impl Default for Lua {
+    fn default() -> Lua {
+        Lua::new()
+    }
+}
+
 // Data associated with the main lua_State via lua_getextraspace.
 pub(crate) struct ExtraData {
     pub registered_userdata: HashMap<TypeId, c_int>,

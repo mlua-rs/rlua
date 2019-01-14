@@ -102,7 +102,7 @@ impl<'lua> Context<'lua> {
         // First, try interpreting the lua as an expression by adding
         // "return", then as a statement.  This is the same thing the
         // actual lua repl does.
-        let mut return_source = "return ".as_bytes().to_vec();
+        let mut return_source = b"return ".to_vec();
         return_source.extend(source.as_ref());
         self.load(&return_source, name)
             .or_else(|_| self.load(source, name))?

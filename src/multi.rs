@@ -87,6 +87,12 @@ impl<T> Variadic<T> {
     }
 }
 
+impl<T> Default for Variadic<T> {
+    fn default() -> Variadic<T> {
+        Variadic::new()
+    }
+}
+
 impl<T> FromIterator<T> for Variadic<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         Variadic(Vec::from_iter(iter))

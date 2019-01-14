@@ -118,7 +118,7 @@ pub struct DebugStack {
 }
 
 /// Determines when a hook function will be called by Lua.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct HookTriggers {
     /// Before a function call.
     pub on_calls: bool,
@@ -183,7 +183,7 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
 }
 
 unsafe fn ptr_to_str<'a>(input: *const i8) -> Option<&'a [u8]> {
-    if input == ptr::null() || ptr::read(input) == 0 {
+    if input.is_null() || ptr::read(input) == 0 {
         None
     } else {
         let len = libc::strlen(input) as usize;

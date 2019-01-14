@@ -86,6 +86,12 @@ impl<'lua> MultiValue<'lua> {
     }
 }
 
+impl<'lua> Default for MultiValue<'lua> {
+    fn default() -> MultiValue<'lua> {
+        MultiValue::new()
+    }
+}
+
 impl<'lua> FromIterator<Value<'lua>> for MultiValue<'lua> {
     fn from_iter<I: IntoIterator<Item = Value<'lua>>>(iter: I) -> Self {
         MultiValue::from_vec(Vec::from_iter(iter))
@@ -136,6 +142,10 @@ impl<'lua> MultiValue<'lua> {
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.len() == 0
     }
 
     pub fn iter(&self) -> iter::Rev<slice::Iter<Value<'lua>>> {
