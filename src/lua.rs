@@ -16,7 +16,7 @@ use crate::hook::{hook_proc, Debug, HookTriggers};
 use crate::markers::NoRefUnwindSafe;
 use crate::types::Callback;
 use crate::util::{
-    assert_stack, init_error_metatables, protect_lua_closure, safe_pcall, safe_xpcall,
+    assert_stack, init_error_registry, protect_lua_closure, safe_pcall, safe_xpcall,
     userdata_destructor,
 };
 
@@ -338,7 +338,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
                 ffi::lua_pop(state, 1);
             }
 
-            init_error_metatables(state);
+            init_error_registry(state);
 
             // Create the function metatable
 

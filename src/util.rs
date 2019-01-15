@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::borrow::Cow;
+use std::fmt::Write;
 use std::os::raw::{c_char, c_int, c_void};
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 use std::sync::Arc;
@@ -179,7 +180,7 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
         if let Some(p) = (*panic).0.take() {
             resume_unwind(p);
         } else {
-            rlua_panic!("panic was resumed twice")
+            rlua_abort!("error during panic handling, panic was resumed twice")
         }
     } else {
         let err_string = to_string(state, -1).into_owned();
@@ -510,7 +511,7 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
     }
 }
 
-// Pushes a WrappedError::Error to the top of the stack.  Uses two stack spaces and does not call
+// Pushes a WrappedError to the top of the stack.  Uses two stack spaces and does not call
 // lua_checkstack.
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
     gc_guard(state, || {
@@ -563,34 +564,38 @@ pub unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) ->
 }
 
 // Initialize the error, panic, and destructed userdata metatables.
-pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
+pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
     assert_stack(state, 8);
 
     // Create error metatable
 
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
-        ffi::luaL_checkstack(state, 2, ptr::null());
+        ffi::luaL_checkstack(state, 3, ptr::null());
 
-        callback_error(state, || {
+        let (ptr, len) = callback_error(state, || {
             if let Some(error) = get_wrapped_error(state, -1).as_ref() {
-                let error_str = error.to_string();
-                gc_guard(state, || {
-                    ffi::lua_pushlstring(
-                        state,
-                        error_str.as_ptr() as *const c_char,
-                        error_str.len(),
-                    )
-                });
-                ffi::lua_remove(state, -2);
+                ffi::lua_pushlightuserdata(
+                    state,
+                    &ERROR_PRINT_BUFFER_KEY as *const u8 as *mut c_void,
+                );
+                ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
+                let error_buffer = ffi::lua_touserdata(state, -1) as *mut String;
+                ffi::lua_pop(state, 2);
 
-                Ok(1)
+                (*error_buffer).clear();
+                let _ = write!(&mut (*error_buffer), "{}", error);
+                Ok((
+                    (*error_buffer).as_ptr() as *const c_char,
+                    (*error_buffer).len(),
+                ))
             } else {
-                // TODO: I'm not sure whether this is possible to trigger without bugs in rlua,
-                // could replace with:
-                // rlua_panic!("userdata mismatch in Error __tostring metamethod")
+                // TODO: I'm not sure whether this is possible to trigger without bugs in rlua?
                 Err(Error::UserDataTypeMismatch)
             }
-        })
+        });
+
+        ffi::lua_pushlstring(state, ptr, len);
+        1
     }
 
     ffi::lua_pushlightuserdata(
@@ -678,12 +683,27 @@ pub unsafe fn init_error_metatables(state: *mut ffi::lua_State) {
     }
 
     ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+
+    // Create error print buffer
+
+    ffi::lua_pushlightuserdata(state, &ERROR_PRINT_BUFFER_KEY as *const u8 as *mut c_void);
+
+    let ud = ffi::lua_newuserdata(state, mem::size_of::<String>()) as *mut String;
+    ptr::write(ud, String::new());
+
+    ffi::lua_newtable(state);
+    ffi::lua_pushstring(state, cstr!("__gc"));
+    ffi::lua_pushcfunction(state, userdata_destructor::<String>);
+    ffi::lua_rawset(state, -3);
+    ffi::lua_setmetatable(state, -2);
+
+    ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
 }
 
 struct WrappedError(pub Error);
 struct WrappedPanic(pub Option<Box<Any + Send>>);
 
-// Pushes a WrappedError::Panic to the top of the stack.  Uses two stack spaces and does not call
+// Pushes a WrappedPanic to the top of the stack.  Uses two stack spaces and does not call
 // lua_checkstack.
 unsafe fn push_wrapped_panic(state: *mut ffi::lua_State, panic: Box<Any + Send>) {
     gc_guard(state, || {
@@ -740,3 +760,4 @@ unsafe fn get_destructed_userdata_metatable(state: *mut ffi::lua_State) {
 static ERROR_METATABLE_REGISTRY_KEY: u8 = 0;
 static PANIC_METATABLE_REGISTRY_KEY: u8 = 0;
 static DESTRUCTED_USERDATA_METATABLE: u8 = 0;
+static ERROR_PRINT_BUFFER_KEY: u8 = 0;
