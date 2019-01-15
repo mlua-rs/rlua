@@ -47,14 +47,14 @@ impl<'lua> Thread<'lua> {
     /// # use rlua::{Lua, Thread, Error};
     /// # fn main() {
     /// # Lua::new().context(|lua_context| {
-    /// let thread: Thread = lua_context.eval(r#"
+    /// let thread: Thread = lua_context.load(r#"
     ///     coroutine.create(function(arg)
     ///         assert(arg == 42)
     ///         local yieldarg = coroutine.yield(123)
     ///         assert(yieldarg == 43)
     ///         return 987
     ///     end)
-    /// "#, None).unwrap();
+    /// "#).eval().unwrap();
     ///
     /// assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);
     /// assert_eq!(thread.resume::<_, u32>(43).unwrap(), 987);

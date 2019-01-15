@@ -43,11 +43,12 @@ impl<'lua> Function<'lua> {
     /// # use rlua::{Lua, Function, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
-    /// let sum: Function = lua_context.eval(r#"
-    ///     function(a, b)
-    ///         return a + b
-    ///     end
-    /// "#, None)?;
+    /// let sum: Function = lua_context.load(
+    ///     r#"
+    ///         function(a, b)
+    ///             return a + b
+    ///         end
+    ///     "#).eval()?;
     ///
     /// assert_eq!(sum.call::<_, u32>((3, 4))?, 3 + 4);
     ///
@@ -98,11 +99,11 @@ impl<'lua> Function<'lua> {
     /// # use rlua::{Lua, Function, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
-    /// let sum: Function = lua_context.eval(r#"
+    /// let sum: Function = lua_context.load(r#"
     ///     function(a, b)
     ///         return a + b
     ///     end
-    /// "#, None)?;
+    /// "#).eval()?;
     ///
     /// let bound_a = sum.bind(1)?;
     /// assert_eq!(bound_a.call::<_, u32>(2)?, 1 + 2);

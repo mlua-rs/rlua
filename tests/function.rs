@@ -4,14 +4,14 @@ use rlua::{Function, Lua, String};
 fn test_function() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            function concat(arg1, arg2)
-                return arg1 .. arg2
-            end
-        "#,
-            None,
+                function concat(arg1, arg2)
+                    return arg1 .. arg2
+                end
+            "#,
         )
+        .exec()
         .unwrap();
 
         let concat = globals.get::<_, Function>("concat").unwrap();
@@ -23,18 +23,18 @@ fn test_function() {
 fn test_bind() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-        function concat(...)
-            local res = ""
-            for _, s in pairs({...}) do
-                res = res..s
-            end
-            return res
-        end
-    "#,
-            None,
+                function concat(...)
+                    local res = ""
+                    for _, s in pairs({...}) do
+                        res = res..s
+                    end
+                    return res
+                end
+            "#,
         )
+        .exec()
         .unwrap();
 
         let mut concat = globals.get::<_, Function>("concat").unwrap();
@@ -52,17 +52,17 @@ fn test_bind() {
 fn test_rust_function() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-        function lua_function()
-            return rust_function()
-        end
+                function lua_function()
+                    return rust_function()
+                end
 
-        -- Test to make sure chunk return is ignored
-        return 1
-    "#,
-            None,
+                -- Test to make sure chunk return is ignored
+                return 1
+            "#,
         )
+        .exec()
         .unwrap();
 
         let lua_function = globals.get::<_, Function>("lua_function").unwrap();

@@ -7,18 +7,18 @@ fn test_thread() {
     Lua::new().context(|lua| {
         let thread = lua
             .create_thread(
-                lua.eval::<_, Function>(
+                lua.load(
                     r#"
-                function (s)
-                    local sum = s
-                    for i = 1,4 do
-                        sum = sum + coroutine.yield(sum)
-                    end
-                    return sum
-                end
-            "#,
-                    None,
+                        function (s)
+                            local sum = s
+                            for i = 1,4 do
+                                sum = sum + coroutine.yield(sum)
+                            end
+                            return sum
+                        end
+                    "#,
                 )
+                .eval()
                 .unwrap(),
             )
             .unwrap();
@@ -37,16 +37,16 @@ fn test_thread() {
 
         let accumulate = lua
             .create_thread(
-                lua.eval::<_, Function>(
+                lua.load(
                     r#"
-                function (sum)
-                    while true do
-                        sum = sum + coroutine.yield(sum)
-                    end
-                end
-            "#,
-                    None,
+                        function (sum)
+                            while true do
+                                sum = sum + coroutine.yield(sum)
+                            end
+                        end
+                    "#,
                 )
+                .eval::<Function>()
                 .unwrap(),
             )
             .unwrap();
@@ -60,32 +60,32 @@ fn test_thread() {
         assert_eq!(accumulate.status(), ThreadStatus::Error);
 
         let thread = lua
-            .eval::<_, Thread>(
+            .load(
                 r#"
-                coroutine.create(function ()
-                    while true do
-                        coroutine.yield(42)
-                    end
-                end)
-            "#,
-                None,
+                    coroutine.create(function ()
+                        while true do
+                            coroutine.yield(42)
+                        end
+                    end)
+                "#,
             )
+            .eval::<Thread>()
             .unwrap();
         assert_eq!(thread.status(), ThreadStatus::Resumable);
         assert_eq!(thread.resume::<_, i64>(()).unwrap(), 42);
 
         let thread: Thread = lua
-            .eval(
+            .load(
                 r#"
-                coroutine.create(function(arg)
-                    assert(arg == 42)
-                    local yieldarg = coroutine.yield(123)
-                    assert(yieldarg == 43)
-                    return 987
-                end)
-            "#,
-                None,
+                    coroutine.create(function(arg)
+                        assert(arg == 42)
+                        local yieldarg = coroutine.yield(123)
+                        assert(yieldarg == 43)
+                        return 987
+                    end)
+                "#,
             )
+            .eval()
             .unwrap();
 
         assert_eq!(thread.resume::<_, u32>(42).unwrap(), 123);
@@ -104,7 +104,7 @@ fn coroutine_from_closure() {
     Lua::new().context(|lua| {
         let thrd_main = lua.create_function(|_, ()| Ok(())).unwrap();
         lua.globals().set("main", thrd_main).unwrap();
-        let thrd: Thread = lua.eval("coroutine.create(main)", None).unwrap();
+        let thrd: Thread = lua.load("coroutine.create(main)").eval().unwrap();
         thrd.resume::<_, ()>(()).unwrap();
     });
 }

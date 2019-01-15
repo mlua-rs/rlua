@@ -26,14 +26,14 @@ fn test_table() {
         assert_eq!(table2.get::<_, String>("foo").unwrap(), "bar");
         assert_eq!(table1.get::<_, String>("baz").unwrap(), "baf");
 
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
                 table1 = {1, 2, 3, 4, 5}
                 table2 = {}
                 table3 = {1, 2, nil, 4, 5}
             "#,
-            None,
         )
+        .exec()
         .unwrap();
 
         let table1 = globals.get::<_, Table>("table1").unwrap();
@@ -102,14 +102,14 @@ fn test_table() {
 fn test_table_scope() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            touter = {
-                tin = {1, 2, 3}
-            }
-        "#,
-            None,
+                touter = {
+                    tin = {1, 2, 3}
+                }
+            "#,
         )
+        .exec()
         .unwrap();
 
         // Make sure that table gets do not borrow the table, but instead just borrow lua.
@@ -154,23 +154,23 @@ fn test_metatable() {
 fn test_table_error() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            table = {}
-            setmetatable(table, {
-                __index = function()
-                    error("lua error")
-                end,
-                __newindex = function()
-                    error("lua error")
-                end,
-                __len = function()
-                    error("lua error")
-                end
-            })
-        "#,
-            None,
+                table = {}
+                setmetatable(table, {
+                    __index = function()
+                        error("lua error")
+                    end,
+                    __newindex = function()
+                        error("lua error")
+                    end,
+                    __len = function()
+                        error("lua error")
+                    end
+                })
+            "#,
         )
+        .exec()
         .unwrap();
 
         let bad_table: Table = globals.get("table").unwrap();

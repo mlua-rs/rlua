@@ -6,14 +6,14 @@ use rlua::{Function, LightUserData, Lua};
 fn test_lightuserdata() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
                 function id(a)
                     return a
                 end
             "#,
-            None,
         )
+        .exec()
         .unwrap();
         let res = globals
             .get::<_, Function>("id")

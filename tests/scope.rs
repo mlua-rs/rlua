@@ -59,7 +59,7 @@ fn scope_drop() {
         });
         assert_eq!(Rc::strong_count(&rc), 1);
 
-        match lua.exec::<_, ()>("test:method()", None) {
+        match lua.load("test:method()").exec() {
             Err(Error::CallbackError { .. }) => {}
             r => panic!("improper return for destructed userdata: {:?}", r),
         };
@@ -127,7 +127,7 @@ fn scope_userdata_methods() {
     let i = Cell::new(42);
     lua.context(|lua| {
         let f: Function = lua
-            .eval(
+            .load(
                 r#"
                     function(u)
                         u:inc()
@@ -136,8 +136,8 @@ fn scope_userdata_methods() {
                         u:dec()
                     end
                 "#,
-                None,
             )
+            .eval()
             .unwrap();
 
         lua.scope(|scope| {
@@ -171,17 +171,17 @@ fn scope_userdata_functions() {
     let dummy = 0;
     Lua::new().context(|lua| {
         let f = lua
-            .exec::<_, Function>(
+            .load(
                 r#"
-                i = 0
-                return function(u)
-                    _ = u + u
-                    _ = u - 1
-                    _ = 1 + u
-                end
-            "#,
-                None,
+                    i = 0
+                    return function(u)
+                        _ = u + u
+                        _ = u - 1
+                        _ = 1 + u
+                    end
+                "#,
             )
+            .eval::<Function>()
             .unwrap();
 
         lua.scope(|scope| {
@@ -207,19 +207,19 @@ fn scope_userdata_mismatch() {
     }
 
     Lua::new().context(|lua| {
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            function okay(a, b)
-                a.inc(a)
-                b.inc(b)
-            end
+                function okay(a, b)
+                    a.inc(a)
+                    b.inc(b)
+                end
 
-            function bad(a, b)
-                a.inc(b)
-            end
-        "#,
-            None,
+                function bad(a, b)
+                    a.inc(b)
+                end
+            "#,
         )
+        .exec()
         .unwrap();
 
         let a = Cell::new(1);

@@ -29,14 +29,14 @@ fn compare() {
 #[test]
 fn string_views() {
     Lua::new().context(|lua| {
-        lua.eval::<_, ()>(
+        lua.load(
             r#"
-            ok = "null bytes are valid utf-8, wh\0 knew?"
-            err = "but \xff isn't :("
-            empty = ""
-        "#,
-            None,
+                ok = "null bytes are valid utf-8, wh\0 knew?"
+                err = "but \xff isn't :("
+                empty = ""
+            "#,
         )
+        .exec()
         .unwrap();
 
         let globals = lua.globals();

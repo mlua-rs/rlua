@@ -2,19 +2,12 @@ use std::cell::RefCell;
 use std::ops::Deref;
 use std::str;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 
 use rlua::HookTriggers;
 use rlua::{Error, Lua, Value};
 
 #[test]
 fn line_counts() {
-    let code = r#"
-        local x = 2 + 3
-        local y = x * 63
-        local z = string.len(x..", "..y)
-    "#;
-
     let output = Arc::new(Mutex::new(Vec::new()));
     let hook_output = output.clone();
 
@@ -30,7 +23,15 @@ fn line_counts() {
         },
     );
     lua.context(|lua| {
-        lua.exec::<_, ()>(code, None).expect("exec error");
+        lua.load(
+            r#"
+                local x = 2 + 3
+                local y = x * 63
+                local z = string.len(x..", "..y)
+            "#,
+        )
+        .exec()
+        .unwrap();
     });
 
     let output = output.lock().unwrap();
@@ -39,8 +40,6 @@ fn line_counts() {
 
 #[test]
 fn function_calls() {
-    let code = r#"local v = string.len("Hello World")"#;
-
     let output = Arc::new(Mutex::new(Vec::new()));
     let hook_output = output.clone();
 
@@ -60,7 +59,13 @@ fn function_calls() {
         },
     );
     lua.context(|lua| {
-        lua.exec::<_, ()>(code, None).expect("exec error");
+        lua.load(
+            r#"
+                local v = string.len("Hello World")
+            "#,
+        )
+        .exec()
+        .expect("exec error");
     });
 
     let output = output.lock().unwrap();
@@ -89,7 +94,8 @@ fn error_within_hook() {
     );
 
     let err = lua.context(|lua| {
-        lua.exec::<_, ()>("x = 1", None)
+        lua.load("x = 1")
+            .exec()
             .expect_err("panic didn't propagate")
     });
     match err {
@@ -102,22 +108,18 @@ fn error_within_hook() {
 }
 
 #[test]
-fn limit_execution_time() {
-    let code = r#"
-        while true do
-            x = x + 1
-        end
-    "#;
-    let start = Instant::now();
-
+fn limit_execution_instructions() {
     let lua = Lua::new();
+    let mut max_instructions = 10000;
+
     lua.set_hook(
         HookTriggers {
             every_nth_instruction: Some(30),
             ..Default::default()
         },
         move |_lua, _debug| {
-            if start.elapsed() >= Duration::from_millis(500) {
+            max_instructions -= 30;
+            if max_instructions < 0 {
                 Err(Error::RuntimeError("time's up".to_string()))
             } else {
                 Ok(())
@@ -128,15 +130,20 @@ fn limit_execution_time() {
     lua.context(|lua| {
         lua.globals().set("x", Value::Integer(0)).unwrap();
         let _ = lua
-            .exec::<_, ()>(code, None)
-            .expect_err("timeout didn't occur");
-        assert!(start.elapsed() < Duration::from_millis(750));
+            .load(
+                r#"
+                    while true do
+                        x = x + 1
+                    end
+                "#,
+            )
+            .exec()
+            .expect_err("instruction limit didn't occur");
     });
 }
 
 #[test]
 fn hook_removal() {
-    let code = r#"local x = 1"#;
     let lua = Lua::new();
 
     lua.set_hook(
@@ -150,14 +157,15 @@ fn hook_removal() {
             ))
         },
     );
+
     lua.context(|lua| {
-        assert!(lua.exec::<_, ()>(code, None).is_err());
+        assert!(lua.load("local x = 1").exec().is_err());
     });
 
     lua.remove_hook();
 
     lua.context(|lua| {
-        assert!(lua.exec::<_, ()>(code, None).is_ok());
+        assert!(lua.load("local x = 1").exec().is_ok());
     });
 }
 
@@ -166,14 +174,6 @@ fn hook_swap_within_hook() {
     thread_local! {
         static TL_LUA: RefCell<Option<Lua>> = RefCell::new(None);
     }
-
-    let code = r#"
-        local x = 1
-        x = 2
-        local y = 3
-    "#
-    .trim_left_matches("\r\n");
-    let inc_code = r#"if ok ~= nil then ok = ok + 1 end"#;
 
     TL_LUA.with(|tl| {
         *tl.borrow_mut() = Some(Lua::new());
@@ -194,8 +194,15 @@ fn hook_swap_within_hook() {
                             ..Default::default()
                         },
                         move |lua, _debug| {
-                            lua.exec::<_, ()>(inc_code, Some("hook_incrementer"))
-                                .expect("exec failure within hook");
+                            lua.load(
+                                r#"
+                                    if ok ~= nil then
+                                        ok = ok + 1
+                                    end
+                                "#,
+                            )
+                            .exec()
+                            .expect("exec failure within hook");
                             TL_LUA.with(|tl| {
                                 tl.borrow().as_ref().unwrap().remove_hook();
                             });
@@ -210,7 +217,16 @@ fn hook_swap_within_hook() {
 
     TL_LUA.with(|tl| {
         tl.borrow().as_ref().unwrap().context(|lua| {
-            assert!(lua.exec::<_, ()>(code, None).is_ok());
+            assert!(lua
+                .load(
+                    r#"
+                        local x = 1
+                        x = 2
+                        local y = 3
+                    "#,
+                )
+                .exec()
+                .is_ok());
             assert_eq!(lua.globals().get::<_, i64>("ok").unwrap_or(-1), 2);
         });
     });

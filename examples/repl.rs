@@ -17,7 +17,7 @@ fn main() {
                     Err(_) => return,
                 }
 
-                match lua.eval::<_, MultiValue>(&line, None) {
+                match lua.load(&line).eval::<MultiValue>() {
                     Ok(values) => {
                         editor.add_history_entry(line);
                         println!(

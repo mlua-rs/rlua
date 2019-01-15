@@ -11,11 +11,11 @@ use rlua::{
 #[test]
 fn test_load() {
     Lua::new().context(|lua| {
-        let func = lua.load("return 1+2", None).unwrap();
+        let func = lua.load("return 1+2").into_function().unwrap();
         let result: i32 = func.call(()).unwrap();
         assert_eq!(result, 3);
 
-        assert!(lua.load("§$%§&$%&", None).is_err());
+        assert!(lua.load("§$%§&$%&").exec().is_err());
     });
 }
 
@@ -23,11 +23,11 @@ fn test_load() {
 fn test_debug() {
     let lua = unsafe { Lua::new_with_debug() };
     lua.context(|lua| {
-        match lua.eval("debug", None).unwrap() {
+        match lua.load("debug").eval().unwrap() {
             Value::Table(_) => {}
             val => panic!("Expected table for debug library, got {:#?}", val),
         }
-        let traceback_output = lua.eval::<_, String>("debug.traceback()", None).unwrap();
+        let traceback_output = lua.load("debug.traceback()").eval::<String>().unwrap();
         assert_eq!(
             traceback_output.to_str().unwrap().split("\n").next(),
             "stack traceback:".into()
@@ -45,28 +45,28 @@ fn test_new_with_debug_panic() {
 fn test_exec() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            res = 'foo'..'bar'
-        "#,
-            None,
+                res = 'foo'..'bar'
+            "#,
         )
+        .exec()
         .unwrap();
         assert_eq!(globals.get::<_, String>("res").unwrap(), "foobar");
 
         let module: Table = lua
-            .exec(
+            .load(
                 r#"
-            local module = {}
+                    local module = {}
 
-            function module.func()
-                return "hello"
-            end
+                    function module.func()
+                        return "hello"
+                    end
 
-            return module
-        "#,
-                None,
+                    return module
+                "#,
             )
+            .eval()
             .unwrap();
         assert!(module.contains_key("func").unwrap());
         assert_eq!(
@@ -83,10 +83,10 @@ fn test_exec() {
 #[test]
 fn test_eval() {
     Lua::new().context(|lua| {
-        assert_eq!(lua.eval::<_, i32>("1 + 1", None).unwrap(), 2);
-        assert_eq!(lua.eval::<_, bool>("false == false", None).unwrap(), true);
-        assert_eq!(lua.eval::<_, i32>("return 1 + 2", None).unwrap(), 3);
-        match lua.eval::<_, ()>("if true then", None) {
+        assert_eq!(lua.load("1 + 1").eval::<i32>().unwrap(), 2);
+        assert_eq!(lua.load("false == false").eval::<bool>().unwrap(), true);
+        assert_eq!(lua.load("return 1 + 2").eval::<i32>().unwrap(), 3);
+        match lua.load("if true then").eval::<()>() {
             Err(Error::SyntaxError {
                 incomplete_input: true,
                 ..
@@ -103,18 +103,18 @@ fn test_eval() {
 fn test_lua_multi() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            function concat(arg1, arg2)
-                return arg1 .. arg2
-            end
+                function concat(arg1, arg2)
+                    return arg1 .. arg2
+                end
 
-            function mreturn()
-                return 1, 2, 3, 4, 5, 6
-            end
-        "#,
-            None,
+                function mreturn()
+                    return 1, 2, 3, 4, 5, 6
+                end
+            "#,
         )
+        .exec()
         .unwrap();
 
         let concat = globals.get::<_, Function>("concat").unwrap();
@@ -133,14 +133,14 @@ fn test_lua_multi() {
 fn test_coercion() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            int = 123
-            str = "123"
-            num = 123.0
-        "#,
-            None,
+                int = 123
+                str = "123"
+                num = 123.0
+            "#,
         )
+        .exec()
         .unwrap();
 
         assert_eq!(globals.get::<_, String>("int").unwrap(), "123");
@@ -172,58 +172,58 @@ fn test_error() {
 
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            function no_error()
-            end
-
-            function lua_error()
-                error("this is a lua error")
-            end
-
-            function rust_error()
-                rust_error_function()
-            end
-
-            function return_error()
-                local status, res = pcall(rust_error_function)
-                assert(not status)
-                return res
-            end
-
-            function return_string_error()
-                return "this should be converted to an error"
-            end
-
-            function test_pcall()
-                local testvar = 0
-
-                pcall(function(arg)
-                    testvar = testvar + arg
-                    error("should be ignored")
-                end, 3)
-
-                local function handler(err)
-                    testvar = testvar + err
-                    return "should be ignored"
+                function no_error()
                 end
 
-                local status, res = xpcall(function()
-                    error(5)
-                end, handler)
-                assert(not status)
-
-                if testvar ~= 8 then
-                    error("testvar had the wrong value, pcall / xpcall misbehaving "..testvar)
+                function lua_error()
+                    error("this is a lua error")
                 end
-            end
 
-            function understand_recursion()
-                understand_recursion()
-            end
-        "#,
-            None,
+                function rust_error()
+                    rust_error_function()
+                end
+
+                function return_error()
+                    local status, res = pcall(rust_error_function)
+                    assert(not status)
+                    return res
+                end
+
+                function return_string_error()
+                    return "this should be converted to an error"
+                end
+
+                function test_pcall()
+                    local testvar = 0
+
+                    pcall(function(arg)
+                        testvar = testvar + arg
+                        error("should be ignored")
+                    end, 3)
+
+                    local function handler(err)
+                        testvar = testvar + err
+                        return "should be ignored"
+                    end
+
+                    local status, res = xpcall(function()
+                        error(5)
+                    end, handler)
+                    assert(not status)
+
+                    if testvar ~= 8 then
+                        error("testvar had the wrong value, pcall / xpcall misbehaving "..testvar)
+                    end
+                end
+
+                function understand_recursion()
+                    understand_recursion()
+                end
+            "#,
         )
+        .exec()
         .unwrap();
 
         let rust_error_function = lua
@@ -260,7 +260,10 @@ fn test_error() {
 
         assert!(return_string_error.call::<_, Error>(()).is_ok());
 
-        match lua.eval::<_, ()>("if youre happy and you know it syntax error", None) {
+        match lua
+            .load("if youre happy and you know it syntax error")
+            .exec()
+        {
             Err(Error::SyntaxError {
                 incomplete_input: false,
                 ..
@@ -268,7 +271,7 @@ fn test_error() {
             Err(_) => panic!("error is not LuaSyntaxError::Syntax kind"),
             _ => panic!("error not returned"),
         }
-        match lua.eval::<_, ()>("function i_will_finish_what_i()", None) {
+        match lua.load("function i_will_finish_what_i()").exec() {
             Err(Error::SyntaxError {
                 incomplete_input: true,
                 ..
@@ -286,14 +289,14 @@ fn test_error() {
         Lua::new().context(|lua| {
             let globals = lua.globals();
 
-            lua.exec::<_, ()>(
+            lua.load(
                 r#"
-                function rust_panic()
-                    pcall(function () rust_panic_function() end)
-                end
-            "#,
-                None,
-            )?;
+                    function rust_panic()
+                        pcall(function () rust_panic_function() end)
+                    end
+                "#,
+            )
+            .exec()?;
             let rust_panic_function = lua
                 .create_function(|_, ()| -> Result<()> { panic!("test_panic") })
                 .unwrap();
@@ -313,14 +316,14 @@ fn test_error() {
         Lua::new().context(|lua| {
             let globals = lua.globals();
 
-            lua.exec::<_, ()>(
+            lua.load(
                 r#"
-                function rust_panic()
-                    xpcall(function() rust_panic_function() end, function() end)
-                end
-            "#,
-                None,
-            )?;
+                    function rust_panic()
+                        xpcall(function() rust_panic_function() end, function() end)
+                    end
+                "#,
+            )
+            .exec()?;
             let rust_panic_function = lua
                 .create_function(|_, ()| -> Result<()> { panic!("test_panic") })
                 .unwrap();
@@ -356,18 +359,18 @@ fn test_result_conversions() {
         globals.set("err", err).unwrap();
         globals.set("ok", ok).unwrap();
 
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            local r, e = err()
-            assert(r == nil)
-            assert(tostring(e):find("only through failure can we succeed") ~= nil)
+                local r, e = err()
+                assert(r == nil)
+                assert(tostring(e):find("only through failure can we succeed") ~= nil)
 
-            local r, e = ok()
-            assert(r == "!")
-            assert(e == nil)
-        "#,
-            None,
+                local r, e = ok()
+                assert(r == "!")
+                assert(e == nil)
+            "#,
         )
+        .exec()
         .unwrap();
     });
 }
@@ -401,19 +404,19 @@ fn test_num_conversion() {
             Some(1.5)
         );
 
-        assert_eq!(lua.eval::<_, i64>("1.0", None).unwrap(), 1);
-        assert_eq!(lua.eval::<_, f64>("1.0", None).unwrap(), 1.0);
-        assert_eq!(lua.eval::<_, String>("1.0", None).unwrap(), "1.0");
+        assert_eq!(lua.load("1.0").eval::<i64>().unwrap(), 1);
+        assert_eq!(lua.load("1.0").eval::<f64>().unwrap(), 1.0);
+        assert_eq!(lua.load("1.0").eval::<String>().unwrap(), "1.0");
 
-        assert_eq!(lua.eval::<_, i64>("1.5", None).unwrap(), 1);
-        assert_eq!(lua.eval::<_, f64>("1.5", None).unwrap(), 1.5);
-        assert_eq!(lua.eval::<_, String>("1.5", None).unwrap(), "1.5");
+        assert_eq!(lua.load("1.5").eval::<i64>().unwrap(), 1);
+        assert_eq!(lua.load("1.5").eval::<f64>().unwrap(), 1.5);
+        assert_eq!(lua.load("1.5").eval::<String>().unwrap(), "1.5");
 
-        assert!(lua.eval::<_, u64>("-1", None).is_err());
-        assert_eq!(lua.eval::<_, i64>("-1", None).unwrap(), -1);
+        assert!(lua.load("-1").eval::<u64>().is_err());
+        assert_eq!(lua.load("-1").eval::<i64>().unwrap(), -1);
 
         assert!(lua.unpack::<u64>(lua.pack(1u128 << 64).unwrap()).is_err());
-        assert!(lua.eval::<_, i64>("math.huge", None).is_err());
+        assert!(lua.load("math.huge").eval::<i64>().is_err());
 
         assert_eq!(
             lua.unpack::<f64>(lua.pack(f32::MAX).unwrap()).unwrap(),
@@ -435,36 +438,38 @@ fn test_pcall_xpcall() {
 
         // make sure that we handle not enough arguments
 
-        assert!(lua.exec::<_, ()>("pcall()", None).is_err());
-        assert!(lua.exec::<_, ()>("xpcall()", None).is_err());
-        assert!(lua.exec::<_, ()>("xpcall(function() end)", None).is_err());
+        assert!(lua.load("pcall()").exec().is_err());
+        assert!(lua.load("xpcall()").exec().is_err());
+        assert!(lua.load("xpcall(function() end)").exec().is_err());
 
         // Make sure that the return values from are correct on success
 
         let (r, e) = lua
-            .eval::<_, (bool, String)>("pcall(function(p) return p end, 'foo')", None)
+            .load("pcall(function(p) return p end, 'foo')")
+            .eval::<(bool, String)>()
             .unwrap();
         assert!(r);
         assert_eq!(e, "foo");
 
         let (r, e) = lua
-            .eval::<_, (bool, String)>("xpcall(function(p) return p end, print, 'foo')", None)
+            .load("xpcall(function(p) return p end, print, 'foo')")
+            .eval::<(bool, String)>()
             .unwrap();
         assert!(r);
         assert_eq!(e, "foo");
 
         // Make sure that the return values are correct on errors, and that error handling works
 
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            pcall_error = nil
-            pcall_status, pcall_error = pcall(error, "testerror")
+                pcall_error = nil
+                pcall_status, pcall_error = pcall(error, "testerror")
 
-            xpcall_error = nil
-            xpcall_status, _ = xpcall(error, function(err) xpcall_error = err end, "testerror")
-        "#,
-            None,
+                xpcall_error = nil
+                xpcall_status, _ = xpcall(error, function(err) xpcall_error = err end, "testerror")
+            "#,
         )
+        .exec()
         .unwrap();
 
         assert_eq!(globals.get::<_, bool>("pcall_status").unwrap(), false);
@@ -480,14 +485,14 @@ fn test_pcall_xpcall() {
         );
 
         // Make sure that weird xpcall error recursion at least doesn't cause unsafety or panics.
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            function xpcall_recursion()
-                xpcall(error, function(err) error(err) end, "testerror")
-            end
-        "#,
-            None,
+                function xpcall_recursion()
+                    xpcall(error, function(err) error(err) end, "testerror")
+                end
+            "#,
         )
+        .exec()
         .unwrap();
         let _ = globals
             .get::<_, Function>("xpcall_recursion")
@@ -539,13 +544,13 @@ fn test_recursive_mut_callback_error() {
 #[test]
 fn test_set_metatable_nil() {
     Lua::new().context(|lua| {
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-        a = {}
-        setmetatable(a, nil)
-    "#,
-            None,
+                a = {}
+                setmetatable(a, nil)
+            "#,
         )
+        .exec()
         .unwrap();
     });
 }
@@ -553,8 +558,9 @@ fn test_set_metatable_nil() {
 #[test]
 fn test_gc_error() {
     Lua::new().context(|lua| {
-        match lua.exec::<_, ()>(
-            r#"
+        match lua
+            .load(
+                r#"
                 val = nil
                 table = {}
                 setmetatable(table, {
@@ -565,8 +571,9 @@ fn test_gc_error() {
                 table = nil
                 collectgarbage("collect")
             "#,
-            None,
-        ) {
+            )
+            .exec()
+        {
             Err(Error::GarbageCollectorError(_)) => {}
             Err(e) => panic!("__gc error did not result in correct error, instead: {}", e),
             Ok(()) => panic!("__gc error did not result in error"),
@@ -630,8 +637,7 @@ fn test_drop_registry_value() {
         drop(r);
         lua.expire_registry_values();
 
-        lua.exec::<_, ()>(r#"collectgarbage("collect")"#, None)
-            .unwrap();
+        lua.load(r#"collectgarbage("collect")"#).exec().unwrap();
 
         assert_eq!(Arc::strong_count(&rc), 1);
     });
@@ -678,7 +684,7 @@ fn too_many_returns() {
 #[test]
 fn too_many_arguments() {
     Lua::new().context(|lua| {
-        lua.exec::<_, ()>("function test(...) end", None).unwrap();
+        lua.load("function test(...) end").exec().unwrap();
         let args = Variadic::from_iter(1..1000000);
         assert!(lua
             .globals()
@@ -712,13 +718,13 @@ fn too_many_recursions() {
 fn too_many_binds() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            function f(...)
-            end
-        "#,
-            None,
+                function f(...)
+                end
+            "#,
         )
+        .exec()
         .unwrap();
 
         let concat = globals.get::<_, Function>("f").unwrap();
@@ -750,14 +756,14 @@ fn large_args() {
             .unwrap();
 
         let f: Function = lua
-            .eval(
+            .load(
                 r#"
-            return function(...)
-                return c(...)
-            end
-        "#,
-                None,
+                    return function(...)
+                        return c(...)
+                    end
+                "#,
             )
+            .eval()
             .unwrap();
 
         assert_eq!(
@@ -782,5 +788,57 @@ fn large_args_ref() {
 
         f.call::<_, ()>((0..100).map(|i| i.to_string()).collect::<Variadic<_>>())
             .unwrap();
+    });
+}
+
+#[test]
+fn chunk_env() {
+    Lua::new().context(|lua| {
+        let assert: Function = lua.globals().get("assert").unwrap();
+
+        let env1 = lua.create_table().unwrap();
+        env1.set("assert", assert.clone()).unwrap();
+
+        let env2 = lua.create_table().unwrap();
+        env2.set("assert", assert).unwrap();
+
+        lua.load(
+            r#"
+                test_var = 1
+            "#,
+        )
+        .set_environment(env1.clone())
+        .unwrap()
+        .exec()
+        .unwrap();
+
+        lua.load(
+            r#"
+                assert(test_var == nil)
+                test_var = 2
+            "#,
+        )
+        .set_environment(env2.clone())
+        .unwrap()
+        .exec()
+        .unwrap();
+
+        assert_eq!(
+            lua.load("test_var")
+                .set_environment(env1)
+                .unwrap()
+                .eval::<i32>()
+                .unwrap(),
+            1
+        );
+
+        assert_eq!(
+            lua.load("test_var")
+                .set_environment(env2)
+                .unwrap()
+                .eval::<i32>()
+                .unwrap(),
+            2
+        );
     });
 }

@@ -31,7 +31,7 @@ impl<'lua> Table<'lua> {
     ///
     /// globals.set("assertions", cfg!(debug_assertions))?;
     ///
-    /// lua_context.exec::<_, ()>(r#"
+    /// lua_context.load(r#"
     ///     if assertions == true then
     ///         -- ...
     ///     elseif assertions == false then
@@ -39,7 +39,7 @@ impl<'lua> Table<'lua> {
     ///     else
     ///         error("assertions neither on nor off?")
     ///     end
-    /// "#, None)?;
+    /// "#).exec()?;
     /// # Ok(())
     /// # })
     /// # }
@@ -301,7 +301,14 @@ impl<'lua> Table<'lua> {
     /// # use rlua::{Lua, Result, Table};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| {
-    /// let my_table: Table = lua_context.eval("{ [1] = 4, [2] = 5, [4] = 7, key = 2 }", None)?;
+    /// let my_table: Table = lua_context.load(r#"
+    ///     {
+    ///         [1] = 4,
+    ///         [2] = 5,
+    ///         [4] = 7,
+    ///         key = 2
+    ///     }
+    /// "#).eval()?;
     ///
     /// let expected = [4, 5];
     /// for (&expected, got) in expected.iter().zip(my_table.sequence_values::<u32>()) {

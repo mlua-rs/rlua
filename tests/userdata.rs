@@ -42,18 +42,18 @@ fn test_methods() {
         let globals = lua.globals();
         let userdata = lua.create_userdata(MyUserData(42)).unwrap();
         globals.set("userdata", userdata.clone()).unwrap();
-        lua.exec::<_, ()>(
+        lua.load(
             r#"
-            function get_it()
-                return userdata:get_value()
-            end
+                function get_it()
+                    return userdata:get_value()
+                end
 
-            function set_it(i)
-                return userdata:set_value(i)
-            end
-        "#,
-            None,
+                function set_it(i)
+                    return userdata:set_value(i)
+                end
+            "#,
         )
+        .exec()
         .unwrap();
         let get = globals.get::<_, Function>("get_it").unwrap();
         let set = globals.get::<_, Function>("set_it").unwrap();
@@ -96,20 +96,22 @@ fn test_metamethods() {
         globals.set("userdata1", MyUserData(7)).unwrap();
         globals.set("userdata2", MyUserData(3)).unwrap();
         assert_eq!(
-            lua.eval::<_, MyUserData>("userdata1 + userdata2", None)
+            lua.load("userdata1 + userdata2")
+                .eval::<MyUserData>()
                 .unwrap()
                 .0,
             10
         );
         assert_eq!(
-            lua.eval::<_, MyUserData>("userdata1 - userdata2", None)
+            lua.load("userdata1 - userdata2")
+                .eval::<MyUserData>()
                 .unwrap()
                 .0,
             4
         );
-        assert_eq!(lua.eval::<_, i64>("userdata1:get()", None).unwrap(), 7);
-        assert_eq!(lua.eval::<_, i64>("userdata2.inner", None).unwrap(), 3);
-        assert!(lua.eval::<_, ()>("userdata2.nonexist_field", None).is_err());
+        assert_eq!(lua.load("userdata1:get()").eval::<i64>().unwrap(), 7);
+        assert_eq!(lua.load("userdata2.inner").eval::<i64>().unwrap(), 3);
+        assert!(lua.load("userdata2.nonexist_field").eval::<()>().is_err());
     });
 }
 
@@ -134,22 +136,22 @@ fn test_gc_userdata() {
             .unwrap();
 
         assert!(lua
-            .eval::<_, ()>(
+            .load(
                 r#"
-                local tbl = setmetatable({
-                    userdata = userdata
-                }, { __gc = function(self)
-                    -- resurrect userdata
-                    hatch = self.userdata
-                end })
+                    local tbl = setmetatable({
+                        userdata = userdata
+                    }, { __gc = function(self)
+                        -- resurrect userdata
+                        hatch = self.userdata
+                    end })
 
-                tbl = nil
-                userdata = nil  -- make table and userdata collectable
-                collectgarbage("collect")
-                hatch:access()
-            "#,
-                None
+                    tbl = nil
+                    userdata = nil  -- make table and userdata collectable
+                    collectgarbage("collect")
+                    hatch:access()
+                "#,
             )
+            .exec()
             .is_err());
     });
 }

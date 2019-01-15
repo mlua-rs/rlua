@@ -165,9 +165,9 @@ impl Lua {
     /// # fn main() -> Result<()> {
     /// let lua = Lua::new();
     /// lua.context(|lua_context| {
-    ///    lua_context.exec::<_, ()>(r#"
+    ///    lua_context.load(r#"
     ///        print("hello world!")
-    ///    "#, None)
+    ///    "#).exec()
     /// })?;
     /// # Ok(())
     /// # }
@@ -207,11 +207,11 @@ impl Lua {
     ///     Ok(())
     /// });
     /// lua.context(|lua_context| {
-    ///     lua_context.exec::<_, ()>(r#"
+    ///     lua_context.load(r#"
     ///         local x = 2 + 3
     ///         local y = x * 63
     ///         local z = string.len(x..", "..y)
-    ///     "#, None)
+    ///     "#).exec()
     /// })?;
     /// # Ok(())
     /// # }
