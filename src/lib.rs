@@ -63,7 +63,7 @@ mod userdata;
 mod util;
 mod value;
 
-pub use crate::context::Context;
+pub use crate::context::{Chunk, Context};
 pub use crate::error::{Error, ExternalError, ExternalResult, Result};
 pub use crate::function::Function;
 pub use crate::hook::{Debug, DebugNames, DebugSource, DebugStack, HookTriggers};
