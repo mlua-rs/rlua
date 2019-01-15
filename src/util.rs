@@ -669,7 +669,11 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
 
     unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
         ffi::luaL_checkstack(state, 2, ptr::null());
-        push_wrapped_error(state, Error::CallbackDestructed);
+        let ud = ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as *mut WrappedError;
+
+        ptr::write(ud, WrappedError(Error::CallbackDestructed));
+        get_error_metatable(state);
+        ffi::lua_setmetatable(state, -2);
         ffi::lua_error(state)
     }
 
