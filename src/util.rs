@@ -225,38 +225,6 @@ pub unsafe fn push_string<S: ?Sized + AsRef<[u8]>>(
     })
 }
 
-// Converts the given lua value to a string in a reasonable format without causing a Lua error or
-// panicking.
-pub unsafe fn to_string<'a>(state: *mut ffi::lua_State, index: c_int) -> Cow<'a, str> {
-    match ffi::lua_type(state, index) {
-        ffi::LUA_TNONE => "<none>".into(),
-        ffi::LUA_TNIL => "<nil>".into(),
-        ffi::LUA_TBOOLEAN => (ffi::lua_toboolean(state, index) != 1).to_string().into(),
-        ffi::LUA_TLIGHTUSERDATA => {
-            format!("<lightuserdata {:?}>", ffi::lua_topointer(state, index)).into()
-        }
-        ffi::LUA_TNUMBER => {
-            let mut isint = 0;
-            let i = ffi::lua_tointegerx(state, -1, &mut isint);
-            if isint == 0 {
-                ffi::lua_tonumber(state, index).to_string().into()
-            } else {
-                i.to_string().into()
-            }
-        }
-        ffi::LUA_TSTRING => {
-            let mut size = 0;
-            let data = ffi::lua_tolstring(state, index, &mut size);
-            String::from_utf8_lossy(slice::from_raw_parts(data as *const u8, size))
-        }
-        ffi::LUA_TTABLE => format!("<table {:?}>", ffi::lua_topointer(state, index)).into(),
-        ffi::LUA_TFUNCTION => format!("<function {:?}>", ffi::lua_topointer(state, index)).into(),
-        ffi::LUA_TUSERDATA => format!("<userdata {:?}>", ffi::lua_topointer(state, index)).into(),
-        ffi::LUA_TTHREAD => format!("<thread {:?}>", ffi::lua_topointer(state, index)).into(),
-        _ => "<unknown>".into(),
-    }
-}
-
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
     let ud = protect_lua_closure(state, 0, 1, move |state| {
@@ -428,19 +396,24 @@ where
 
 // Takes an error at the top of the stack, and if it is a WrappedError, converts it to an
 // Error::CallbackError with a traceback, if it is some lua type, prints the error along with a
-// traceback, and if it is a WrappedPanic, does not modify it.  This function should never panic or
-// trigger an error (longjmp).
+// traceback, and if it is a WrappedPanic, does not modify it.  This function does its best to avoid
+// triggering another error and shadowing previous rust errors, but it may trigger Lua errors that
+// shadow rust errors under certain memory conditions.  This function ensures that such behavior
+// will *never* occur with a rust panic, however.
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     // I believe luaL_traceback requires this much free stack to not error.
     const LUA_TRACEBACK_STACK: c_int = 11;
 
     if ffi::lua_checkstack(state, 2) == 0 {
-        // If we don't have enough stack space to even check the error type, do nothing
+        // If we don't have enough stack space to even check the error type, do nothing so we don't
+        // risk shadowing a rust panic.
     } else if let Some(error) = get_wrapped_error(state, -1).as_ref() {
+        // lua_newuserdata and luaL_traceback may error, but nothing that implements Drop should be
+        // on the rust stack at this time.
+        let ud = ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as *mut WrappedError;
         let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
-            gc_guard(state, || {
-                ffi::luaL_traceback(state, state, ptr::null(), 0);
-            });
+            ffi::luaL_traceback(state, state, ptr::null(), 0);
+
             let traceback = to_string(state, -1).into_owned();
             ffi::lua_pop(state, 1);
             traceback
@@ -449,27 +422,21 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         };
 
         let error = error.clone();
-        ffi::lua_pop(state, 1);
+        ffi::lua_remove(state, -2);
 
-        push_wrapped_error(
-            state,
-            Error::CallbackError {
+        ptr::write(
+            ud,
+            WrappedError(Error::CallbackError {
                 traceback,
                 cause: Arc::new(error),
-            },
+            }),
         );
+        get_error_metatable(state);
+        ffi::lua_setmetatable(state, -2);
     } else if !is_wrapped_panic(state, -1) {
         if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
-            // ensure that 's' has a trailing NUL byte, but if it has internal NUL bytes already
-            // just use the string up to the first NUL byte.
-            let mut s: Vec<u8> = to_string(state, -1).into_owned().into();
-            s.reserve_exact(1);
-            s.push(0);
-            let s = s.as_ptr() as *const c_char;
-
-            gc_guard(state, || {
-                ffi::luaL_traceback(state, state, s, 0);
-            });
+            let s = ffi::luaL_tolstring(state, -1, ptr::null_mut());
+            ffi::luaL_traceback(state, state, s, 0);
             ffi::lua_remove(state, -2);
         }
     }
@@ -735,6 +702,38 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
 
 struct WrappedError(pub Error);
 struct WrappedPanic(pub Option<Box<Any + Send>>);
+
+// Converts the given lua value to a string in a reasonable format without causing a Lua error or
+// panicking.
+unsafe fn to_string<'a>(state: *mut ffi::lua_State, index: c_int) -> Cow<'a, str> {
+    match ffi::lua_type(state, index) {
+        ffi::LUA_TNONE => "<none>".into(),
+        ffi::LUA_TNIL => "<nil>".into(),
+        ffi::LUA_TBOOLEAN => (ffi::lua_toboolean(state, index) != 1).to_string().into(),
+        ffi::LUA_TLIGHTUSERDATA => {
+            format!("<lightuserdata {:?}>", ffi::lua_topointer(state, index)).into()
+        }
+        ffi::LUA_TNUMBER => {
+            let mut isint = 0;
+            let i = ffi::lua_tointegerx(state, -1, &mut isint);
+            if isint == 0 {
+                ffi::lua_tonumber(state, index).to_string().into()
+            } else {
+                i.to_string().into()
+            }
+        }
+        ffi::LUA_TSTRING => {
+            let mut size = 0;
+            let data = ffi::lua_tolstring(state, index, &mut size);
+            String::from_utf8_lossy(slice::from_raw_parts(data as *const u8, size))
+        }
+        ffi::LUA_TTABLE => format!("<table {:?}>", ffi::lua_topointer(state, index)).into(),
+        ffi::LUA_TFUNCTION => format!("<function {:?}>", ffi::lua_topointer(state, index)).into(),
+        ffi::LUA_TUSERDATA => format!("<userdata {:?}>", ffi::lua_topointer(state, index)).into(),
+        ffi::LUA_TTHREAD => format!("<thread {:?}>", ffi::lua_topointer(state, index)).into(),
+        _ => "<unknown>".into(),
+    }
+}
 
 // Checks if the value at the given index is a WrappedPanic.  Uses 2 stack spaces and does not call
 // lua_checkstack.

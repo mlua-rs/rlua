@@ -3,7 +3,9 @@ use std::os::raw::c_int;
 use crate::error::{Error, Result};
 use crate::ffi;
 use crate::types::LuaRef;
-use crate::util::{assert_stack, check_stack, error_traceback, pop_error, StackGuard};
+use crate::util::{
+    assert_stack, check_stack, error_traceback, pop_error, protect_lua_closure, StackGuard,
+};
 use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
 /// Status of a Lua thread (or coroutine).
@@ -76,7 +78,7 @@ impl<'lua> Thread<'lua> {
         let args = args.to_lua_multi(lua)?;
         let results = unsafe {
             let _sg = StackGuard::new(lua.state);
-            assert_stack(lua.state, 1);
+            assert_stack(lua.state, 3);
 
             lua.push_ref(&self.0);
             let thread_state = ffi::lua_tothread(lua.state, -1);
@@ -99,7 +101,10 @@ impl<'lua> Thread<'lua> {
 
             let ret = ffi::lua_resume(thread_state, lua.state, nargs);
             if ret != ffi::LUA_OK && ret != ffi::LUA_YIELD {
-                error_traceback(thread_state);
+                protect_lua_closure(lua.state, 0, 0, |_| {
+                    error_traceback(thread_state);
+                    0
+                })?;
                 return Err(pop_error(thread_state, ret));
             }
 
