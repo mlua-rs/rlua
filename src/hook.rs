@@ -162,7 +162,7 @@ impl HookTriggers {
 }
 
 pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_Debug) {
-    callback_error(state, || {
+    callback_error(state, |_| {
         let context = Context::new(state);
         let debug = Debug {
             ar,

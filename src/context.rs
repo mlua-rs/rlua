@@ -723,12 +723,11 @@ impl<'lua> Context<'lua> {
     // and will reduce the number of hacks required in Context and Scope.
     pub(crate) fn create_callback(self, func: Callback<'lua, 'static>) -> Result<Function<'lua>> {
         unsafe extern "C" fn call_callback(state: *mut ffi::lua_State) -> c_int {
-            callback_error(state, || {
+            callback_error(state, |nargs| {
                 if ffi::lua_type(state, ffi::lua_upvalueindex(1)) == ffi::LUA_TNIL {
                     return Err(Error::CallbackDestructed);
                 }
 
-                let nargs = ffi::lua_gettop(state);
                 if nargs < ffi::LUA_MINSTACK {
                     check_stack(state, ffi::LUA_MINSTACK - nargs)?;
                 }
