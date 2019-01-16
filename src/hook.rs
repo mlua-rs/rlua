@@ -1,7 +1,6 @@
+use std::ffi::CStr;
 use std::marker::PhantomData;
-use std::{ptr, slice};
-
-use libc::{self, c_int};
+use std::os::raw::{c_char, c_int};
 
 use crate::context::Context;
 use crate::ffi::{self, lua_Debug, lua_State};
@@ -182,11 +181,10 @@ pub(crate) unsafe extern "C" fn hook_proc(state: *mut lua_State, ar: *mut lua_De
     });
 }
 
-unsafe fn ptr_to_str<'a>(input: *const i8) -> Option<&'a [u8]> {
-    if input.is_null() || ptr::read(input) == 0 {
+unsafe fn ptr_to_str<'a>(input: *const c_char) -> Option<&'a [u8]> {
+    if input.is_null() {
         None
     } else {
-        let len = libc::strlen(input) as usize;
-        Some(slice::from_raw_parts(input as *const u8, len))
+        Some(CStr::from_ptr(input).to_bytes())
     }
 }

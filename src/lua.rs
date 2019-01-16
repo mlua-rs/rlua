@@ -6,7 +6,7 @@ use std::os::raw::{c_int, c_void};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use libc;
+use bitflags::bitflags;
 
 use crate::context::Context;
 use crate::error::Result;

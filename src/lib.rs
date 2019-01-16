@@ -40,9 +40,6 @@
 // warnings at all.
 #![doc(test(attr(deny(warnings))))]
 
-#[macro_use]
-extern crate bitflags;
-
 mod error;
 mod ffi;
 #[macro_use]
