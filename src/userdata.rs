@@ -66,31 +66,31 @@ pub enum MetaMethod {
 }
 
 impl MetaMethod {
-    pub(crate) fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static [u8] {
         match self {
-            MetaMethod::Add => "__add",
-            MetaMethod::Sub => "__sub",
-            MetaMethod::Mul => "__mul",
-            MetaMethod::Div => "__div",
-            MetaMethod::Mod => "__mod",
-            MetaMethod::Pow => "__pow",
-            MetaMethod::Unm => "__unm",
-            MetaMethod::IDiv => "__idiv",
-            MetaMethod::BAnd => "__band",
-            MetaMethod::BOr => "__bor",
-            MetaMethod::BXor => "__bxor",
-            MetaMethod::BNot => "__bnot",
-            MetaMethod::Shl => "__shl",
-            MetaMethod::Shr => "__shr",
-            MetaMethod::Concat => "__concat",
-            MetaMethod::Len => "__len",
-            MetaMethod::Eq => "__eq",
-            MetaMethod::Lt => "__lt",
-            MetaMethod::Le => "__le",
-            MetaMethod::Index => "__index",
-            MetaMethod::NewIndex => "__newindex",
-            MetaMethod::Call => "__call",
-            MetaMethod::ToString => "__tostring",
+            MetaMethod::Add => b"__add",
+            MetaMethod::Sub => b"__sub",
+            MetaMethod::Mul => b"__mul",
+            MetaMethod::Div => b"__div",
+            MetaMethod::Mod => b"__mod",
+            MetaMethod::Pow => b"__pow",
+            MetaMethod::Unm => b"__unm",
+            MetaMethod::IDiv => b"__idiv",
+            MetaMethod::BAnd => b"__band",
+            MetaMethod::BOr => b"__bor",
+            MetaMethod::BXor => b"__bxor",
+            MetaMethod::BNot => b"__bnot",
+            MetaMethod::Shl => b"__shl",
+            MetaMethod::Shr => b"__shr",
+            MetaMethod::Concat => b"__concat",
+            MetaMethod::Len => b"__len",
+            MetaMethod::Eq => b"__eq",
+            MetaMethod::Lt => b"__lt",
+            MetaMethod::Le => b"__le",
+            MetaMethod::Index => b"__index",
+            MetaMethod::NewIndex => b"__newindex",
+            MetaMethod::Call => b"__call",
+            MetaMethod::ToString => b"__tostring",
         }
     }
 }
@@ -106,8 +106,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     ///
     /// If `add_meta_method` is used to set the `__index` metamethod, the `__index` metamethod will
     /// be used as a fall-back if no regular method is found.
-    fn add_method<A, R, M>(&mut self, name: &str, method: M)
+    fn add_method<S, A, R, M>(&mut self, name: &S, method: M)
     where
+        S: ?Sized + AsRef<[u8]>,
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
         M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>;
@@ -117,8 +118,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// Refer to [`add_method`] for more information about the implementation.
     ///
     /// [`add_method`]: #method.add_method
-    fn add_method_mut<A, R, M>(&mut self, name: &str, method: M)
+    fn add_method_mut<S, A, R, M>(&mut self, name: &S, method: M)
     where
+        S: ?Sized + AsRef<[u8]>,
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
         M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>;
@@ -130,8 +132,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     ///
     /// [`add_method`]: #method.add_method
     /// [`add_method_mut`]: #method.add_method_mut
-    fn add_function<A, R, F>(&mut self, name: &str, function: F)
+    fn add_function<S, A, R, F>(&mut self, name: &S, function: F)
     where
+        S: ?Sized + AsRef<[u8]>,
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>;
@@ -142,8 +145,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
     /// This is a version of [`add_function`] that accepts a FnMut argument.
     ///
     /// [`add_function`]: #method.add_function
-    fn add_function_mut<A, R, F>(&mut self, name: &str, function: F)
+    fn add_function_mut<S, A, R, F>(&mut self, name: &S, function: F)
     where
+        S: ?Sized + AsRef<[u8]>,
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
         F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>;

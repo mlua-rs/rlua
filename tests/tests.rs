@@ -590,10 +590,10 @@ fn test_gc_error() {
 #[test]
 fn test_named_registry_value() {
     Lua::new().context(|lua| {
-        lua.set_named_registry_value::<i32>("test", 42).unwrap();
+        lua.set_named_registry_value::<_, i32>("test", 42).unwrap();
         let f = lua
             .create_function(move |lua, ()| {
-                assert_eq!(lua.named_registry_value::<i32>("test")?, 42);
+                assert_eq!(lua.named_registry_value::<_, i32>("test")?, 42);
                 Ok(())
             })
             .unwrap();

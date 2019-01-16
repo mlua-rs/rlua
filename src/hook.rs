@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::{ptr, slice, str};
+use std::{ptr, slice};
 
 use libc::{self, c_int};
 

@@ -4,9 +4,8 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_int, c_void};
-use std::string::String as StdString;
 use std::sync::Arc;
-use std::{mem, ptr, str};
+use std::{mem, ptr};
 
 use crate::error::{Error, Result};
 use crate::ffi;
@@ -360,7 +359,11 @@ impl<'lua> Context<'lua> {
     ///
     /// This value will be available to rust from all `Lua` instances which share the same main
     /// state.
-    pub fn set_named_registry_value<T: ToLua<'lua>>(self, name: &str, t: T) -> Result<()> {
+    pub fn set_named_registry_value<S, T>(self, name: &S, t: T) -> Result<()>
+    where
+        S: ?Sized + AsRef<[u8]>,
+        T: ToLua<'lua>,
+    {
         let t = t.to_lua(self)?;
         unsafe {
             let _sg = StackGuard::new(self.state);
@@ -383,7 +386,11 @@ impl<'lua> Context<'lua> {
     /// get a value previously set by [`set_named_registry_value`].
     ///
     /// [`set_named_registry_value`]: #method.set_named_registry_value
-    pub fn named_registry_value<T: FromLua<'lua>>(self, name: &str) -> Result<T> {
+    pub fn named_registry_value<S, T>(self, name: &S) -> Result<T>
+    where
+        S: ?Sized + AsRef<[u8]>,
+        T: FromLua<'lua>,
+    {
         let value = unsafe {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 4);
@@ -405,7 +412,7 @@ impl<'lua> Context<'lua> {
     /// Equivalent to calling [`set_named_registry_value`] with a value of Nil.
     ///
     /// [`set_named_registry_value`]: #method.set_named_registry_value
-    pub fn unset_named_registry_value(self, name: &str) -> Result<()> {
+    pub fn unset_named_registry_value<S: ?Sized + AsRef<[u8]>>(self, name: &S) -> Result<()> {
         self.set_named_registry_value(name, Nil)
     }
 
@@ -950,7 +957,7 @@ unsafe fn ref_stack_pop(extra: *mut ExtraData) -> c_int {
 }
 
 struct StaticUserDataMethods<'lua, T: 'static + UserData> {
-    methods: HashMap<StdString, Callback<'lua, 'static>>,
+    methods: HashMap<Vec<u8>, Callback<'lua, 'static>>,
     meta_methods: HashMap<MetaMethod, Callback<'lua, 'static>>,
     _type: PhantomData<T>,
 }
@@ -966,44 +973,48 @@ impl<'lua, T: 'static + UserData> Default for StaticUserDataMethods<'lua, T> {
 }
 
 impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMethods<'lua, T> {
-    fn add_method<A, R, M>(&mut self, name: &str, method: M)
+    fn add_method<S, A, R, M>(&mut self, name: &S, method: M)
     where
+        S: ?Sized + AsRef<[u8]>,
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
         M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>,
     {
         self.methods
-            .insert(name.to_owned(), Self::box_method(method));
+            .insert(name.as_ref().to_vec(), Self::box_method(method));
     }
 
-    fn add_method_mut<A, R, M>(&mut self, name: &str, method: M)
+    fn add_method_mut<S, A, R, M>(&mut self, name: &S, method: M)
     where
+        S: ?Sized + AsRef<[u8]>,
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
         M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>,
     {
         self.methods
-            .insert(name.to_owned(), Self::box_method_mut(method));
+            .insert(name.as_ref().to_vec(), Self::box_method_mut(method));
     }
 
-    fn add_function<A, R, F>(&mut self, name: &str, function: F)
+    fn add_function<S, A, R, F>(&mut self, name: &S, function: F)
     where
+        S: ?Sized + AsRef<[u8]>,
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
         self.methods
-            .insert(name.to_owned(), Self::box_function(function));
+            .insert(name.as_ref().to_vec(), Self::box_function(function));
     }
 
-    fn add_function_mut<A, R, F>(&mut self, name: &str, function: F)
+    fn add_function_mut<S, A, R, F>(&mut self, name: &S, function: F)
     where
+        S: ?Sized + AsRef<[u8]>,
         A: FromLuaMulti<'lua>,
         R: ToLuaMulti<'lua>,
         F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>,
     {
         self.methods
-            .insert(name.to_owned(), Self::box_function_mut(function));
+            .insert(name.as_ref().to_vec(), Self::box_function_mut(function));
     }
 
     fn add_meta_method<A, R, M>(&mut self, meta: MetaMethod, method: M)

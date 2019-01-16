@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::os::raw::{c_int, c_void};
 use std::rc::Rc;
-use std::str;
 use std::sync::{Arc, Mutex};
 
 use libc;
