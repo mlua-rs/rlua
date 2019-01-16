@@ -1,3 +1,6 @@
+## [0.16.1]
+- Documentation fixes
+
 ## [0.16]
 - Small fixes for the way new `Lua` states are created, preventing some potential unhandled errors
 - Propery mark all internal panics as internal and indicative of a bug
