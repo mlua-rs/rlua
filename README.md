@@ -59,7 +59,7 @@ panics, and by handling panic errors on the receiving Rust side by resuming the
 panic.
 
 `rlua` should also be panic safe in another way as well, which is that any `Lua`
-instances or handles should remain usable after a user triggered panic, and such
+instances or handles should remain usable after a user generated panic, and such
 panics should not break internal invariants or leak Lua stack space.  This is
 mostly important to safely use `rlua` types in Drop impls, as you should not be
 using panics for general error handling.
@@ -94,7 +94,7 @@ If you encounter them, a bug report would be very welcome:
   * If you detect that, after catching a panic or during a Drop triggered from a
     panic, a `Lua` or handle method is triggering other bugs or there is a Lua
     stack space leak, this is a bug.  `rlua` instances are supposed to remain
-    fully usable in the face of user triggered panics.  This guarantee does not
+    fully usable in the face of user generated panics.  This guarantee does not
     extend to panics marked with "rlua internal error" simply because that is
     already indicative of a separate bug.
 
