@@ -290,8 +290,7 @@ impl Lua {
 
     /// Steps the garbage collector one indivisible step.
     ///
-    /// If `simul_kbytes` is 0, then this performs garbage collection as though `simul_kbytes`
-    /// has been allocated, if it is None, then this performs one indivisible gc step.
+    /// Returns true if this has finished a collection cycle.
     pub fn gc_step(&self) -> Result<bool> {
         self.gc_step_kbytes(0)
     }
