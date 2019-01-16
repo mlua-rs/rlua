@@ -129,7 +129,8 @@ single VM instruction!
 
 Fourth, especially in the context of sharing the environment across separate
 sandboxed scripts, properly sandobxing can be quite difficult.  Some information
-on this can be found [here](http://lua-users.org/wiki/SandBoxes).
+on this (and also useful information about Lua sandboxing in general) can be
+found [here](http://lua-users.org/wiki/SandBoxes).
 
 In any case, sandboxing in this way may still be useful to protect against buggy
 (but non-malicious) scripts, and may even serve as a single *layer* of a larger
