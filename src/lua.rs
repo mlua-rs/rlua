@@ -129,7 +129,7 @@ impl Lua {
     ///
     /// In order to create Lua values, load and execute Lua code, or otherwise interact with the Lua
     /// state in any way, you must first call `Lua::context` and then call methods on the provided
-    /// [`Context]` parameter.
+    /// [`Context`] parameter.
     ///
     /// rlua uses reference types like `String` and `Table` which reference shared data in the Lua
     /// state.  These are special reference counted types that contain pointers to the main Lua
@@ -156,7 +156,7 @@ impl Lua {
     /// It is not possible to return types with this `'lua` context lifetime from the given
     /// callback, or store them outside of the callback in any way.  There is an escape hatch here,
     /// though: if you need to keep references to internal Lua values long-term, you can use the Lua
-    /// registry via `Lua::set_named_registry_value` and `Lua::create_registry_value`.
+    /// registry via [`Context::set_named_registry_value`] and [`Context::create_registry_value`].
     ///
     /// # Examples
     ///
@@ -174,6 +174,8 @@ impl Lua {
     /// ```
     ///
     /// [`Context`]: struct.Context.html
+    /// [`Context::set_named_registry_value`]: struct.Context.html#method.set_named_registry_value
+    /// [`Context::create_registry_value`]: struct.Context.html#method.create_registry_value
     pub fn context<F, R>(&self, f: F) -> R
     where
         F: FnOnce(Context) -> R,
