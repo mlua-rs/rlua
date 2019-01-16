@@ -117,9 +117,9 @@ malicious scripts.  Please understand that though PUC-Rio Lua is an extremely
 well written language runtime, it is still quite a lot of C code, and it is not
 commonly used with truly malicious scripts.  Take a look
 [here](https://www.lua.org/bugs.html) and count how many known bugs resulted in
-crashes in the interpreter.  Another small example: did you know there is a way
-to attack Lua tables to cause linear complexity in the table length operator?
-That this still counts as one VM instruction?
+memory unsafety in the interpreter.  Another small example: did you know there
+is a way to attack Lua tables to cause linear complexity in the table length
+operator?  That this still counts as one VM instruction?
 
 Third, if you provide an API to scripts, it can be very very difficult to secure
 that API.  Do all of your API functions have some maximum runtime?  Do any of
