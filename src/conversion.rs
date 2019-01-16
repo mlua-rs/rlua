@@ -36,7 +36,7 @@ impl<'lua> ToLua<'lua> for String<'lua> {
 impl<'lua> FromLua<'lua> for String<'lua> {
     fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<String<'lua>> {
         let ty = value.type_name();
-        lua.coerce_string(value)
+        lua.coerce_string(value)?
             .ok_or_else(|| Error::FromLuaConversionError {
                 from: ty,
                 to: "String",
@@ -151,7 +151,7 @@ impl<'lua> FromLua<'lua> for Error {
         match value {
             Value::Error(err) => Ok(err),
             val => Ok(Error::RuntimeError(
-                lua.coerce_string(val)
+                lua.coerce_string(val)?
                     .and_then(|s| Some(s.to_str().ok()?.to_owned()))
                     .unwrap_or_else(|| "<unprintable error>".to_owned()),
             )),
@@ -204,7 +204,7 @@ impl<'lua> FromLua<'lua> for StdString {
     fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<Self> {
         let ty = value.type_name();
         Ok(lua
-            .coerce_string(value)
+            .coerce_string(value)?
             .ok_or_else(|| Error::FromLuaConversionError {
                 from: ty,
                 to: "String",
@@ -231,7 +231,7 @@ impl<'lua> FromLua<'lua> for CString {
     fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<Self> {
         let ty = value.type_name();
         let string = lua
-            .coerce_string(value)
+            .coerce_string(value)?
             .ok_or_else(|| Error::FromLuaConversionError {
                 from: ty,
                 to: "CString",
@@ -276,19 +276,18 @@ macro_rules! lua_convert_int {
         impl<'lua> FromLua<'lua> for $x {
             fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<Self> {
                 let ty = value.type_name();
-                (if let Some(i) = lua.coerce_integer(value.clone()) {
+                (if let Some(i) = lua.coerce_integer(value.clone())? {
                     cast(i)
                 } else {
-                    cast(
-                        lua.coerce_number(value)
-                            .ok_or_else(|| Error::FromLuaConversionError {
-                                from: ty,
-                                to: stringify!($x),
-                                message: Some(
-                                    "expected number or string coercible to number".to_string(),
-                                ),
-                            })?,
-                    )
+                    cast(lua.coerce_number(value)?.ok_or_else(|| {
+                        Error::FromLuaConversionError {
+                            from: ty,
+                            to: stringify!($x),
+                            message: Some(
+                                "expected number or string coercible to number".to_string(),
+                            ),
+                        }
+                    })?)
                 })
                 .ok_or_else(|| Error::FromLuaConversionError {
                     from: ty,
@@ -324,7 +323,7 @@ macro_rules! lua_convert_float {
         impl<'lua> FromLua<'lua> for $x {
             fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<Self> {
                 let ty = value.type_name();
-                lua.coerce_number(value)
+                lua.coerce_number(value)?
                     .ok_or_else(|| Error::FromLuaConversionError {
                         from: ty,
                         to: stringify!($x),

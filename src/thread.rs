@@ -95,7 +95,7 @@ impl<'lua> Thread<'lua> {
             check_stack(thread_state, nargs + 1)?;
 
             for arg in args {
-                lua.push_value(arg);
+                lua.push_value(arg)?;
             }
             ffi::lua_xmove(lua.state, thread_state, nargs);
 

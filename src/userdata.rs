@@ -335,7 +335,7 @@ impl<'lua> AnyUserData<'lua> {
             let _sg = StackGuard::new(lua.state);
             assert_stack(lua.state, 2);
             lua.push_ref(&self.0);
-            lua.push_value(v);
+            lua.push_value(v)?;
             ffi::lua_setuservalue(lua.state, -2);
             Ok(())
         }

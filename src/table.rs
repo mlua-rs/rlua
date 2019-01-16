@@ -55,8 +55,8 @@ impl<'lua> Table<'lua> {
             assert_stack(lua.state, 6);
 
             lua.push_ref(&self.0);
-            lua.push_value(key);
-            lua.push_value(value);
+            lua.push_value(key)?;
+            lua.push_value(value)?;
 
             unsafe extern "C" fn set_table(state: *mut ffi::lua_State) -> c_int {
                 ffi::lua_settable(state, -3);
@@ -99,7 +99,7 @@ impl<'lua> Table<'lua> {
             assert_stack(lua.state, 5);
 
             lua.push_ref(&self.0);
-            lua.push_value(key);
+            lua.push_value(key)?;
 
             unsafe extern "C" fn get_table(state: *mut ffi::lua_State) -> c_int {
                 ffi::lua_gettable(state, -2);
@@ -121,7 +121,7 @@ impl<'lua> Table<'lua> {
             assert_stack(lua.state, 5);
 
             lua.push_ref(&self.0);
-            lua.push_value(key);
+            lua.push_value(key)?;
 
             unsafe extern "C" fn get_table(state: *mut ffi::lua_State) -> c_int {
                 ffi::lua_gettable(state, -2);
@@ -145,8 +145,8 @@ impl<'lua> Table<'lua> {
             assert_stack(lua.state, 6);
 
             lua.push_ref(&self.0);
-            lua.push_value(key);
-            lua.push_value(value);
+            lua.push_value(key)?;
+            lua.push_value(value)?;
 
             unsafe extern "C" fn raw_set(state: *mut ffi::lua_State) -> c_int {
                 ffi::lua_rawset(state, -3);
@@ -167,7 +167,7 @@ impl<'lua> Table<'lua> {
             assert_stack(lua.state, 3);
 
             lua.push_ref(&self.0);
-            lua.push_value(key);
+            lua.push_value(key)?;
             ffi::lua_rawget(lua.state, -2);
             lua.pop_value()
         };
@@ -359,7 +359,7 @@ where
                     assert_stack(lua.state, 6);
 
                     lua.push_ref(&self.table);
-                    lua.push_value(next_key);
+                    lua.push_value(next_key)?;
 
                     if protect_lua_closure(lua.state, 2, ffi::LUA_MULTRET, |state| {
                         ffi::lua_next(state, -2) != 0

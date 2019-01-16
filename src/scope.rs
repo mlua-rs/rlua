@@ -248,7 +248,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
 
             for (k, m) in ud_methods.meta_methods {
                 push_string(lua.state, k.name())?;
-                lua.push_value(Value::Function(wrap_method(self, data.clone(), m)?));
+                lua.push_value(Value::Function(wrap_method(self, data.clone(), m)?))?;
 
                 protect_lua_closure(lua.state, 3, 1, |state| {
                     ffi::lua_rawset(state, -3);
@@ -263,7 +263,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
                 })?;
                 for (k, m) in ud_methods.methods {
                     push_string(lua.state, &k)?;
-                    lua.push_value(Value::Function(wrap_method(self, data.clone(), m)?));
+                    lua.push_value(Value::Function(wrap_method(self, data.clone(), m)?))?;
                     protect_lua_closure(lua.state, 3, 1, |state| {
                         ffi::lua_rawset(state, -3);
                     })?;

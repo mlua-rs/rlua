@@ -70,7 +70,7 @@ impl<'lua> Function<'lua> {
             let stack_start = ffi::lua_gettop(lua.state);
             lua.push_ref(&self.0);
             for arg in args {
-                lua.push_value(arg);
+                lua.push_value(arg)?;
             }
             let ret = ffi::lua_pcall(lua.state, nargs, ffi::LUA_MULTRET, stack_start);
             if ret != ffi::LUA_OK {
@@ -151,7 +151,7 @@ impl<'lua> Function<'lua> {
             lua.push_ref(&self.0);
             ffi::lua_pushinteger(lua.state, nargs as ffi::lua_Integer);
             for arg in args {
-                lua.push_value(arg);
+                lua.push_value(arg)?;
             }
 
             protect_lua_closure(lua.state, nargs + 2, 1, |state| {

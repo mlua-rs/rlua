@@ -180,7 +180,7 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
         if let Some(p) = (*panic).0.take() {
             resume_unwind(p);
         } else {
-            rlua_abort!("error during panic handling, panic was resumed twice")
+            rlua_panic!("error during panic handling, panic was resumed twice")
         }
     } else {
         let err_string = to_string(state, -1).into_owned();
@@ -203,11 +203,7 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
                 // between that and "ordinary" runtime errors, we handle them the same way.
                 Error::RuntimeError(err_string)
             }
-            ffi::LUA_ERRMEM => {
-                // This should be impossible, as we set the lua allocator to one that aborts
-                // instead of failing.
-                rlua_abort!("impossible Lua allocation error")
-            }
+            ffi::LUA_ERRMEM => Error::MemoryError(err_string),
             ffi::LUA_ERRGCMM => Error::GarbageCollectorError(err_string),
             _ => rlua_panic!("unrecognized lua error code"),
         }
@@ -510,14 +506,14 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
 
 // Pushes a WrappedError to the top of the stack.  Uses two stack spaces and does not call
 // lua_checkstack.
-pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) {
-    gc_guard(state, || {
-        let ud = ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as *mut WrappedError;
-        ptr::write(ud, WrappedError(err))
-    });
-
+pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) -> Result<()> {
+    let ud = protect_lua_closure(state, 0, 1, move |state| {
+        ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as *mut WrappedError
+    })?;
+    ptr::write(ud, WrappedError(err));
     get_error_metatable(state);
     ffi::lua_setmetatable(state, -2);
+    Ok(())
 }
 
 // Checks if the value at the given index is a WrappedError, and if it is returns a pointer to it,
@@ -540,23 +536,6 @@ pub unsafe fn get_wrapped_error(state: *mut ffi::lua_State, index: c_int) -> *co
         &(*get_userdata::<WrappedError>(state, -1)).0
     } else {
         ptr::null()
-    }
-}
-
-// Runs the given function with the Lua garbage collector disabled.  `rlua` assumes that all
-// allocation failures are aborts, so when the garbage collector is disabled, 'm' functions that can
-// cause either an allocation error or a a `__gc` metamethod error are prevented from causing errors
-// at all.  The given function should never panic or longjmp, because this could inadverntently
-// disable the gc.  This is useful when error handling must allocate, and `__gc` errors at that time
-// would shadow more important errors, or be extremely difficult to handle safely.
-pub unsafe fn gc_guard<R, F: FnOnce() -> R>(state: *mut ffi::lua_State, f: F) -> R {
-    if ffi::lua_gc(state, ffi::LUA_GCISRUNNING, 0) != 0 {
-        ffi::lua_gc(state, ffi::LUA_GCSTOP, 0);
-        let r = f();
-        ffi::lua_gc(state, ffi::LUA_GCRESTART, 0);
-        r
-    } else {
-        f()
     }
 }
 

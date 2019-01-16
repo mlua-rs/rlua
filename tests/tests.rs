@@ -379,28 +379,34 @@ fn test_result_conversions() {
 fn test_num_conversion() {
     Lua::new().context(|lua| {
         assert_eq!(
-            lua.coerce_integer(Value::String(lua.create_string("1").unwrap())),
+            lua.coerce_integer(Value::String(lua.create_string("1").unwrap()))
+                .unwrap(),
             Some(1)
         );
         assert_eq!(
-            lua.coerce_integer(Value::String(lua.create_string("1.0").unwrap())),
+            lua.coerce_integer(Value::String(lua.create_string("1.0").unwrap()))
+                .unwrap(),
             Some(1)
         );
         assert_eq!(
-            lua.coerce_integer(Value::String(lua.create_string("1.5").unwrap())),
+            lua.coerce_integer(Value::String(lua.create_string("1.5").unwrap()))
+                .unwrap(),
             None
         );
 
         assert_eq!(
-            lua.coerce_number(Value::String(lua.create_string("1").unwrap())),
+            lua.coerce_number(Value::String(lua.create_string("1").unwrap()))
+                .unwrap(),
             Some(1.0)
         );
         assert_eq!(
-            lua.coerce_number(Value::String(lua.create_string("1.0").unwrap())),
+            lua.coerce_number(Value::String(lua.create_string("1.0").unwrap()))
+                .unwrap(),
             Some(1.0)
         );
         assert_eq!(
-            lua.coerce_number(Value::String(lua.create_string("1.5").unwrap())),
+            lua.coerce_number(Value::String(lua.create_string("1.5").unwrap()))
+                .unwrap(),
             Some(1.5)
         );
 

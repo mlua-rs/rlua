@@ -20,7 +20,7 @@ use crate::thread::Thread;
 use crate::types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
 use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use crate::util::{
-    assert_stack, callback_error, check_stack, gc_guard, get_userdata, get_wrapped_error,
+    assert_stack, callback_error, check_stack, get_userdata, get_wrapped_error,
     init_userdata_metatable, pop_error, protect_lua, protect_lua_closure, push_string,
     push_userdata, push_wrapped_error, StackGuard,
 };
@@ -102,8 +102,8 @@ impl<'lua> Context<'lua> {
             protect_lua(self.state, 0, new_table)?;
 
             for (k, v) in cont {
-                self.push_value(k.to_lua(self)?);
-                self.push_value(v.to_lua(self)?);
+                self.push_value(k.to_lua(self)?)?;
+                self.push_value(v.to_lua(self)?)?;
                 unsafe extern "C" fn raw_set(state: *mut ffi::lua_State) -> c_int {
                     ffi::lua_rawset(state, -3);
                     1
@@ -268,22 +268,23 @@ impl<'lua> Context<'lua> {
     ///
     /// To succeed, the value must be a string (in which case this is a no-op), an integer, or a
     /// number.
-    pub fn coerce_string(self, v: Value<'lua>) -> Option<String<'lua>> {
-        match v {
+    pub fn coerce_string(self, v: Value<'lua>) -> Result<Option<String<'lua>>> {
+        Ok(match v {
             Value::String(s) => Some(s),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
                 assert_stack(self.state, 4);
 
-                self.push_value(v);
-                let s = gc_guard(self.state, || ffi::lua_tostring(self.state, -1));
-                if s.is_null() {
-                    None
-                } else {
+                self.push_value(v)?;
+                if protect_lua_closure(self.state, 1, 1, |state| {
+                    !ffi::lua_tostring(state, -1).is_null()
+                })? {
                     Some(String(self.pop_ref()))
+                } else {
+                    None
                 }
             },
-        }
+        })
     }
 
     /// Attempts to coerce a Lua value into an integer in a manner consistent with Lua's internal
@@ -292,14 +293,14 @@ impl<'lua> Context<'lua> {
     /// To succeed, the value must be an integer, a floating point number that has an exact
     /// representation as an integer, or a string that can be converted to an integer. Refer to the
     /// Lua manual for details.
-    pub fn coerce_integer(self, v: Value<'lua>) -> Option<Integer> {
-        match v {
+    pub fn coerce_integer(self, v: Value<'lua>) -> Result<Option<Integer>> {
+        Ok(match v {
             Value::Integer(i) => Some(i),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
                 assert_stack(self.state, 2);
 
-                self.push_value(v);
+                self.push_value(v)?;
                 let mut isint = 0;
                 let i = ffi::lua_tointegerx(self.state, -1, &mut isint);
                 if isint == 0 {
@@ -308,7 +309,7 @@ impl<'lua> Context<'lua> {
                     Some(i)
                 }
             },
-        }
+        })
     }
 
     /// Attempts to coerce a Lua value into a Number in a manner consistent with Lua's internal
@@ -316,14 +317,14 @@ impl<'lua> Context<'lua> {
     ///
     /// To succeed, the value must be a number or a string that can be converted to a number. Refer
     /// to the Lua manual for details.
-    pub fn coerce_number(self, v: Value<'lua>) -> Option<Number> {
-        match v {
+    pub fn coerce_number(self, v: Value<'lua>) -> Result<Option<Number>> {
+        Ok(match v {
             Value::Number(n) => Some(n),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
                 assert_stack(self.state, 2);
 
-                self.push_value(v);
+                self.push_value(v)?;
                 let mut isnum = 0;
                 let n = ffi::lua_tonumberx(self.state, -1, &mut isnum);
                 if isnum == 0 {
@@ -332,7 +333,7 @@ impl<'lua> Context<'lua> {
                     Some(n)
                 }
             },
-        }
+        })
     }
 
     /// Converts a value that implements `ToLua` into a `Value` instance.
@@ -366,7 +367,7 @@ impl<'lua> Context<'lua> {
             assert_stack(self.state, 5);
 
             push_string(self.state, name)?;
-            self.push_value(t);
+            self.push_value(t)?;
 
             unsafe extern "C" fn set_registry(state: *mut ffi::lua_State) -> c_int {
                 ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
@@ -418,10 +419,10 @@ impl<'lua> Context<'lua> {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 2);
 
-            self.push_value(t);
-            let registry_id = gc_guard(self.state, || {
-                ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX)
-            });
+            self.push_value(t)?;
+            let registry_id = protect_lua_closure(self.state, 1, 0, |state| {
+                ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX)
+            })?;
 
             Ok(RegistryKey {
                 registry_id,
@@ -511,7 +512,7 @@ impl<'lua> Context<'lua> {
     }
 
     // Uses 2 stack spaces, does not call checkstack
-    pub(crate) unsafe fn push_value(self, value: Value<'lua>) {
+    pub(crate) unsafe fn push_value(self, value: Value<'lua>) -> Result<()> {
         match value {
             Value::Nil => {
                 ffi::lua_pushnil(self.state);
@@ -554,9 +555,11 @@ impl<'lua> Context<'lua> {
             }
 
             Value::Error(e) => {
-                push_wrapped_error(self.state, e);
+                push_wrapped_error(self.state, e)?;
             }
         }
+
+        Ok(())
     }
 
     // Uses 2 stack spaces, does not call checkstack
@@ -676,7 +679,7 @@ impl<'lua> Context<'lua> {
         })?;
         for (k, m) in methods.meta_methods {
             push_string(self.state, k.name())?;
-            self.push_value(Value::Function(self.create_callback(m)?));
+            self.push_value(Value::Function(self.create_callback(m)?))?;
 
             protect_lua_closure(self.state, 3, 1, |state| {
                 ffi::lua_rawset(state, -3);
@@ -691,7 +694,7 @@ impl<'lua> Context<'lua> {
             })?;
             for (k, m) in methods.methods {
                 push_string(self.state, &k)?;
-                self.push_value(Value::Function(self.create_callback(m)?));
+                self.push_value(Value::Function(self.create_callback(m)?))?;
                 protect_lua_closure(self.state, 3, 1, |state| {
                     ffi::lua_rawset(state, -3);
                 })?;
@@ -701,9 +704,9 @@ impl<'lua> Context<'lua> {
             ffi::lua_pop(self.state, 1);
         }
 
-        let id = gc_guard(self.state, || {
-            ffi::luaL_ref(self.state, ffi::LUA_REGISTRYINDEX)
-        });
+        let id = protect_lua_closure(self.state, 1, 0, |state| {
+            ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX)
+        })?;
         (*extra_data(self.state))
             .registered_userdata
             .insert(TypeId::of::<T>(), id);
@@ -747,7 +750,7 @@ impl<'lua> Context<'lua> {
 
                 check_stack(state, nresults)?;
                 for r in results {
-                    context.push_value(r);
+                    context.push_value(r)?;
                 }
 
                 Ok(nresults)
@@ -832,7 +835,7 @@ impl<'lua> Context<'lua> {
             } {
                 ffi::LUA_OK => {
                     if let Some(env) = env {
-                        self.push_value(env);
+                        self.push_value(env)?;
                         ffi::lua_setupvalue(self.state, -2, 1);
                     }
                     Ok(Function(self.pop_ref()))

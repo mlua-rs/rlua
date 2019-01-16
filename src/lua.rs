@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::os::raw::{c_int, c_void};
 use std::rc::Rc;
+use std::str;
 use std::sync::{Arc, Mutex};
-use std::{ptr, str};
 
 use libc;
 
@@ -268,31 +268,7 @@ pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
 }
 
 unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
-    unsafe extern "C" fn allocator(
-        _: *mut c_void,
-        ptr: *mut c_void,
-        _: usize,
-        nsize: usize,
-    ) -> *mut c_void {
-        if nsize == 0 {
-            libc::free(ptr as *mut libc::c_void);
-            ptr::null_mut()
-        } else {
-            let p = libc::realloc(ptr as *mut libc::c_void, nsize);
-            if p.is_null() {
-                // We require that OOM results in an abort, and that the lua allocator function
-                // never errors.  Since this is what rust itself normally does on OOM, this is
-                // not really a huge loss.  Importantly, this allows us to turn off the gc, and
-                // then know that calling Lua API functions marked as 'm' will not result in a
-                // 'longjmp' error while the gc is off.
-                abort!("out of memory in rlua::Lua allocation, aborting!");
-            } else {
-                p as *mut c_void
-            }
-        }
-    }
-
-    let state = ffi::lua_newstate(allocator, ptr::null_mut());
+    let state = ffi::luaL_newstate();
 
     let ref_thread = rlua_expect!(
         protect_lua_closure(state, 0, 0, |state| {

@@ -1,6 +1,7 @@
 use std::error::Error as StdError;
 use std::fmt;
 use std::result::Result as StdResult;
+use std::string::String as StdString;
 use std::sync::Arc;
 
 /// Error type returned by `rlua` methods.
@@ -9,7 +10,7 @@ pub enum Error {
     /// Syntax error while parsing Lua source code.
     SyntaxError {
         /// The error message as returned by Lua.
-        message: String,
+        message: StdString,
         /// `true` if the error can likely be fixed by appending more input to the source code.
         ///
         /// This is useful for implementing REPLs as they can query the user for more input if this
@@ -21,11 +22,16 @@ pub enum Error {
     /// The Lua VM returns this error when a builtin operation is performed on incompatible types.
     /// Among other things, this includes invoking operators on wrong types (such as calling or
     /// indexing a `nil` value).
-    RuntimeError(String),
+    RuntimeError(StdString),
+    /// Lua memory error, aka `LUA_ERRMEM`
+    ///
+    /// The Lua VM returns this error when the allocator does not return the requested memory, aka
+    /// it is an out-of-memory error.
+    MemoryError(StdString),
     /// Lua garbage collector error, aka `LUA_ERRGCMM`.
     ///
     /// The Lua VM returns this error when there is an error running a `__gc` metamethod.
-    GarbageCollectorError(String),
+    GarbageCollectorError(StdString),
     /// A mutable callback has triggered Lua code that has called the same mutable callback again.
     ///
     /// This is an error because a mutable callback can only be borrowed mutably once.
@@ -52,7 +58,7 @@ pub enum Error {
         /// Name of the Lua type that could not be created.
         to: &'static str,
         /// A message indicating why the conversion failed in more detail.
-        message: Option<String>,
+        message: Option<StdString>,
     },
     /// A Lua value could not be converted to the expected Rust type.
     FromLuaConversionError {
@@ -61,7 +67,7 @@ pub enum Error {
         /// Name of the Rust type that could not be created.
         to: &'static str,
         /// A string containing more detailed error information.
-        message: Option<String>,
+        message: Option<StdString>,
     },
     /// [`Thread::resume`] was called on an inactive coroutine.
     ///
@@ -106,7 +112,7 @@ pub enum Error {
     /// A Rust callback returned `Err`, raising the contained `Error` as a Lua error.
     CallbackError {
         /// Lua call stack backtrace.
-        traceback: String,
+        traceback: StdString,
         /// Original error returned by the Rust code.
         cause: Arc<Error>,
     },
@@ -128,6 +134,9 @@ impl fmt::Display for Error {
         match *self {
             Error::SyntaxError { ref message, .. } => write!(fmt, "syntax error: {}", message),
             Error::RuntimeError(ref msg) => write!(fmt, "runtime error: {}", msg),
+            Error::MemoryError(ref msg) => {
+                write!(fmt, "memory error: {}", msg)
+            }
             Error::GarbageCollectorError(ref msg) => {
                 write!(fmt, "garbage collector error: {}", msg)
             }

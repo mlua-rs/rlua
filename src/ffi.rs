@@ -186,6 +186,7 @@ extern "C" {
     pub fn luaopen_debug(state: *mut lua_State) -> c_int;
     pub fn luaopen_package(state: *mut lua_State) -> c_int;
 
+    pub fn luaL_newstate() -> *mut lua_State;
     pub fn luaL_openlibs(state: *mut lua_State);
     pub fn luaL_requiref(
         state: *mut lua_State,

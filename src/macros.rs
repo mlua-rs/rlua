@@ -11,30 +11,6 @@ macro_rules! cstr {
     };
 }
 
-macro_rules! abort {
-    ($msg:expr) => {
-        {
-            eprintln!($msg);
-            ::std::process::abort()
-        }
-    };
-
-    ($msg:expr,) => {
-        abort!($msg);
-    };
-
-    ($msg:expr, $($arg:expr),+) => {
-        {
-            eprintln!($msg, $($arg),+);
-            ::std::process::abort()
-        }
-    };
-
-    ($msg:expr, $($arg:expr),+,) => {
-        abort!($msg, $($arg),+);
-    };
-}
-
 macro_rules! rlua_panic {
     ($msg:expr) => {
         panic!(bug_msg!(": ", $msg));
@@ -86,28 +62,6 @@ macro_rules! rlua_debug_assert {
 
     ($cond:expr, $msg:expr, $($arg:expr),+,) => {
         rlua_debug_assert!($cond, $msg, $($arg),+);
-    };
-}
-
-macro_rules! rlua_abort {
-    ($msg:expr) => {
-        {
-            abort!(bug_msg!(", aborting! ", $msg));
-        }
-    };
-
-    ($msg:expr,) => {
-        rlua_abort!($msg);
-    };
-
-    ($msg:expr, $($arg:expr),+) => {
-        {
-            abort!(bug_msg!(", aborting! ", $msg), $($arg),+);
-        }
-    };
-
-    ($msg:expr, $($arg:expr),+,) => {
-        rlua_abort!($msg, $($arg),+);
     };
 }
 
