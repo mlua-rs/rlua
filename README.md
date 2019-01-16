@@ -122,11 +122,11 @@ unsafety in the interpreter.  Another small example: did you know there is a way
 to attack Lua tables to cause linear complexity in the table length operator?
 That this still counts as one VM instruction?
 
-Third, if you provide an API to scripts, it can be very very difficult to secure
-that API.  Do all of your API functions have some maximum runtime?  Do any of
-your API functions allow the script to allocate via Rust?  Are there limits on
-how much they can allocate this way?  All callback functions still count as a
-single VM instruction!
+Third, if you provide a callback API to scripts, it can be very very difficult
+to secure that API.  Do all of your API functions have some maximum runtime?  Do
+any of your API functions allow the script to allocate via Rust?  Are there
+limits on how much they can allocate this way?  All callback functions still
+count as a single VM instruction!
 
 Fourth, especially in the context of sharing the environment across separate
 sandboxed scripts, properly sandobxing Lua can be quite difficult.  Some
