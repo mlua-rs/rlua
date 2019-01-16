@@ -21,12 +21,14 @@ pub(crate) type Callback<'lua, 'a> =
 
 /// An auto generated key into the Lua registry.
 ///
-/// This is a handle to a value stored inside the Lua registry.  It is not directly usable like the
-/// `Table` or `Function` handle types, but since it doesn't hold a reference to a parent Lua and is
-/// Send + Sync + 'static, it is much more flexible and can be used in many situations where it is
-/// impossible to directly store a normal handle type.  It is not automatically garbage collected on
-/// Drop, but it can be removed with [`Context::remove_registry_value`], and instances not manually
-/// removed can be garbage collected with [`Context::expire_registry_values`].
+/// This is a handle to a value stored inside the Lua registry.  Unlike the `Table` or `Function`
+/// handle types, this handle is `Send + Sync + 'static` and can be returned outside of a call to
+/// `Lua::context`.  Also, rather than calling methods directly on it, you must instead retrieve the
+/// value first by calling [`Context::registry_value`] inside a call to `Lua::context`.
+///
+/// It is not automatically garbage collected on Drop, but it can be removed with
+/// [`Context::remove_registry_value`], and instances not manually removed can be garbage collected
+/// with [`Context::expire_registry_values`].
 ///
 /// Be warned, If you place this into Lua via a `UserData` type or a rust callback, it is *very
 /// easy* to accidentally cause reference cycles that the Lua garbage collector cannot resolve.
@@ -34,6 +36,7 @@ pub(crate) type Callback<'lua, 'a> =
 /// [`UserData::set_user_value`] / [`UserData::get_user_value`], and instead of moving a RegistryKey
 /// into a callback, prefer [`Context::scope`].
 ///
+/// [`Context::registry_value`]: struct.Context.html#method.registry_value
 /// [`Context::remove_registry_value`]: struct.Context.html#method.remove_registry_value
 /// [`Context::expire_registry_values`]: struct.Context.html#method.expire_registry_values
 /// [`Context::scope`]: struct.Context.html#method.scope
