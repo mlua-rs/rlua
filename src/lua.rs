@@ -76,9 +76,8 @@ impl Drop for Lua {
                 "reference leak detected"
             );
             *rlua_expect!((*extra).registry_unref_list.lock(), "unref list poisoned") = None;
-            Box::from_raw(extra);
-
             ffi::lua_close(self.main_state);
+            Box::from_raw(extra);
         }
     }
 }
