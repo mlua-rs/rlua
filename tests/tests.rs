@@ -562,32 +562,6 @@ fn test_set_metatable_nil() {
 }
 
 #[test]
-fn test_gc_error() {
-    Lua::new().context(|lua| {
-        match lua
-            .load(
-                r#"
-                val = nil
-                table = {}
-                setmetatable(table, {
-                    __gc = function()
-                        error("gcwascalled")
-                    end
-                })
-                table = nil
-                collectgarbage("collect")
-            "#,
-            )
-            .exec()
-        {
-            Err(Error::GarbageCollectorError(_)) => {}
-            Err(e) => panic!("__gc error did not result in correct error, instead: {}", e),
-            Ok(()) => panic!("__gc error did not result in error"),
-        }
-    });
-}
-
-#[test]
 fn test_named_registry_value() {
     Lua::new().context(|lua| {
         lua.set_named_registry_value::<_, i32>("test", 42).unwrap();

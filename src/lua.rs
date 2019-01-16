@@ -255,6 +255,77 @@ impl Lua {
             (*extra_data(self.main_state)).memory_limit = memory_limit;
         }
     }
+
+    /// Returns true if the garbage collector is currently running automatically.
+    pub fn gc_is_running(&self) -> bool {
+        unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCISRUNNING, 0) != 0 }
+    }
+
+    /// Stop the Lua GC from running
+    pub fn gc_stop(&self) {
+        unsafe {
+            ffi::lua_gc(self.main_state, ffi::LUA_GCSTOP, 0);
+        }
+    }
+
+    /// Restarts the Lua GC if it is not running
+    pub fn gc_restart(&self) {
+        unsafe {
+            ffi::lua_gc(self.main_state, ffi::LUA_GCRESTART, 0);
+        }
+    }
+
+    /// Perform a full garbage-collection cycle.
+    ///
+    /// It may be necessary to call this function twice to collect all currently unreachable
+    /// objects.  Once to finish the current gc cycle, and once to start and finish the next cycle.
+    pub fn gc_collect(&self) -> Result<()> {
+        unsafe {
+            protect_lua_closure(self.main_state, 0, 0, |state| {
+                ffi::lua_gc(state, ffi::LUA_GCCOLLECT, 0);
+            })
+        }
+    }
+
+    /// Steps the garbage collector one indivisible step.
+    ///
+    /// If `simul_kbytes` is 0, then this performs garbage collection as though `simul_kbytes`
+    /// has been allocated, if it is None, then this performs one indivisible gc step.
+    pub fn gc_step(&self) -> Result<bool> {
+        self.gc_step_kbytes(0)
+    }
+
+    /// Steps the garbage collector as though memory had been allocated.
+    ///
+    /// if `kbytes` is 0, then this is the same as calling `gc_step`.  Returns true if this step has
+    /// finished a collection cycle.
+    pub fn gc_step_kbytes(&self, kbytes: c_int) -> Result<bool> {
+        unsafe {
+            protect_lua_closure(self.main_state, 0, 0, |state| {
+                ffi::lua_gc(state, ffi::LUA_GCSTEP, kbytes) != 0
+            })
+        }
+    }
+
+    /// Sets the 'pause' value of the collector.
+    ///
+    /// Returns the previous value of 'pause'.  More information can be found in the [Lua 5.3
+    /// documentation][lua_doc].
+    ///
+    /// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#2.5
+    pub fn gc_set_pause(&self, pause: c_int) -> c_int {
+        unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETPAUSE, pause) }
+    }
+
+    /// Sets the 'step multiplier' value of the collector.
+    ///
+    /// Returns the previous value of the 'step multiplier'.  More information can be found in the
+    /// [Lua 5.3 documentation][lua_doc].
+    ///
+    /// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#2.5
+    pub fn gc_set_step_multiplier(&self, step_multiplier: c_int) -> c_int {
+        unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETSTEPMUL, step_multiplier) }
+    }
 }
 
 impl Default for Lua {
