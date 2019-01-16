@@ -74,16 +74,16 @@ If you encounter them, a bug report would be very welcome:
     space!  There are a few ways to generate normal script errors by running out
     of stack, but if you encounter a *panic* based on running out of stack, this
     is a bug.
-  * If you load the "debug" library (which requires typing "unsafe"), every
-    safety / panic / abort guarantee goes out the window.  The debug library can
-    be used to do extremely scary things.  If you use the debug library and
-    encounter a bug, it may still very well be a bug, but try to find a
-    reproduction that does not involve the debug library first.
+  * If you load the "debug" library (which requires typing "unsafe"), the safety
+    and panic guarantees goes out the window.  The debug library can be used to
+    do extremely scary things.  If you use the debug library and encounter a
+    bug, it may still very well be a bug, but try to find a reproduction that
+    does not involve the debug library first.
   * When the internal version of Lua is built using the `gcc` crate, and
     `cfg!(debug_assertions)` is true, Lua is built with the `LUA_USE_APICHECK`
     define set.  Any abort caused by this internal Lua API checking is
     *absolutely* a bug, and is likely to be a soundness bug because without
-    `LUA_USE_APICHECK` it would likely lead to UB.
+    `LUA_USE_APICHECK` this would likely instead be UB.
   * Lua C API errors are handled by lonjmp.  *ALL* instances where the Lua C API
     would longjmp should be protected from Rust, except in internal callbacks
     where this is intentional.  If you detect that `rlua` is triggering a
