@@ -1,3 +1,29 @@
+## [0.16]
+- Small fixes for the way new `Lua` states are created, preventing some potential unhandled errors
+- Propery mark all internal panics as internal and indicative of a bug
+- HUGE API incompatible change: move most of the `Lua` API into `Context` and require context
+  callbacks to generate a branding lifetime, and use this branding lifetime on handle types.  Fixes
+  a hard to trigger soundness issue, and removes the only remaining API panic (that is not a bug).
+  See the documentation for the `Lua` type for more details.
+- Fix `error_traceback` to work in all cases (thanks @yasumutte!)
+- Use compiletest_rs on stable
+- API incompatible change: Change to use 2018 edition, `rlua` now requires rustc 1.31 to use.
+- Implement `ToLua` for `CStr` and `CString`, implement `FromLua` for `CString` (thanks @althonos!)
+- Add ability to control what std libraries are loaded in a Lua state on startup
+  (huge thanks to @Shiroy!)
+- Add ability to set the Lua "hook function", which allows for limiting the execution of running scripts
+  (huge thanks to @lemarcuspoilus!)
+- API incompatible change: remove `failure` as a dependency, `Error` no longer implements
+  `failure::Fail`.
+- API incompatible change: change the API for loading Lua chunks to allow for changing _ENV
+- API incompatible change: remove `str` assumptions from the remaining places: the `UserData` trait
+  and named registry keys
+- (Painstakingly!) remove the need for the `gc_guard` garbage collector hack, and thus also the
+  "abort on OOM" hack.
+- Add an API for memory limits, now possible because of removal of `gc_guard`.
+- Add an API for controlling the garbage collector, also now possible due to the removal of `gc_guard`.
+- Remove the last internal aborts from `rlua`, possible to make safe due to the removal of `gc_guard`.
+
 ## [0.15.3]
 - Fix improper num-traits dependency, proper [ui]128 support only added
   later in 0.2 series (thanks @sakridge for catching this!)
