@@ -3,8 +3,7 @@ use std::ops::Deref;
 use std::str;
 use std::sync::{Arc, Mutex};
 
-use rlua::HookTriggers;
-use rlua::{Error, Lua, Value};
+use rlua::{Error, HookTriggers, Lua, Value};
 
 #[test]
 fn line_counts() {

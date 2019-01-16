@@ -33,6 +33,7 @@ builtin-lua = ["cc"]
 system-lua = ["pkg-config"]
 
 [dependencies]
+libc = { version = "0.2" }
 num-traits = { version = "0.2.6" }
 bitflags = { version = "1.0.4" }
 

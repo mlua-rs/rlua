@@ -3,10 +3,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::os::raw::{c_int, c_void};
+use std::ptr;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use bitflags::bitflags;
+use libc;
 
 use crate::context::Context;
 use crate::error::Result;
@@ -240,6 +242,19 @@ impl Lua {
             ffi::lua_sethook(self.main_state, None, 0, 0);
         }
     }
+
+    /// Returns the memory currently used inside this Lua state.
+    pub fn used_memory(&self) -> usize {
+        unsafe { (*extra_data(self.main_state)).used_memory }
+    }
+
+    /// Sets a memory limit on this Lua state.  Once an allocation occurs that would pass this
+    /// memory limit, a `Error::MemoryError` is generated instead.
+    pub fn set_memory_limit(&self, memory_limit: Option<usize>) {
+        unsafe {
+            (*extra_data(self.main_state)).memory_limit = memory_limit;
+        }
+    }
 }
 
 impl Default for Lua {
@@ -258,6 +273,9 @@ pub(crate) struct ExtraData {
     pub ref_stack_max: c_int,
     pub ref_free: Vec<c_int>,
 
+    used_memory: usize,
+    memory_limit: Option<usize>,
+
     pub hook_callback: Option<Rc<RefCell<FnMut(Context, Debug) -> Result<()>>>>,
 }
 
@@ -266,9 +284,64 @@ pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
 }
 
 unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
-    let state = ffi::luaL_newstate();
+    unsafe extern "C" fn allocator(
+        extra_data: *mut c_void,
+        ptr: *mut c_void,
+        osize: usize,
+        nsize: usize,
+    ) -> *mut c_void {
+        let extra_data = extra_data as *mut ExtraData;
 
-    let ref_thread = rlua_expect!(
+        // If the `ptr` argument is null, osize instead encodes the allocated object type, which
+        // we currently ignore.
+        let new_used_memory = if ptr.is_null() {
+            (*extra_data).used_memory + nsize
+        } else if nsize >= osize {
+            (*extra_data).used_memory + (nsize - osize)
+        } else {
+            (*extra_data).used_memory - (osize - nsize)
+        };
+
+        if new_used_memory > (*extra_data).used_memory {
+            // We only check memory limits when memory is allocated, not freed
+            if let Some(memory_limit) = (*extra_data).memory_limit {
+                if new_used_memory > memory_limit {
+                    return ptr::null_mut();
+                }
+            }
+        }
+
+        if nsize == 0 {
+            (*extra_data).used_memory = new_used_memory;
+            libc::free(ptr as *mut libc::c_void);
+            ptr::null_mut()
+        } else {
+            let p = libc::realloc(ptr as *mut libc::c_void, nsize) as *mut c_void;
+            if !p.is_null() {
+                // Only commit the new used memory if the allocation was successful.  Probably in
+                // reality, libc::realloc will never fail.
+                (*extra_data).used_memory = new_used_memory;
+            }
+            p
+        }
+    }
+
+    let mut extra = Box::new(ExtraData {
+        registered_userdata: HashMap::new(),
+        registry_unref_list: Arc::new(Mutex::new(Some(Vec::new()))),
+        ref_thread: ptr::null_mut(),
+        // We need 1 extra stack space to move values in and out of the ref stack.
+        ref_stack_size: ffi::LUA_MINSTACK - 1,
+        ref_stack_max: 0,
+        ref_free: Vec::new(),
+        used_memory: 0,
+        memory_limit: None,
+        hook_callback: None,
+    });
+
+    let state = ffi::lua_newstate(allocator, &mut *extra as *mut ExtraData as *mut c_void);
+
+    extra.ref_thread = rlua_expect!(
         protect_lua_closure(state, 0, 0, |state| {
             // Do not open the debug library, it can be used to cause unsafety.
             if lua_mod_to_load.contains(StdLib::BASE) {
@@ -352,7 +425,6 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
 
             let ref_thread = ffi::lua_newthread(state);
             ffi::luaL_ref(state, ffi::LUA_REGISTRYINDEX);
-
             ref_thread
         }),
         "Error during Lua construction",
@@ -361,19 +433,8 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
     rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
     assert_stack(state, ffi::LUA_MINSTACK);
 
-    // Create ExtraData, and place it in the lua_State "extra space"
-
-    let extra = Box::into_raw(Box::new(ExtraData {
-        registered_userdata: HashMap::new(),
-        registry_unref_list: Arc::new(Mutex::new(Some(Vec::new()))),
-        ref_thread,
-        // We need 1 extra stack space to move values in and out of the ref stack.
-        ref_stack_size: ffi::LUA_MINSTACK - 1,
-        ref_stack_max: 0,
-        ref_free: Vec::new(),
-        hook_callback: None,
-    }));
-    *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = extra;
+    // Place pointer to ExtraData in the lua_State "extra space"
+    *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = Box::into_raw(extra);
 
     Lua {
         main_state: state,
