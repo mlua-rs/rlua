@@ -877,13 +877,13 @@ impl<'lua, 'a> Chunk<'lua, 'a> {
         Ok(self)
     }
 
-    /// Sets the first upvalue (_ENV) of the loaded chunk to the given value.
+    /// Sets the first upvalue (`_ENV`) of the loaded chunk to the given value.
     ///
     /// Lua main chunks always have exactly one upvalue, and this upvalue is used as the `_ENV`
     /// variable inside the chunk.  By default this value is set to the global environment.
     ///
-    /// Calling this method changes the _ENV upvalue to the value provided, and variables inside the
-    /// chunk will refer to the given environment rather than the global one.
+    /// Calling this method changes the `_ENV` upvalue to the value provided, and variables inside
+    /// the chunk will refer to the given environment rather than the global one.
     ///
     /// All global variables (including the standard library!) are looked up in `_ENV`, so it may be
     /// necessary to populate the environment in order for scripts using custom environments to be
