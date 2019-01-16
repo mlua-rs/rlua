@@ -195,7 +195,6 @@ impl Lua {
     /// Shows each line number of code being executed by the Lua interpreter.
     ///
     /// ```
-    /// # extern crate rlua;
     /// # use rlua::{Lua, HookTriggers, Result};
     /// # fn main() -> Result<()> {
     /// let lua = Lua::new();
