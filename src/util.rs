@@ -38,7 +38,7 @@ pub struct StackGuard {
 impl StackGuard {
     // Creates a StackGuard instance with wa record of the stack size, and on Drop will check the
     // stack size and drop any extra elements.  If the stack size at the end is *smaller* than at
-    // the beginning, this is considered a fatal logic error and will result in an abort.
+    // the beginning, this is considered a fatal logic error and will result in a panic.
     pub unsafe fn new(state: *mut ffi::lua_State) -> StackGuard {
         StackGuard {
             state,
@@ -546,7 +546,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
     // Create error metatable
 
     unsafe extern "C" fn error_tostring(state: *mut ffi::lua_State) -> c_int {
-        let (ptr, len) = callback_error(state, |_| {
+        let err_buf = callback_error(state, |_| {
             check_stack(state, 3)?;
             if let Some(error) = get_wrapped_error(state, -1).as_ref() {
                 ffi::lua_pushlightuserdata(
@@ -554,22 +554,27 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
                     &ERROR_PRINT_BUFFER_KEY as *const u8 as *mut c_void,
                 );
                 ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
-                let error_buffer = ffi::lua_touserdata(state, -1) as *mut String;
+                let err_buf = ffi::lua_touserdata(state, -1) as *mut String;
                 ffi::lua_pop(state, 2);
 
-                (*error_buffer).clear();
-                let _ = write!(&mut (*error_buffer), "{}", error);
-                Ok((
-                    (*error_buffer).as_ptr() as *const c_char,
-                    (*error_buffer).len(),
-                ))
+                (*err_buf).clear();
+                // Depending on how the API is used and what error types scripts are given, it may
+                // be possible to make this consume arbitrary amounts of memory (for example, some
+                // kind of recursive error structure?)
+                let _ = write!(&mut (*err_buf), "{}", error);
+                Ok(err_buf)
             } else {
-                // TODO: I'm not sure whether this is possible to trigger without bugs in rlua?
+                // I'm not sure whether this is possible to trigger without bugs in rlua?
                 Err(Error::UserDataTypeMismatch)
             }
         });
 
-        ffi::lua_pushlstring(state, ptr, len);
+        ffi::lua_pushlstring(
+            state,
+            (*err_buf).as_ptr() as *const c_char,
+            (*err_buf).len(),
+        );
+        (*err_buf).clear();
         1
     }
 
