@@ -15,7 +15,8 @@
   (huge thanks to @lemarcuspoilus!)
 - API incompatible change: remove `failure` as a dependency, `Error` no longer implements
   `failure::Fail`.
-- API incompatible change: change the API for loading Lua chunks to allow for changing _ENV
+- API incompatible change: change the API for loading Lua chunks to allow for changing _ENV.
+  `Context::load` now returns a builder on which you can set the chunk name and _ENV.
 - API incompatible change: remove `str` assumptions from the remaining places: the `UserData` trait
   and named registry keys
 - (Painstakingly!) remove the need for the `gc_guard` garbage collector hack, and thus also the
