@@ -40,12 +40,13 @@
 // warnings at all.
 #![doc(test(attr(deny(warnings))))]
 
-mod error;
-mod ffi;
 #[macro_use]
 mod macros;
+
 mod context;
 mod conversion;
+mod error;
+mod ffi;
 mod function;
 mod hook;
 mod lua;
