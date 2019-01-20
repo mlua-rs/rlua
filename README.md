@@ -69,8 +69,8 @@ If you encounter them, a bug report would be very welcome:
 
   * If you can cause UB at all with `rlua` without typing the word "unsafe",
     this is absolutely 100% a bug.
-  * If your code panics with a message that contains the string "rlua internal
-    error", this is a bug.
+  * If your program panics with a message that contains the string "rlua
+    internal error", this is a bug.
   * The above is true even for the internal panic about running out of stack
     space!  There are a few ways to generate normal script errors by running out
     of stack, but if you encounter a *panic* based on running out of stack, this
@@ -89,8 +89,8 @@ If you encounter them, a bug report would be very welcome:
     would otherwise longjmp over calling stack frames should be guarded against,
     except in internal callbacks where this is intentional.  If you detect that
     `rlua` is triggering a longjmp over your Rust stack frames, this is a bug!
-  * If you can somehow handle a panic in a Rust callback from Lua, this is a
-    bug.
+  * If you can somehow handle a panic triggered from a Rust callback in Lua,
+    this is a bug.
   * If you detect that, after catching a panic or during a Drop triggered from a
     panic, a `Lua` or handle method is triggering other bugs or there is a Lua
     stack space leak, this is a bug.  `rlua` instances are supposed to remain
