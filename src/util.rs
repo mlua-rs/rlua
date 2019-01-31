@@ -197,10 +197,10 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
                 }
             }
             ffi::LUA_ERRERR => {
-                // The Lua manual documents this error wrongly: It is not raised when a message
-                // handler errors, but rather when some specific situations regarding stack
-                // overflow handling occurs. Since it is not very useful do differentiate
-                // between that and "ordinary" runtime errors, we handle them the same way.
+                // This error is raised when the error handler raises an error too many times
+                // recursively, and continuing to trigger the error handler would cause a stack
+                // overflow.  It is not very useful to differentiate between this and "ordinary"
+                // runtime errors, so we handle them the same way.
                 Error::RuntimeError(err_string)
             }
             ffi::LUA_ERRMEM => Error::MemoryError(err_string),
