@@ -1,6 +1,5 @@
 use std::any::Any;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem;
 use std::os::raw::c_void;
@@ -335,15 +334,15 @@ enum NonStaticMethod<'lua, T> {
 }
 
 struct NonStaticUserDataMethods<'lua, T: UserData> {
-    methods: HashMap<Vec<u8>, NonStaticMethod<'lua, T>>,
-    meta_methods: HashMap<MetaMethod, NonStaticMethod<'lua, T>>,
+    methods: Vec<(Vec<u8>, NonStaticMethod<'lua, T>)>,
+    meta_methods: Vec<(MetaMethod, NonStaticMethod<'lua, T>)>,
 }
 
 impl<'lua, T: UserData> Default for NonStaticUserDataMethods<'lua, T> {
     fn default() -> NonStaticUserDataMethods<'lua, T> {
         NonStaticUserDataMethods {
-            methods: HashMap::new(),
-            meta_methods: HashMap::new(),
+            methods: Vec::new(),
+            meta_methods: Vec::new(),
         }
     }
 }
@@ -356,12 +355,12 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         R: ToLuaMulti<'lua>,
         M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>,
     {
-        self.methods.insert(
+        self.methods.push((
             name.as_ref().to_vec(),
             NonStaticMethod::Method(Box::new(move |lua, ud, args| {
                 method(lua, ud, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
-        );
+        ));
     }
 
     fn add_method_mut<S, A, R, M>(&mut self, name: &S, mut method: M)
@@ -371,12 +370,12 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         R: ToLuaMulti<'lua>,
         M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>,
     {
-        self.methods.insert(
+        self.methods.push((
             name.as_ref().to_vec(),
             NonStaticMethod::MethodMut(Box::new(move |lua, ud, args| {
                 method(lua, ud, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
-        );
+        ));
     }
 
     fn add_function<S, A, R, F>(&mut self, name: &S, function: F)
@@ -386,12 +385,12 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         R: ToLuaMulti<'lua>,
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
-        self.methods.insert(
+        self.methods.push((
             name.as_ref().to_vec(),
             NonStaticMethod::Function(Box::new(move |lua, args| {
                 function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
-        );
+        ));
     }
 
     fn add_function_mut<S, A, R, F>(&mut self, name: &S, mut function: F)
@@ -401,12 +400,12 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         R: ToLuaMulti<'lua>,
         F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>,
     {
-        self.methods.insert(
+        self.methods.push((
             name.as_ref().to_vec(),
             NonStaticMethod::FunctionMut(Box::new(move |lua, args| {
                 function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
-        );
+        ));
     }
 
     fn add_meta_method<A, R, M>(&mut self, meta: MetaMethod, method: M)
@@ -415,12 +414,12 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         R: ToLuaMulti<'lua>,
         M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>,
     {
-        self.meta_methods.insert(
+        self.meta_methods.push((
             meta,
             NonStaticMethod::Method(Box::new(move |lua, ud, args| {
                 method(lua, ud, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
-        );
+        ));
     }
 
     fn add_meta_method_mut<A, R, M>(&mut self, meta: MetaMethod, mut method: M)
@@ -429,12 +428,12 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         R: ToLuaMulti<'lua>,
         M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>,
     {
-        self.meta_methods.insert(
+        self.meta_methods.push((
             meta,
             NonStaticMethod::MethodMut(Box::new(move |lua, ud, args| {
                 method(lua, ud, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
-        );
+        ));
     }
 
     fn add_meta_function<A, R, F>(&mut self, meta: MetaMethod, function: F)
@@ -443,12 +442,12 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         R: ToLuaMulti<'lua>,
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
-        self.meta_methods.insert(
+        self.meta_methods.push((
             meta,
             NonStaticMethod::Function(Box::new(move |lua, args| {
                 function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
-        );
+        ));
     }
 
     fn add_meta_function_mut<A, R, F>(&mut self, meta: MetaMethod, mut function: F)
@@ -457,11 +456,11 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         R: ToLuaMulti<'lua>,
         F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>,
     {
-        self.meta_methods.insert(
+        self.meta_methods.push((
             meta,
             NonStaticMethod::FunctionMut(Box::new(move |lua, args| {
                 function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
-        );
+        ));
     }
 }

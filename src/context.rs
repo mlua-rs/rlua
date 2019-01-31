@@ -1,6 +1,5 @@
 use std::any::TypeId;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::ffi::CString;
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_int, c_void};
@@ -957,16 +956,16 @@ unsafe fn ref_stack_pop(extra: *mut ExtraData) -> c_int {
 }
 
 struct StaticUserDataMethods<'lua, T: 'static + UserData> {
-    methods: HashMap<Vec<u8>, Callback<'lua, 'static>>,
-    meta_methods: HashMap<MetaMethod, Callback<'lua, 'static>>,
+    methods: Vec<(Vec<u8>, Callback<'lua, 'static>)>,
+    meta_methods: Vec<(MetaMethod, Callback<'lua, 'static>)>,
     _type: PhantomData<T>,
 }
 
 impl<'lua, T: 'static + UserData> Default for StaticUserDataMethods<'lua, T> {
     fn default() -> StaticUserDataMethods<'lua, T> {
         StaticUserDataMethods {
-            methods: HashMap::new(),
-            meta_methods: HashMap::new(),
+            methods: Vec::new(),
+            meta_methods: Vec::new(),
             _type: PhantomData,
         }
     }
@@ -981,7 +980,7 @@ impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMet
         M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>,
     {
         self.methods
-            .insert(name.as_ref().to_vec(), Self::box_method(method));
+            .push((name.as_ref().to_vec(), Self::box_method(method)));
     }
 
     fn add_method_mut<S, A, R, M>(&mut self, name: &S, method: M)
@@ -992,7 +991,7 @@ impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMet
         M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>,
     {
         self.methods
-            .insert(name.as_ref().to_vec(), Self::box_method_mut(method));
+            .push((name.as_ref().to_vec(), Self::box_method_mut(method)));
     }
 
     fn add_function<S, A, R, F>(&mut self, name: &S, function: F)
@@ -1003,7 +1002,7 @@ impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMet
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
         self.methods
-            .insert(name.as_ref().to_vec(), Self::box_function(function));
+            .push((name.as_ref().to_vec(), Self::box_function(function)));
     }
 
     fn add_function_mut<S, A, R, F>(&mut self, name: &S, function: F)
@@ -1014,7 +1013,7 @@ impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMet
         F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>,
     {
         self.methods
-            .insert(name.as_ref().to_vec(), Self::box_function_mut(function));
+            .push((name.as_ref().to_vec(), Self::box_function_mut(function)));
     }
 
     fn add_meta_method<A, R, M>(&mut self, meta: MetaMethod, method: M)
@@ -1023,7 +1022,7 @@ impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMet
         R: ToLuaMulti<'lua>,
         M: 'static + Send + Fn(Context<'lua>, &T, A) -> Result<R>,
     {
-        self.meta_methods.insert(meta, Self::box_method(method));
+        self.meta_methods.push((meta, Self::box_method(method)));
     }
 
     fn add_meta_method_mut<A, R, M>(&mut self, meta: MetaMethod, method: M)
@@ -1032,7 +1031,7 @@ impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMet
         R: ToLuaMulti<'lua>,
         M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>,
     {
-        self.meta_methods.insert(meta, Self::box_method_mut(method));
+        self.meta_methods.push((meta, Self::box_method_mut(method)));
     }
 
     fn add_meta_function<A, R, F>(&mut self, meta: MetaMethod, function: F)
@@ -1041,7 +1040,7 @@ impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMet
         R: ToLuaMulti<'lua>,
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
-        self.meta_methods.insert(meta, Self::box_function(function));
+        self.meta_methods.push((meta, Self::box_function(function)));
     }
 
     fn add_meta_function_mut<A, R, F>(&mut self, meta: MetaMethod, function: F)
@@ -1051,7 +1050,7 @@ impl<'lua, T: 'static + UserData> UserDataMethods<'lua, T> for StaticUserDataMet
         F: 'static + Send + FnMut(Context<'lua>, A) -> Result<R>,
     {
         self.meta_methods
-            .insert(meta, Self::box_function_mut(function));
+            .push((meta, Self::box_function_mut(function)));
     }
 }
 
