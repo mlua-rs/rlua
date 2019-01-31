@@ -1,6 +1,10 @@
 macro_rules! bug_msg {
-    ($($arg:expr),*) => {
-        concat!("rlua internal error (this is a bug, please file an issue)", $($arg),*)
+    ($arg:expr) => {
+        concat!(
+            "rlua internal error: ",
+            $arg,
+            " (this is a bug, please file an issue)"
+        )
     };
 }
 
@@ -13,7 +17,7 @@ macro_rules! cstr {
 
 macro_rules! rlua_panic {
     ($msg:expr) => {
-        panic!(bug_msg!(": ", $msg));
+        panic!(bug_msg!($msg));
     };
 
     ($msg:expr,) => {
@@ -21,7 +25,7 @@ macro_rules! rlua_panic {
     };
 
     ($msg:expr, $($arg:expr),+) => {
-        panic!(bug_msg!(": ", $msg), $($arg),+);
+        panic!(bug_msg!($msg), $($arg),+);
     };
 
     ($msg:expr, $($arg:expr),+,) => {
@@ -31,7 +35,7 @@ macro_rules! rlua_panic {
 
 macro_rules! rlua_assert {
     ($cond:expr, $msg:expr) => {
-        assert!($cond, bug_msg!(": ", $msg));
+        assert!($cond, bug_msg!($msg));
     };
 
     ($cond:expr, $msg:expr,) => {
@@ -39,7 +43,7 @@ macro_rules! rlua_assert {
     };
 
     ($cond:expr, $msg:expr, $($arg:expr),+) => {
-        assert!($cond, bug_msg!(": ", $msg), $($arg),+);
+        assert!($cond, bug_msg!($msg), $($arg),+);
     };
 
     ($cond:expr, $msg:expr, $($arg:expr),+,) => {
@@ -49,7 +53,7 @@ macro_rules! rlua_assert {
 
 macro_rules! rlua_debug_assert {
     ($cond:expr, $msg:expr) => {
-        debug_assert!($cond, bug_msg!(": ", $msg));
+        debug_assert!($cond, bug_msg!($msg));
     };
 
     ($cond:expr, $msg:expr,) => {
@@ -57,7 +61,7 @@ macro_rules! rlua_debug_assert {
     };
 
     ($cond:expr, $msg:expr, $($arg:expr),+) => {
-        debug_assert!($cond, bug_msg!(": ", $msg), $($arg),+);
+        debug_assert!($cond, bug_msg!($msg), $($arg),+);
     };
 
     ($cond:expr, $msg:expr, $($arg:expr),+,) => {
@@ -67,7 +71,7 @@ macro_rules! rlua_debug_assert {
 
 macro_rules! rlua_expect {
     ($res:expr, $msg:expr) => {
-        $res.expect(bug_msg!(": ", $msg))
+        $res.expect(bug_msg!($msg))
     };
 
     ($res:expr, $msg:expr,) => {
