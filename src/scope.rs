@@ -19,8 +19,8 @@ use crate::util::{
 };
 use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 
-/// Constructed by the [`Context::scope`] method, allows temporarily passing to Lua userdata that is
-/// !Send, and callbacks that are !Send and not 'static.
+/// Constructed by the [`Context::scope`] method, allows temporarily creating Lua userdata and
+/// callbacks that are not required to be Send or 'static.
 ///
 /// See [`Context::scope`] for more details.
 ///
