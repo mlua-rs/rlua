@@ -825,18 +825,20 @@ impl<'lua> Context<'lua> {
             let source = source.as_ref();
 
             match if let Some(name) = name {
-                ffi::luaL_loadbuffer(
+                ffi::luaL_loadbufferx(
                     self.state,
                     source.as_ptr() as *const c_char,
                     source.len(),
                     name.as_ptr() as *const c_char,
+                    cstr!("t"),
                 )
             } else {
-                ffi::luaL_loadbuffer(
+                ffi::luaL_loadbufferx(
                     self.state,
                     source.as_ptr() as *const c_char,
                     source.len(),
                     ptr::null(),
+                    cstr!("t"),
                 )
             } {
                 ffi::LUA_OK => {

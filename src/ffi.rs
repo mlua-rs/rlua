@@ -332,15 +332,6 @@ pub unsafe fn lua_replace(state: *mut lua_State, index: c_int) {
     lua_pop(state, 1);
 }
 
-pub unsafe fn luaL_loadbuffer(
-    state: *mut lua_State,
-    buf: *const c_char,
-    size: usize,
-    name: *const c_char,
-) -> c_int {
-    luaL_loadbufferx(state, buf, size, name, ptr::null())
-}
-
 pub unsafe fn luaL_tostring(state: *mut lua_State, index: c_int) -> *const c_char {
     luaL_tolstring(state, index, ptr::null_mut())
 }
