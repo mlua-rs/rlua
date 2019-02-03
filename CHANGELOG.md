@@ -1,3 +1,10 @@
+## [0.16.2]
+- Documentation fixes
+- Performance improvement to scoped and non-scoped UserDataMethods.  Still could be much better,
+  further improvements coming eventually.
+- API incompatible change (soundness fix): Remove unintentional ability to load bytecode via
+  `Context::load`.  Now only loads text source, bytecode can cause UB in the Lua VM.
+
 ## [0.16.1]
 - Documentation fixes
 
