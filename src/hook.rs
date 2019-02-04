@@ -32,8 +32,8 @@ impl<'a> Debug<'a> {
                 "lua_getinfo failed with `n`"
             );
             DebugNames {
-                name: ptr_to_str((*self.ar).name as *const i8),
-                name_what: ptr_to_str((*self.ar).namewhat as *const i8),
+                name: ptr_to_str((*self.ar).name),
+                name_what: ptr_to_str((*self.ar).namewhat),
             }
         }
     }
@@ -46,11 +46,11 @@ impl<'a> Debug<'a> {
                 "lua_getinfo failed with `S`"
             );
             DebugSource {
-                source: ptr_to_str((*self.ar).source as *const i8),
-                short_src: ptr_to_str((*self.ar).short_src.as_ptr() as *const i8),
+                source: ptr_to_str((*self.ar).source),
+                short_src: ptr_to_str((*self.ar).short_src.as_ptr()),
                 line_defined: (*self.ar).linedefined as i32,
                 last_line_defined: (*self.ar).lastlinedefined as i32,
-                what: ptr_to_str((*self.ar).what as *const i8),
+                what: ptr_to_str((*self.ar).what),
             }
         }
     }
