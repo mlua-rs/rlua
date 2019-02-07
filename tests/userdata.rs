@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use rlua::{ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods};
+use rlua::{
+    AnyUserData, ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods,
+};
 
 #[test]
 fn test_user_data() {
@@ -186,5 +188,55 @@ fn user_value() {
         ud.set_user_value("hello").unwrap();
         assert_eq!(ud.get_user_value::<String>().unwrap(), "hello");
         assert!(ud.get_user_value::<u32>().is_err());
+    });
+}
+
+#[test]
+fn test_functions() {
+    struct MyUserData(i64);
+
+    impl UserData for MyUserData {
+        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+            methods.add_function("get_value", |_, ud: AnyUserData| {
+                Ok(ud.borrow::<MyUserData>()?.0)
+            });
+            methods.add_function("set_value", |_, (ud, value): (AnyUserData, i64)| {
+                ud.borrow_mut::<MyUserData>()?.0 = value;
+                Ok(())
+            });
+            methods.add_function("get_constant", |_, ()| Ok(7));
+        }
+    }
+
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        let userdata = lua.create_userdata(MyUserData(42)).unwrap();
+        globals.set("userdata", userdata.clone()).unwrap();
+        lua.load(
+            r#"
+                function get_it()
+                    return userdata:get_value()
+                end
+
+                function set_it(i)
+                    return userdata:set_value(i)
+                end
+
+                function get_constant()
+                    return userdata.get_constant()
+                end
+            "#,
+        )
+        .exec()
+        .unwrap();
+        let get = globals.get::<_, Function>("get_it").unwrap();
+        let set = globals.get::<_, Function>("set_it").unwrap();
+        let get_constant = globals.get::<_, Function>("get_constant").unwrap();
+        assert_eq!(get.call::<_, i64>(()).unwrap(), 42);
+        userdata.borrow_mut::<MyUserData>().unwrap().0 = 64;
+        assert_eq!(get.call::<_, i64>(()).unwrap(), 64);
+        set.call::<_, ()>(100).unwrap();
+        assert_eq!(get.call::<_, i64>(()).unwrap(), 100);
+        assert_eq!(get_constant.call::<_, i64>(()).unwrap(), 7);
     });
 }

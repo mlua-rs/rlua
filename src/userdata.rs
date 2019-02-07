@@ -126,7 +126,9 @@ pub trait UserDataMethods<'lua, T: UserData> {
         M: 'static + Send + FnMut(Context<'lua>, &mut T, A) -> Result<R>;
 
     /// Add a regular method as a function which accepts generic arguments, the first argument will
-    /// always be a `UserData` of type T.
+    /// be a `UserData` of type T if the method is called with Lua method syntax:
+    /// `my_userdata:my_method(arg1, arg2)`, or it is passed in as the first argument:
+    /// `my_userdata.my_method(my_userdata, arg1, arg2)`.
     ///
     /// Prefer to use [`add_method`] or [`add_method_mut`] as they are easier to use.
     ///
@@ -139,8 +141,7 @@ pub trait UserDataMethods<'lua, T: UserData> {
         R: ToLuaMulti<'lua>,
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>;
 
-    /// Add a regular method as a mutable function which accepts generic arguments, the first
-    /// argument will always be a `UserData` of type T.
+    /// Add a regular method as a mutable function which accepts generic arguments.
     ///
     /// This is a version of [`add_function`] that accepts a FnMut argument.
     ///
