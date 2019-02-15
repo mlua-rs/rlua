@@ -118,6 +118,7 @@ extern "C" {
     pub fn lua_pushstring(state: *mut lua_State, s: *const c_char) -> *const c_char;
     pub fn lua_pushlightuserdata(state: *mut lua_State, data: *mut c_void);
     pub fn lua_pushcclosure(state: *mut lua_State, function: lua_CFunction, n: c_int);
+    pub fn lua_pushthread(state: *mut lua_State) -> c_int;
 
     pub fn lua_tointegerx(state: *mut lua_State, index: c_int, isnum: *mut c_int) -> lua_Integer;
     pub fn lua_tolstring(state: *mut lua_State, index: c_int, len: *mut usize) -> *const c_char;

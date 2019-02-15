@@ -234,6 +234,16 @@ impl<'lua> Context<'lua> {
         }
     }
 
+    /// Returns a handle to the active `Thread` for this `Context`.  For calls to `Lua::context`
+    /// this will be the main Lua thread, for `Context` parameters given to a callback, this will be
+    /// whatever Lua thread called the callback.
+    pub fn current_thread(self) -> Thread<'lua> {
+        unsafe {
+            ffi::lua_pushthread(self.state);
+            Thread(self.pop_ref())
+        }
+    }
+
     /// Calls the given function with a `Scope` parameter, giving the function the ability to create
     /// userdata and callbacks from rust types that are !Send or non-'static.
     ///
