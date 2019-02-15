@@ -822,3 +822,19 @@ fn chunk_env() {
         );
     });
 }
+
+#[test]
+fn context_thread() {
+    Lua::new().context(|lua_ctx| {
+        let f = lua_ctx
+            .load(
+                r#"
+                    local thread = ...
+                    assert(coroutine.running() == thread)
+                "#,
+            )
+            .into_function()
+            .unwrap();
+        f.call::<_, ()>(lua_ctx.current_thread()).unwrap();
+    });
+}
