@@ -49,6 +49,8 @@ mod error;
 mod ffi;
 mod function;
 mod hook;
+#[cfg(feature = "json")]
+mod json;
 mod lua;
 mod markers;
 mod multi;

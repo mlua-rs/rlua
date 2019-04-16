@@ -31,11 +31,13 @@ builtin-lua = ["cc"]
 # the final binary manually.  The builtin-lua and system-lua features are
 # mutually exclusive and enabling both will cause an error at build time.
 system-lua = ["pkg-config"]
+json = ["serde_json"]
 
 [dependencies]
 libc = { version = "0.2" }
 num-traits = { version = "0.2.6" }
 bitflags = { version = "1.0.4" }
+serde_json = { version = "1.0", optional = true }
 
 [build-dependencies]
 cc = { version = "1.0", optional = true }
