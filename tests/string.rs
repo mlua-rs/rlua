@@ -58,7 +58,7 @@ fn string_views() {
 
         assert_eq!(empty.to_str().unwrap(), "");
         assert_eq!(empty.as_bytes_with_nul(), &[0]);
-        assert_eq!(empty.as_bytes(), &[]);
+        assert_eq!(empty.as_bytes(), b"");
     });
 }
 

@@ -72,7 +72,7 @@ fn test_table() {
                 .sequence_values()
                 .collect::<Result<Vec<i64>>>()
                 .unwrap(),
-            vec![]
+            Vec::<i64>::new(),
         );
 
         // sequence_values should only iterate until the first border
