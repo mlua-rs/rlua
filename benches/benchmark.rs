@@ -1,4 +1,5 @@
-use criterion::Criterion;
+use criterion::{criterion_group, criterion_main, Criterion};
+
 use rlua::prelude::*;
 
 fn create_table(c: &mut Criterion) {
@@ -6,7 +7,9 @@ fn create_table(c: &mut Criterion) {
         b.iter_with_setup(
             || Lua::new(),
             |lua| -> Lua {
-                lua.create_table().unwrap();
+                lua.context(|ctx| {
+                    ctx.create_table().unwrap();
+                });
                 lua
             },
         );
@@ -18,12 +21,12 @@ fn create_array(c: &mut Criterion) {
         b.iter_with_setup(
             || Lua::new(),
             |lua| -> Lua {
-                {
-                    let table = lua.create_table().unwrap();
+                lua.context(|ctx| {
+                    let table = ctx.create_table().unwrap();
                     for i in 1..11 {
                         table.set(i, i).unwrap();
                     }
-                }
+                });
                 lua
             },
         );
@@ -35,13 +38,13 @@ fn create_string_table(c: &mut Criterion) {
         b.iter_with_setup(
             || Lua::new(),
             |lua| -> Lua {
-                {
-                    let table = lua.create_table().unwrap();
+                lua.context(|ctx| {
+                    let table = ctx.create_table().unwrap();
                     for &s in &["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] {
-                        let s = lua.create_string(s).unwrap();
+                        let s = ctx.create_string(s).unwrap();
                         table.set(s.clone(), s).unwrap();
                     }
-                }
+                });
                 lua
             },
         );
@@ -53,28 +56,28 @@ fn call_add_function(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let lua = Lua::new();
-                let f = {
-                    let f: LuaFunction = lua
-                        .eval(
+                let f = lua.context(|ctx| {
+                    let f: LuaFunction = ctx
+                        .load(
                             r#"
-                            function(a, b, c)
-                                return a + b + c
-                            end
-                        "#,
-                            None,
+                                function(a, b, c)
+                                    return a + b + c
+                                end
+                            "#,
                         )
+                        .eval()
                         .unwrap();
-                    lua.create_registry_value(f).unwrap()
-                };
+                    ctx.create_registry_value(f).unwrap()
+                });
                 (lua, f)
             },
             |(lua, f)| -> Lua {
-                {
-                    let add_function: LuaFunction = lua.registry_value(&f).unwrap();
+                lua.context(|ctx| {
+                    let add_function: LuaFunction = ctx.registry_value(&f).unwrap();
                     for i in 0..10 {
                         let _result: i64 = add_function.call((i, i + 1, i + 2)).unwrap();
                     }
-                }
+                });
                 lua
             },
         );
@@ -86,32 +89,32 @@ fn call_add_callback(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let lua = Lua::new();
-                let f = {
-                    let c: LuaFunction = lua
+                let f = lua.context(|ctx| {
+                    let c: LuaFunction = ctx
                         .create_function(|_, (a, b, c): (i64, i64, i64)| Ok(a + b + c))
                         .unwrap();
-                    lua.globals().set("callback", c).unwrap();
-                    let f: LuaFunction = lua
-                        .eval(
+                    ctx.globals().set("callback", c).unwrap();
+                    let f: LuaFunction = ctx
+                        .load(
                             r#"
-                            function()
-                                for i = 1,10 do
-                                    callback(i, i, i)
+                                function()
+                                    for i = 1,10 do
+                                        callback(i, i, i)
+                                    end
                                 end
-                            end
-                        "#,
-                            None,
+                            "#,
                         )
+                        .eval()
                         .unwrap();
-                    lua.create_registry_value(f).unwrap()
-                };
+                    ctx.create_registry_value(f).unwrap()
+                });
                 (lua, f)
             },
             |(lua, f)| -> Lua {
-                {
-                    let entry_function: LuaFunction = lua.registry_value(&f).unwrap();
+                lua.context(|ctx| {
+                    let entry_function: LuaFunction = ctx.registry_value(&f).unwrap();
                     entry_function.call::<_, ()>(()).unwrap();
-                }
+                });
                 lua
             },
         );
@@ -123,34 +126,34 @@ fn call_append_callback(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let lua = Lua::new();
-                let f = {
-                    let c: LuaFunction = lua
+                let f = lua.context(|ctx| {
+                    let c: LuaFunction = ctx
                         .create_function(|_, (a, b): (LuaString, LuaString)| {
                             Ok(format!("{}{}", a.to_str()?, b.to_str()?))
                         })
                         .unwrap();
-                    lua.globals().set("callback", c).unwrap();
-                    let f: LuaFunction = lua
-                        .eval(
+                    ctx.globals().set("callback", c).unwrap();
+                    let f: LuaFunction = ctx
+                        .load(
                             r#"
-                            function()
-                                for _ = 1,10 do
-                                    callback("a", "b")
+                                function()
+                                    for _ = 1,10 do
+                                        callback("a", "b")
+                                    end
                                 end
-                            end
-                        "#,
-                            None,
+                            "#,
                         )
+                        .eval()
                         .unwrap();
-                    lua.create_registry_value(f).unwrap()
-                };
+                    ctx.create_registry_value(f).unwrap()
+                });
                 (lua, f)
             },
             |(lua, f)| -> Lua {
-                {
-                    let entry_function: LuaFunction = lua.registry_value(&f).unwrap();
+                lua.context(|ctx| {
+                    let entry_function: LuaFunction = ctx.registry_value(&f).unwrap();
                     entry_function.call::<_, ()>(()).unwrap();
-                }
+                });
                 lua
             },
         );
@@ -162,10 +165,12 @@ fn create_registry_values(c: &mut Criterion) {
         b.iter_with_setup(
             || Lua::new(),
             |lua| -> Lua {
-                for _ in 0..10 {
-                    lua.create_registry_value(lua.pack(true).unwrap()).unwrap();
-                }
-                lua.expire_registry_values();
+                lua.context(|ctx| {
+                    for _ in 0..10 {
+                        ctx.create_registry_value(ctx.pack(true).unwrap()).unwrap();
+                    }
+                    ctx.expire_registry_values();
+                });
                 lua
             },
         );
@@ -180,12 +185,12 @@ fn create_userdata(c: &mut Criterion) {
         b.iter_with_setup(
             || Lua::new(),
             |lua| -> Lua {
-                {
-                    let table: LuaTable = lua.create_table().unwrap();
+                lua.context(|ctx| {
+                    let table: LuaTable = ctx.create_table().unwrap();
                     for i in 1..11 {
                         table.set(i, UserData(i)).unwrap();
                     }
-                }
+                });
                 lua
             },
         );
