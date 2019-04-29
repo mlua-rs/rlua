@@ -1,6 +1,6 @@
 # rlua -- High level bindings between Rust and Lua
 
-[![Build Status](https://travis-ci.org/kyren/rlua.svg?branch=master)](https://travis-ci.org/kyren/rlua)
+[![Build Status](https://circleci.com/gh/kyren/rlua.svg?style=svg)](https://circleci.com/gh/kyren/rlua)
 [![Latest Version](https://img.shields.io/crates/v/rlua.svg)](https://crates.io/crates/rlua)
 [![API Documentation](https://docs.rs/rlua/badge.svg)](https://docs.rs/rlua)
 

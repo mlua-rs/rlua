@@ -17,7 +17,10 @@ jobs:
             - cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
           name: Check Formatting
-          command: cargo fmt --all -- --check
+          command: |
+              rustup component add rustfmt
+              rustfmt --version
+              cargo fmt --all -- --check --color=auto
       - run:
           name: Build all targets
           command: cargo build --all --all-targets
