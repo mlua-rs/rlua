@@ -1,3 +1,9 @@
+## [0.16.3]
+- Add a `Context::current_thread` method to get a reference to the `Thread`
+  backing a given `Context`.
+- Portability fix: Remove a needless cast, fixing builds targetting armv7.
+- Small documentation improvements, additional tests
+
 ## [0.16.2]
 - Documentation fixes
 - Performance improvement to scoped and non-scoped UserDataMethods.  Still could be much better,
