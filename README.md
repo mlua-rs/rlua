@@ -130,3 +130,7 @@ In any case, sandboxing in this way may still be useful to protect against buggy
 (but non-malicious) scripts, and may even serve as a single *layer* of a larger
 security strategy, but **please think twice before relying on this to protect
 you from untrusted Lua code**.
+
+## License
+
+This project is licensed under the [MIT license](LICENSE)
