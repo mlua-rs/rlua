@@ -429,6 +429,15 @@ impl<'lua> Context<'lua> {
     ///
     /// This value will be available to rust from all `Lua` instances which share the same main
     /// state.
+    ///
+    /// The returned [`RegistryKey`] is of `'static` lifetime and is *the* main way in `rlua` of
+    /// maintaining ownership of a Lua value outside of a [`Lua::context`] call.
+    ///
+    /// Be warned, garbage collection of values held inside the registry is not automatic, see
+    /// [`RegistryKey`] for more details.
+    ///
+    /// [`RegistryKey`]: struct.RegistryKey.html
+    /// [`Lua::context`]: struct.Lua.html#method.context
     pub fn create_registry_value<T: ToLua<'lua>>(self, t: T) -> Result<RegistryKey> {
         let t = t.to_lua(self)?;
         unsafe {
