@@ -3,6 +3,7 @@ use std::ffi::{CStr, CString};
 use std::hash::{BuildHasher, Hash};
 use std::string::String as StdString;
 
+use bstr::{BStr, BString};
 use num_traits::cast;
 
 use crate::context::Context;
@@ -252,6 +253,33 @@ impl<'lua> FromLua<'lua> for CString {
 impl<'lua, 'a> ToLua<'lua> for &'a CStr {
     fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
         Ok(Value::String(lua.create_string(self.to_bytes())?))
+    }
+}
+
+impl<'lua, 'a> ToLua<'lua> for BString {
+    fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
+        Ok(Value::String(lua.create_string(&self)?))
+    }
+}
+
+impl<'lua> FromLua<'lua> for BString {
+    fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<Self> {
+        let ty = value.type_name();
+        Ok(BString::from(
+            lua.coerce_string(value)?
+                .ok_or_else(|| Error::FromLuaConversionError {
+                    from: ty,
+                    to: "String",
+                    message: Some("expected string or number".to_string()),
+                })?
+                .as_bytes().to_vec(),
+        ))
+    }
+}
+
+impl<'lua, 'a> ToLua<'lua> for &BStr {
+    fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
+        Ok(Value::String(lua.create_string(&self)?))
     }
 }
 
