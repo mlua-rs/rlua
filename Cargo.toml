@@ -42,7 +42,7 @@ cc = { version = "1.0", optional = true }
 pkg-config = { version = "0.3.11", optional = true }
 
 [dev-dependencies]
-rustyline = "3.0.0"
+rustyline = "5.0"
 criterion = "0.2.0"
 compiletest_rs = { version = "0.3", features = ["stable"] }
 
