@@ -841,7 +841,6 @@ impl<'lua> Context<'lua> {
         unsafe {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 1);
-            let source = source.as_ref();
 
             match if let Some(name) = name {
                 ffi::luaL_loadbufferx(
@@ -931,7 +930,7 @@ impl<'lua, 'a> Chunk<'lua, 'a> {
         // "return", then as a statement.  This is the same thing the
         // actual lua repl does.
         let mut expression_source = b"return ".to_vec();
-        expression_source.extend(self.source.as_ref());
+        expression_source.extend(self.source);
         if let Ok(function) =
             self.context
                 .load_chunk(&expression_source, self.name.as_ref(), self.env.clone())
