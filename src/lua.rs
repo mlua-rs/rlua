@@ -125,6 +125,42 @@ impl Lua {
         create_lua(lua_mod)
     }
 
+    /// Loads the specified set of safe standard libraries into an existing Lua state.
+    ///
+    /// Use the [`StdLib`] flags to specifiy the libraries you want to load.
+    ///
+    /// Note that the `debug` library can't be loaded using this function as it can be used to break
+    /// the safety guarantees of rlua.  If you really want to load it, use the sister function
+    /// [`Lua::unsafe_load_from_std_lib`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `lua_mod` contains `StdLib::DEBUG`
+    pub fn load_from_std_lib(&self, lua_mod: StdLib) -> Result<()> {
+        assert!(
+            !lua_mod.contains(StdLib::DEBUG),
+            "The lua debug module can't be loaded using `load_from_std_lib`. Use `unsafe_load_from_std_lib` instead."
+        );
+
+        unsafe {
+            protect_lua_closure(self.main_state, 0, 0, |state| {
+                load_from_std_lib(state, lua_mod);
+            })
+        }
+    }
+
+    /// Loads the specified set of standard libraries into an existing Lua state.
+    ///
+    /// Use the [`StdLib`] flags to specifiy the libraries you want to load.
+    ///
+    /// This function is unsafe because it can be used to load the `debug` library which can be used
+    /// to break the safety guarantees provided by rlua.
+    pub unsafe fn unsafe_load_from_std_lib(&self, lua_mod: StdLib) -> Result<()> {
+        protect_lua_closure(self.main_state, 0, 0, |state| {
+            load_from_std_lib(state, lua_mod);
+        })
+    }
+
     /// The main entry point of the rlua API.
     ///
     /// In order to create Lua values, load and execute Lua code, or otherwise interact with the Lua
@@ -414,47 +450,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
 
     extra.ref_thread = rlua_expect!(
         protect_lua_closure(state, 0, 0, |state| {
-            // Do not open the debug library, it can be used to cause unsafety.
-            if lua_mod_to_load.contains(StdLib::BASE) {
-                ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
-                ffi::lua_pop(state, 1);
-            }
-            if lua_mod_to_load.contains(StdLib::COROUTINE) {
-                ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
-                ffi::lua_pop(state, 1);
-            }
-            if lua_mod_to_load.contains(StdLib::TABLE) {
-                ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
-                ffi::lua_pop(state, 1);
-            }
-            if lua_mod_to_load.contains(StdLib::IO) {
-                ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
-                ffi::lua_pop(state, 1);
-            }
-            if lua_mod_to_load.contains(StdLib::OS) {
-                ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
-                ffi::lua_pop(state, 1);
-            }
-            if lua_mod_to_load.contains(StdLib::STRING) {
-                ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
-                ffi::lua_pop(state, 1);
-            }
-            if lua_mod_to_load.contains(StdLib::UTF8) {
-                ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
-                ffi::lua_pop(state, 1);
-            }
-            if lua_mod_to_load.contains(StdLib::MATH) {
-                ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
-                ffi::lua_pop(state, 1);
-            }
-            if lua_mod_to_load.contains(StdLib::PACKAGE) {
-                ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
-                ffi::lua_pop(state, 1);
-            }
-            if lua_mod_to_load.contains(StdLib::DEBUG) {
-                ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
-                ffi::lua_pop(state, 1);
-            }
+            load_from_std_lib(state, lua_mod_to_load);
 
             init_error_registry(state);
 
@@ -510,6 +506,49 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
     Lua {
         main_state: state,
         _no_ref_unwind_safe: PhantomData,
+    }
+}
+
+unsafe fn load_from_std_lib(state: *mut ffi::lua_State, lua_mod: StdLib) {
+    if lua_mod.contains(StdLib::BASE) {
+        ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
+        ffi::lua_pop(state, 1);
+    }
+    if lua_mod.contains(StdLib::COROUTINE) {
+        ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
+        ffi::lua_pop(state, 1);
+    }
+    if lua_mod.contains(StdLib::TABLE) {
+        ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
+        ffi::lua_pop(state, 1);
+    }
+    if lua_mod.contains(StdLib::IO) {
+        ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
+        ffi::lua_pop(state, 1);
+    }
+    if lua_mod.contains(StdLib::OS) {
+        ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
+        ffi::lua_pop(state, 1);
+    }
+    if lua_mod.contains(StdLib::STRING) {
+        ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
+        ffi::lua_pop(state, 1);
+    }
+    if lua_mod.contains(StdLib::UTF8) {
+        ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
+        ffi::lua_pop(state, 1);
+    }
+    if lua_mod.contains(StdLib::MATH) {
+        ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
+        ffi::lua_pop(state, 1);
+    }
+    if lua_mod.contains(StdLib::PACKAGE) {
+        ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
+        ffi::lua_pop(state, 1);
+    }
+    if lua_mod.contains(StdLib::DEBUG) {
+        ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
+        ffi::lua_pop(state, 1);
     }
 }
 

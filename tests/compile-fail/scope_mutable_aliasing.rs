@@ -12,7 +12,7 @@ fn main() {
         lua.scope(|scope| {
             let a = scope.create_nonstatic_userdata(MyUserData(&mut i)).unwrap();
             let b = scope.create_nonstatic_userdata(MyUserData(&mut i)).unwrap();
-            //~^ error: cannot borrow `*i` as mutable more than once at a time
+            //~^ error: cannot borrow `i` as mutable more than once at a time
         });
     });
 }

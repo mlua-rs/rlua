@@ -14,8 +14,8 @@ fn main() {
 
                 scope
                     .create_function_mut(|_, ()| {
+                        //~^ error: closure may outlive the current function, but it borrows `test`, which is owned by the current function
                         test.field = 42;
-                        //~^ error: `test` does not live long enough
                         Ok(())
                     })
                     .unwrap()
