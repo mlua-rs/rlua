@@ -272,7 +272,8 @@ impl<'lua> FromLua<'lua> for BString {
                     to: "String",
                     message: Some("expected string or number".to_string()),
                 })?
-                .as_bytes().to_vec(),
+                .as_bytes()
+                .to_vec(),
         ))
     }
 }

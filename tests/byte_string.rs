@@ -1,5 +1,5 @@
-use rlua::Lua;
 use bstr::{BStr, BString};
+use rlua::Lua;
 
 #[test]
 fn byte_string_round_trip() {
@@ -52,14 +52,30 @@ fn byte_string_round_trip() {
         let aas = globals.get::<_, BString>("an_actual_string").unwrap();
         assert_eq!(aas, b"Hello, world!".as_ref());
 
-        globals.set::<_, &BStr>("bstr_invalid_sequence_identifier", isi.as_ref()).unwrap();
-        globals.set::<_, &BStr>("bstr_invalid_2_octet_sequence_2nd", i2os2.as_ref()).unwrap();
-        globals.set::<_, &BStr>("bstr_invalid_3_octet_sequence_2nd", i3os2.as_ref()).unwrap();
-        globals.set::<_, &BStr>("bstr_invalid_3_octet_sequence_3rd", i3os3.as_ref()).unwrap();
-        globals.set::<_, &BStr>("bstr_invalid_4_octet_sequence_2nd", i4os2.as_ref()).unwrap();
-        globals.set::<_, &BStr>("bstr_invalid_4_octet_sequence_3rd", i4os3.as_ref()).unwrap();
-        globals.set::<_, &BStr>("bstr_invalid_4_octet_sequence_4th", i4os4.as_ref()).unwrap();
-        globals.set::<_, &BStr>("bstr_an_actual_string", aas.as_ref()).unwrap();
+        globals
+            .set::<_, &BStr>("bstr_invalid_sequence_identifier", isi.as_ref())
+            .unwrap();
+        globals
+            .set::<_, &BStr>("bstr_invalid_2_octet_sequence_2nd", i2os2.as_ref())
+            .unwrap();
+        globals
+            .set::<_, &BStr>("bstr_invalid_3_octet_sequence_2nd", i3os2.as_ref())
+            .unwrap();
+        globals
+            .set::<_, &BStr>("bstr_invalid_3_octet_sequence_3rd", i3os3.as_ref())
+            .unwrap();
+        globals
+            .set::<_, &BStr>("bstr_invalid_4_octet_sequence_2nd", i4os2.as_ref())
+            .unwrap();
+        globals
+            .set::<_, &BStr>("bstr_invalid_4_octet_sequence_3rd", i4os3.as_ref())
+            .unwrap();
+        globals
+            .set::<_, &BStr>("bstr_invalid_4_octet_sequence_4th", i4os4.as_ref())
+            .unwrap();
+        globals
+            .set::<_, &BStr>("bstr_an_actual_string", aas.as_ref())
+            .unwrap();
 
         lua.load(
             r#"
@@ -76,14 +92,30 @@ fn byte_string_round_trip() {
         .exec()
         .unwrap();
 
-        globals.set::<_, BString>("bstring_invalid_sequence_identifier", isi).unwrap();
-        globals.set::<_, BString>("bstring_invalid_2_octet_sequence_2nd", i2os2).unwrap();
-        globals.set::<_, BString>("bstring_invalid_3_octet_sequence_2nd", i3os2).unwrap();
-        globals.set::<_, BString>("bstring_invalid_3_octet_sequence_3rd", i3os3).unwrap();
-        globals.set::<_, BString>("bstring_invalid_4_octet_sequence_2nd", i4os2).unwrap();
-        globals.set::<_, BString>("bstring_invalid_4_octet_sequence_3rd", i4os3).unwrap();
-        globals.set::<_, BString>("bstring_invalid_4_octet_sequence_4th", i4os4).unwrap();
-        globals.set::<_, BString>("bstring_an_actual_string", aas).unwrap();
+        globals
+            .set::<_, BString>("bstring_invalid_sequence_identifier", isi)
+            .unwrap();
+        globals
+            .set::<_, BString>("bstring_invalid_2_octet_sequence_2nd", i2os2)
+            .unwrap();
+        globals
+            .set::<_, BString>("bstring_invalid_3_octet_sequence_2nd", i3os2)
+            .unwrap();
+        globals
+            .set::<_, BString>("bstring_invalid_3_octet_sequence_3rd", i3os3)
+            .unwrap();
+        globals
+            .set::<_, BString>("bstring_invalid_4_octet_sequence_2nd", i4os2)
+            .unwrap();
+        globals
+            .set::<_, BString>("bstring_invalid_4_octet_sequence_3rd", i4os3)
+            .unwrap();
+        globals
+            .set::<_, BString>("bstring_invalid_4_octet_sequence_4th", i4os4)
+            .unwrap();
+        globals
+            .set::<_, BString>("bstring_an_actual_string", aas)
+            .unwrap();
 
         lua.load(
             r#"
