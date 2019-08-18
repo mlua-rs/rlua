@@ -111,8 +111,10 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
             let u = self.lua.make_userdata(data)?;
             self.destructors.borrow_mut().push((u.0.clone(), |u| {
                 let state = u.lua.state;
-                assert_stack(state, 1);
+                assert_stack(state, 2);
                 u.lua.push_ref(&u);
+                // We know the destructor has not run yet because we hold a reference to the
+                // userdata.
                 Box::new(take_userdata::<RefCell<T>>(state))
             }));
             Ok(u)
@@ -292,10 +294,11 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
         let mut destructors = self.destructors.borrow_mut();
         destructors.push((f.0.clone(), |f| {
             let state = f.lua.state;
-            assert_stack(state, 2);
+            assert_stack(state, 3);
             f.lua.push_ref(&f);
 
             ffi::lua_getupvalue(state, -1, 1);
+            // We know the destructor has not run yet because we hold a reference to the callback.
             let ud = take_userdata::<Callback>(state);
 
             ffi::lua_pushnil(state);
