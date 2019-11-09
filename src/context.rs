@@ -955,6 +955,13 @@ impl<'lua, 'a> Chunk<'lua, 'a> {
         self.context
             .load_chunk(self.source, self.name.as_ref(), self.env)
     }
+    
+    /// Gets source bytecode.
+    ///
+    /// This is read-only so as to prevent UB.
+    pub fn get_source(&self) -> Box<&[u8]> {
+        Box::new(self.source.clone())
+    }
 }
 
 unsafe fn ref_stack_pop(extra: *mut ExtraData) -> c_int {
