@@ -688,7 +688,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
 }
 
 struct WrappedError(pub Error);
-struct WrappedPanic(pub Option<Box<Any + Send>>);
+struct WrappedPanic(pub Option<Box<dyn Any + Send>>);
 
 // Converts the given lua value to a string in a reasonable format without causing a Lua error or
 // panicking.

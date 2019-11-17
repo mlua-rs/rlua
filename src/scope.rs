@@ -26,7 +26,7 @@ use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 /// [`Context::scope`]: struct.Context.html#method.scope
 pub struct Scope<'lua, 'scope> {
     lua: Context<'lua>,
-    destructors: RefCell<Vec<(LuaRef<'lua>, fn(LuaRef<'lua>) -> Box<Any>)>>,
+    destructors: RefCell<Vec<(LuaRef<'lua>, fn(LuaRef<'lua>) -> Box<dyn Any>)>>,
     _scope_invariant: Invariant<'scope>,
 }
 
@@ -330,10 +330,10 @@ impl<'lua, 'scope> Drop for Scope<'lua, 'scope> {
 }
 
 enum NonStaticMethod<'lua, T> {
-    Method(Box<Fn(Context<'lua>, &T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
-    MethodMut(Box<FnMut(Context<'lua>, &mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
-    Function(Box<Fn(Context<'lua>, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
-    FunctionMut(Box<FnMut(Context<'lua>, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
+    Method(Box<dyn Fn(Context<'lua>, &T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
+    MethodMut(Box<dyn FnMut(Context<'lua>, &mut T, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
+    Function(Box<dyn Fn(Context<'lua>, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
+    FunctionMut(Box<dyn FnMut(Context<'lua>, MultiValue<'lua>) -> Result<MultiValue<'lua>>>),
 }
 
 struct NonStaticUserDataMethods<'lua, T: UserData> {

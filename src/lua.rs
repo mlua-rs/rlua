@@ -383,7 +383,7 @@ pub(crate) struct ExtraData {
     used_memory: usize,
     memory_limit: Option<usize>,
 
-    pub hook_callback: Option<Rc<RefCell<FnMut(Context, Debug) -> Result<()>>>>,
+    pub hook_callback: Option<Rc<RefCell<dyn FnMut(Context, Debug) -> Result<()>>>>,
 }
 
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
