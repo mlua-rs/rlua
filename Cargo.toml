@@ -44,7 +44,7 @@ pkg-config = { version = "0.3.11", optional = true }
 
 [dev-dependencies]
 rustyline = "5.0"
-criterion = "0.2.0"
+criterion = "0.3.0"
 compiletest_rs = { version = "0.3", features = ["stable"] }
 
 [[bench]]
