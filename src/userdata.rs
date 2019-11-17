@@ -63,6 +63,8 @@ pub enum MetaMethod {
     ///
     /// This is not an operator, but will be called by methods such as `tostring` and `print`.
     ToString,
+    /// result of pairs(obj)
+    Pairs,
 }
 
 impl MetaMethod {
@@ -91,6 +93,7 @@ impl MetaMethod {
             MetaMethod::NewIndex => b"__newindex",
             MetaMethod::Call => b"__call",
             MetaMethod::ToString => b"__tostring",
+            MetaMethod::Pairs => b"__pairs",
         }
     }
 }
