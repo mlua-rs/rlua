@@ -1,3 +1,12 @@
+## [0.17]
+- API incompatible change: depend on `bstr` crate and implement `ToLua` /
+  `FromLua` for `BString` and `BStr` types (thanks @azdle!)
+- Add methods (`Lua::[unsafe]_load_from_stdlib` load from the Lua stdlib on an
+  existing instance (thanks @azdle!)
+- Actually print the cause error in `Error::CallbackError` (thanks @LPGhatguy!)
+- API incompatible change: Add `MetaMethod::Pairs` for the metamethod used by
+  the bult-in `pairs` function (thanks @steven-aerts!)
+
 ## [0.16.3]
 - Add a `Context::current_thread` method to get a reference to the `Thread`
   backing a given `Context`.
