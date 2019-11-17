@@ -63,7 +63,9 @@ pub enum MetaMethod {
     ///
     /// This is not an operator, but will be called by methods such as `tostring` and `print`.
     ToString,
-    /// result of pairs(obj)
+    /// The `__pairs` metamethod.
+    ///
+    /// This is not an operator, but it will be called by the built-in `pairs` function.
     Pairs,
 }
 
