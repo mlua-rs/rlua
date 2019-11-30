@@ -95,7 +95,7 @@ If you encounter them, a bug report would be very welcome:
 ## Sandboxing and Untrusted Scripts
 
 The API now contains the pieces necessary to implement simple, limited
-"sanboxing" of Lua scripts by controlling their environment, limiting their
+"sandboxing" of Lua scripts by controlling their environment, limiting their
 allotted VM instructions, and limiting the amount of memory they may allocate.
 
 These features deserve a few words of warning: **Do not use them to run
@@ -107,7 +107,7 @@ First, this library contains a huge amount of unsafe code, and I currently
 certainly bugs still lurking in this library!  It is surprisingly, fiendishly
 difficult to use the Lua C API without the potential for unsafety.
 
-Second, properly sandobxing Lua scripts can be quite difficult, much of the
+Second, properly sandboxing Lua scripts can be quite difficult, much of the
 stdlib is unsafe, and sometimes in surprising ways.  Some information on this
 can be found [here](http://lua-users.org/wiki/SandBoxes).
 
