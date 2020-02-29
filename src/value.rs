@@ -47,7 +47,7 @@ pub enum Value<'lua> {
 pub use self::Value::Nil;
 
 impl<'lua> Value<'lua> {
-    pub(crate) fn type_name(&self) -> &'static str {
+    pub fn type_name(&self) -> &'static str {
         match *self {
             Value::Nil => "nil",
             Value::Boolean(_) => "boolean",
