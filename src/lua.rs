@@ -8,7 +8,6 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use bitflags::bitflags;
-use libc;
 
 use crate::context::Context;
 use crate::error::Result;
@@ -390,6 +389,16 @@ pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
     *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
 }
 
+unsafe fn will_exceed_memory_limit(extra_data: *const ExtraData, new_used_memory: usize) -> bool {
+    if let Some(memory_limit) = (*extra_data).memory_limit {
+        if new_used_memory > memory_limit {
+            return true;
+        }
+    }
+
+    false
+}
+
 unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
     unsafe extern "C" fn allocator(
         extra_data: *mut c_void,
@@ -397,39 +406,77 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
         osize: usize,
         nsize: usize,
     ) -> *mut c_void {
+        use std::alloc;
+
+        // Copied from https://github.com/rust-lang/rust/blob/master/src/libstd/sys_common/alloc.rs
+        #[cfg(all(any(
+            target_arch = "x86",
+            target_arch = "arm",
+            target_arch = "mips",
+            target_arch = "powerpc",
+            target_arch = "powerpc64",
+            target_arch = "asmjs",
+            target_arch = "wasm32",
+            target_arch = "hexagon"
+        )))]
+        pub const MIN_ALIGN: usize = 8;
+        #[cfg(all(any(
+            target_arch = "x86_64",
+            target_arch = "aarch64",
+            target_arch = "mips64",
+            target_arch = "s390x",
+            target_arch = "sparc64",
+            target_arch = "riscv64"
+        )))]
+        pub const MIN_ALIGN: usize = 16;
+
         let extra_data = extra_data as *mut ExtraData;
-
-        // If the `ptr` argument is null, osize instead encodes the allocated object type, which
-        // we currently ignore.
-        let new_used_memory = if ptr.is_null() {
-            (*extra_data).used_memory + nsize
-        } else if nsize >= osize {
-            (*extra_data).used_memory + (nsize - osize)
-        } else {
-            (*extra_data).used_memory - (osize - nsize)
-        };
-
-        if new_used_memory > (*extra_data).used_memory {
-            // We only check memory limits when memory is allocated, not freed
-            if let Some(memory_limit) = (*extra_data).memory_limit {
-                if new_used_memory > memory_limit {
-                    return ptr::null_mut();
-                }
-            }
-        }
-
         if nsize == 0 {
-            (*extra_data).used_memory = new_used_memory;
-            libc::free(ptr as *mut libc::c_void);
+            // free(NULL) should be a no-op
+            if !ptr.is_null() {
+                let layout = alloc::Layout::from_size_align_unchecked(osize, MIN_ALIGN);
+                alloc::dealloc(ptr as *mut u8, layout);
+                (*extra_data).used_memory -= osize;
+            }
             ptr::null_mut()
         } else {
-            let p = libc::realloc(ptr as *mut libc::c_void, nsize) as *mut c_void;
-            if !p.is_null() {
-                // Only commit the new used memory if the allocation was successful.  Probably in
-                // reality, libc::realloc will never fail.
-                (*extra_data).used_memory = new_used_memory;
+            if ptr.is_null() {
+                // malloc, osize instead encodes the allocated object type, which we currently ignore.
+                let new_used_memory = (*extra_data).used_memory + nsize;
+                if will_exceed_memory_limit(extra_data, new_used_memory) {
+                    return ptr::null_mut();
+                }
+
+                let layout = alloc::Layout::from_size_align_unchecked(nsize, MIN_ALIGN);
+                let p = alloc::alloc(layout) as *mut c_void;
+                if !p.is_null() {
+                    (*extra_data).used_memory = new_used_memory;
+                }
+                p
+            } else {
+                // realloc, osize is previous size of allocated block
+                let new_used_memory = if nsize >= osize {
+                    (*extra_data).used_memory + (nsize - osize)
+                } else {
+                    (*extra_data).used_memory - (osize - nsize)
+                };
+
+                if will_exceed_memory_limit(extra_data, new_used_memory) {
+                    return ptr::null_mut();
+                }
+
+                let layout = alloc::Layout::from_size_align_unchecked(osize, MIN_ALIGN);
+                let p = alloc::realloc(ptr as *mut u8, layout, nsize) as *mut c_void;
+                if !p.is_null() {
+                    (*extra_data).used_memory = new_used_memory;
+                } else if nsize < osize {
+                    // Lua assumes that the allocator never fails when osize >= nsize.
+                    let failed_layout = alloc::Layout::from_size_align_unchecked(nsize, MIN_ALIGN);
+                    alloc::handle_alloc_error(failed_layout)
+                }
+
+                p
             }
-            p
         }
     }
 
