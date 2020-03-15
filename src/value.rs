@@ -51,7 +51,7 @@ impl<'lua> Value<'lua> {
         match *self {
             Value::Nil => "nil",
             Value::Boolean(_) => "boolean",
-            Value::LightUserData(_) => "light userdata",
+            Value::LightUserData(_) => "lightuserdata",
             Value::Integer(_) => "integer",
             Value::Number(_) => "number",
             Value::String(_) => "string",
