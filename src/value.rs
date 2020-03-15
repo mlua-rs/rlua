@@ -58,7 +58,8 @@ impl<'lua> Value<'lua> {
             Value::Table(_) => "table",
             Value::Function(_) => "function",
             Value::Thread(_) => "thread",
-            Value::UserData(_) | Value::Error(_) => "userdata",
+            Value::UserData(_) => "userdata",
+            Value::Error(_) => "error",
         }
     }
 }
