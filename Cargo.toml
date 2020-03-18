@@ -43,9 +43,9 @@ cc = { version = "1.0", optional = true }
 pkg-config = { version = "0.3.11", optional = true }
 
 [dev-dependencies]
-rustyline = "5.0"
+rustyline = "6.0"
 criterion = "0.3.0"
-compiletest_rs = { version = "0.3", features = ["stable"] }
+compiletest_rs = { version = "0.4", features = ["stable"] }
 
 [[bench]]
 name = "benchmark"
