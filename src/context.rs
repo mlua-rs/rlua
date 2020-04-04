@@ -929,12 +929,8 @@ impl<'lua, 'a> Chunk<'lua, 'a> {
         // First, try interpreting the lua as an expression by adding
         // "return", then as a statement.  This is the same thing the
         // actual lua repl does.
-        let mut expression_source = b"return ".to_vec();
-        expression_source.extend(self.source);
-        if let Ok(function) =
-            self.context
-                .load_chunk(&expression_source, self.name.as_ref(), self.env.clone())
-        {
+        let mut buf = Vec::with_capacity(b"return ".len() + self.source.len());
+        if let Ok(function) = Chunk::return_expr(&self, &mut buf).into_function() {
             function.call(())
         } else {
             self.call(())
@@ -950,10 +946,26 @@ impl<'lua, 'a> Chunk<'lua, 'a> {
 
     /// Load this chunk into a regular `Function`.
     ///
-    /// This simply compiles the chunk without actually executing it.  
+    /// This simply compiles the chunk without actually executing it.
     pub fn into_function(self) -> Result<Function<'lua>> {
         self.context
             .load_chunk(self.source, self.name.as_ref(), self.env)
+    }
+
+    /// Create a chunk based on the given expression chunk, that adds `return ` in front of the
+    /// chunk. The returned `Chunk` will have the lifetime of the `Vec` passed in.
+    ///
+    /// This function is mostly useful when combined with `into_function`, as it turns an
+    /// expression chunk into one that can be turned into a function.
+    pub fn return_expr<'b>(chunk: &Chunk<'lua, 'b>, buf: &'a mut Vec<u8>) -> Chunk<'lua, 'a> {
+        buf.extend(b"return ");
+        buf.extend(chunk.source);
+        Chunk {
+            context: chunk.context,
+            source: buf,
+            name: chunk.name.clone(),
+            env: chunk.env.clone(),
+        }
     }
 }
 
