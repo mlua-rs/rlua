@@ -114,6 +114,10 @@ fn test_metamethods() {
         assert_eq!(lua.load("userdata1:get()").eval::<i64>().unwrap(), 7);
         assert_eq!(lua.load("userdata2.inner").eval::<i64>().unwrap(), 3);
         assert!(lua.load("userdata2.nonexist_field").eval::<()>().is_err());
+
+        let ud1: AnyUserData = globals.get("userdata1").unwrap();
+        assert_eq!(ud1.get_metamethod(MetaMethod::Index).unwrap().type_name(), "function");
+        assert_eq!(ud1.get_metamethod(MetaMethod::Call).unwrap().type_name(), "nil");
     });
 }
 
