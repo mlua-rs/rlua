@@ -1,4 +1,5 @@
 use std::cell::{Ref, RefCell, RefMut};
+use std::os::raw::{c_int};
 
 use crate::context::Context;
 use crate::error::{Error, Result};
@@ -335,10 +336,11 @@ impl<'lua> AnyUserData<'lua> {
 
     /// Sets an associated value to this `AnyUserData`.
     ///
-    /// The value may be any Lua value whatsoever, and can be retrieved with [`get_user_value`].
+    /// The value may be any Lua value whatsoever, and can be retrieved with [`get_i_user_value`].
     ///
-    /// [`get_user_value`]: #method.get_user_value
-    pub fn set_user_value<V: ToLua<'lua>>(&self, v: V) -> Result<()> {
+    /// [`get_i_user_value`]: #method.get_i_user_value
+    // TODO: error-check the 'n' parameter
+    pub fn set_i_user_value<V: ToLua<'lua>>(&self, v: V, n: c_int) -> Result<()> {
         let lua = self.0.lua;
         let v = v.to_lua(lua)?;
         unsafe {
@@ -346,21 +348,22 @@ impl<'lua> AnyUserData<'lua> {
             assert_stack(lua.state, 2);
             lua.push_ref(&self.0);
             lua.push_value(v)?;
-            ffi::lua_setuservalue(lua.state, -2);
+            ffi::lua_setiuservalue(lua.state, -2, n);
             Ok(())
         }
     }
 
-    /// Returns an associated value set by [`set_user_value`].
+    /// Returns an associated value set by [`set_i_user_value`].
     ///
-    /// [`set_user_value`]: #method.set_user_value
-    pub fn get_user_value<V: FromLua<'lua>>(&self) -> Result<V> {
+    /// [`set_i_user_value`]: #method.set_i_user_value
+    // TODO: error-check the 'n' parameter
+    pub fn get_i_user_value<V: FromLua<'lua>>(&self, n: c_int) -> Result<V> {
         let lua = self.0.lua;
         let res = unsafe {
             let _sg = StackGuard::new(lua.state);
             assert_stack(lua.state, 3);
             lua.push_ref(&self.0);
-            ffi::lua_getuservalue(lua.state, -1);
+            ffi::lua_getiuservalue(lua.state, -1, n);
             lua.pop_value()
         };
         V::from_lua(res, lua)

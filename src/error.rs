@@ -28,10 +28,6 @@ pub enum Error {
     /// The Lua VM returns this error when the allocator does not return the requested memory, aka
     /// it is an out-of-memory error.
     MemoryError(StdString),
-    /// Lua garbage collector error, aka `LUA_ERRGCMM`.
-    ///
-    /// The Lua VM returns this error when there is an error running a `__gc` metamethod.
-    GarbageCollectorError(StdString),
     /// A mutable callback has triggered Lua code that has called the same mutable callback again.
     ///
     /// This is an error because a mutable callback can only be borrowed mutably once.
@@ -136,9 +132,6 @@ impl fmt::Display for Error {
             Error::RuntimeError(ref msg) => write!(fmt, "runtime error: {}", msg),
             Error::MemoryError(ref msg) => {
                 write!(fmt, "memory error: {}", msg)
-            }
-            Error::GarbageCollectorError(ref msg) => {
-                write!(fmt, "garbage collector error: {}", msg)
             }
             Error::RecursiveMutCallback => write!(fmt, "mutable callback called recursively"),
             Error::CallbackDestructed => write!(

@@ -343,22 +343,46 @@ impl Lua {
         }
     }
 
-    /// Sets the 'pause' value of the collector.
+    /// Sets the garbage collector to incremental mode.
     ///
-    /// Returns the previous value of 'pause'.  More information can be found in the [Lua 5.3
+    /// Returns the previous mode (`LUA_GCGEN` or `LUA_GCINC`).  More information can be found in the
+    /// [Lua 5.4 documentation][lua_doc].
+    ///
+    /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
+    pub fn gc_set_inc(&self, pause: c_int, step_multiplier: c_int, step_size: c_int) -> c_int {
+        unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCINC, pause, step_multiplier, step_size) }
+    }
+
+    /// Sets the garbage collector to generational mode.
+    ///
+    /// Returns the previous mode (`LUA_GCGEN` or `LUA_GCINC`).  More information can be found in the
+    /// [Lua 5.4 documentation][lua_doc].
+    ///
+    /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
+    pub fn gc_set_gen(&self, minor_multiplier: c_int, major_multiplier: c_int) -> c_int {
+        unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCGEN, minor_multiplier, major_multiplier) }
+    }
+
+    /// Sets the 'pause' value of the incremental collector.
+    ///
+    /// Returns the previous value of 'pause'.  More information can be found in the [Lua 5.4
     /// documentation][lua_doc].
     ///
-    /// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#2.5
+    /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
+    #[deprecated(note="please use `gc_set_inc` instead")]
+    #[allow(deprecated)]
     pub fn gc_set_pause(&self, pause: c_int) -> c_int {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETPAUSE, pause) }
     }
 
-    /// Sets the 'step multiplier' value of the collector.
+    /// Sets the 'step multiplier' value of the incremental collector.
     ///
     /// Returns the previous value of the 'step multiplier'.  More information can be found in the
-    /// [Lua 5.3 documentation][lua_doc].
+    /// [Lua 5.4 documentation][lua_doc].
     ///
-    /// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#2.5
+    /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
+    #[deprecated(note="please use `gc_set_inc` instead")]
+    #[allow(deprecated)]
     pub fn gc_set_step_multiplier(&self, step_multiplier: c_int) -> c_int {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETSTEPMUL, step_multiplier) }
     }

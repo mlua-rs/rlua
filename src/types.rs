@@ -37,15 +37,15 @@ pub(crate) type Callback<'lua, 'a> =
 /// and it if it is not droped, [`Context::expire_registry_values`] will never remove the value from
 /// the registry, leading to an uncollectable cycle.  Instead of placing a `RegistryKey` into Lua
 /// and relying on it being automatically dropped, prefer APIs which the Lua garbage collector
-/// understands, such as [`UserData::set_user_value`] / [`UserData::get_user_value`] for UserData
+/// understands, such as [`UserData::set_i_user_value`] / [`UserData::get_i_user_value`] for UserData
 /// types and [`Function::bind`] for callbacks.
 ///
 /// [`Context::registry_value`]: struct.Context.html#method.registry_value
 /// [`Context::remove_registry_value`]: struct.Context.html#method.remove_registry_value
 /// [`Context::expire_registry_values`]: struct.Context.html#method.expire_registry_values
 /// [`Function::bind`]: struct.Function.html#method.bind
-/// [`UserData::set_user_value`]: struct.UserData.html#method.set_user_value
-/// [`UserData::get_user_value`]: struct.UserData.html#method.get_user_value
+/// [`UserData::set_i_user_value`]: struct.UserData.html#method.set_user_value
+/// [`UserData::get_i_user_value`]: struct.UserData.html#method.get_user_value
 pub struct RegistryKey {
     pub(crate) registry_id: c_int,
     pub(crate) unref_list: Arc<Mutex<Option<Vec<c_int>>>>,

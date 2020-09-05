@@ -178,6 +178,7 @@ fn detroys_userdata() {
     assert_eq!(Arc::strong_count(&rc), 1);
 }
 
+// TODO: add tests for the 'n' parameter
 #[test]
 fn user_value() {
     struct MyUserData;
@@ -185,9 +186,9 @@ fn user_value() {
 
     Lua::new().context(|lua| {
         let ud = lua.create_userdata(MyUserData).unwrap();
-        ud.set_user_value("hello").unwrap();
-        assert_eq!(ud.get_user_value::<String>().unwrap(), "hello");
-        assert!(ud.get_user_value::<u32>().is_err());
+        ud.set_i_user_value("hello", 1).unwrap();
+        assert_eq!(ud.get_i_user_value::<String>(1).unwrap(), "hello");
+        assert!(ud.get_i_user_value::<u32>(1).is_err());
     });
 }
 
