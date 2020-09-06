@@ -368,8 +368,7 @@ where
     let ud = ffi::lua_newuserdatauv(
         state,
         mem::size_of::<WrappedError>().max(mem::size_of::<WrappedPanic>()),
-        // TODO: temp
-        1,
+        0,
     );
     ffi::lua_rotate(state, 1, 1);
 
@@ -413,8 +412,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         // lua_newuserdatauv and luaL_traceback may error, but nothing that implements Drop should be
         // on the rust stack at this time.
         // We don't need any user values in this userdata
-        // TODO: temp
-        let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 1) as *mut WrappedError;
+        let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
         let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             ffi::luaL_traceback(state, state, ptr::null(), 0);
 
@@ -518,7 +516,7 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) -> Resu
     // We don't need any user values in this userdata
     // TODO: temp
     let ud = protect_lua_closure(state, 0, 1, move |state| {
-        ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 1) as *mut WrappedError
+        ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError
     })?;
     ptr::write(ud, WrappedError(err));
     get_error_metatable(state);
@@ -631,8 +629,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
     unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
         ffi::luaL_checkstack(state, 2, ptr::null());
         // We don't need any user values in this userdata
-        // TODO: temp
-        let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 1) as *mut WrappedError;
+        let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
 
         ptr::write(ud, WrappedError(Error::CallbackDestructed));
         get_error_metatable(state);
@@ -685,8 +682,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
     ffi::lua_pushlightuserdata(state, &ERROR_PRINT_BUFFER_KEY as *const u8 as *mut c_void);
 
     // We don't need any user values in this userdata
-    // TODO: temp
-    let ud = ffi::lua_newuserdatauv(state, mem::size_of::<String>(), 1) as *mut String;
+    let ud = ffi::lua_newuserdatauv(state, mem::size_of::<String>(), 0) as *mut String;
     ptr::write(ud, String::new());
 
     ffi::lua_newtable(state);
