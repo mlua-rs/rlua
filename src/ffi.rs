@@ -3,7 +3,7 @@
 #![allow(unused)]
 
 use std::mem;
-use std::os::raw::{c_char, c_double, c_int, c_longlong, c_uchar, c_ushort, c_void};
+use std::os::raw::{c_char, c_double, c_int, c_longlong, c_uchar, c_uint, c_ushort, c_void};
 use std::ptr;
 
 pub type lua_Integer = c_longlong;
@@ -180,6 +180,7 @@ extern "C" {
     pub fn lua_gc(state: *mut lua_State, what: c_int, ...) -> c_int;
     pub fn lua_getinfo(state: *mut lua_State, what: *const c_char, ar: *mut lua_Debug) -> c_int;
 
+    pub fn lua_setcstacklimit(state: *mut lua_State, limit: c_uint) -> c_int;
     pub fn lua_sethook(state: *mut lua_State, f: Option<lua_Hook>, mask: c_int, count: c_int);
 
     pub fn luaopen_base(state: *mut lua_State) -> c_int;

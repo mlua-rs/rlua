@@ -2,7 +2,7 @@ use std::any::TypeId;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::os::raw::{c_int, c_void};
+use std::os::raw::{c_int, c_uint, c_void};
 use std::ptr;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -57,6 +57,13 @@ bitflags! {
             | StdLib::PACKAGE.bits;
     }
 }
+
+// at 812, tests pass
+// at 813, tests fail
+// at 700, it should be somewhat safe
+// TODO: move this somewhere nicer
+// TODO: make this configurable?
+const SAFE_CSTACK_SIZE: c_uint = 700;
 
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
@@ -471,6 +478,8 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
     });
 
     let state = ffi::lua_newstate(allocator, &mut *extra as *mut ExtraData as *mut c_void);
+
+    ffi::lua_setcstacklimit(state, SAFE_CSTACK_SIZE);
 
     extra.ref_thread = rlua_expect!(
         protect_lua_closure(state, 0, 0, |state| {
