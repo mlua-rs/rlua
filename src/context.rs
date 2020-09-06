@@ -20,7 +20,7 @@ use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use crate::util::{
     assert_stack, callback_error, check_stack, get_userdata, get_wrapped_error,
     init_userdata_metatable, pop_error, protect_lua, protect_lua_closure, push_string,
-    push_userdatauv, push_wrapped_error, StackGuard,
+    push_userdata_uv, push_wrapped_error, StackGuard,
 };
 use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
@@ -749,7 +749,6 @@ impl<'lua> Context<'lua> {
     // When ATCs become available in Rust, the signature of the ToLua / FromLua traits should be
     // changed to remove the lifetime parameter, which will enable using the correct callback type
     // and will reduce the number of hacks required in Context and Scope.
-    // TODO: make use of the nuvalue parameter in push_userdatauv, check the above still applies
     pub(crate) fn create_callback(self, func: Callback<'lua, 'static>) -> Result<Function<'lua>> {
         unsafe extern "C" fn call_callback(state: *mut ffi::lua_State) -> c_int {
             callback_error(state, |nargs| {
@@ -787,7 +786,7 @@ impl<'lua> Context<'lua> {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 4);
 
-            push_userdatauv::<Callback>(self.state, func, 1)?;
+            push_userdata_uv::<Callback>(self.state, func, 1)?;
 
             ffi::lua_pushlightuserdata(
                 self.state,
@@ -805,7 +804,6 @@ impl<'lua> Context<'lua> {
     }
 
     // Does not require Send bounds, which can lead to unsafety.
-    // TODO: make use of the nuvalue parameter in push_userdatauv
     pub(crate) unsafe fn make_userdata<T>(self, data: T) -> Result<AnyUserData<'lua>>
     where
         T: 'static + UserData,
@@ -814,7 +812,8 @@ impl<'lua> Context<'lua> {
         assert_stack(self.state, 4);
 
         let ud_index = self.userdata_metatable::<T>()?;
-        push_userdatauv::<RefCell<T>>(self.state, RefCell::new(data), 1)?;
+        let uvalues_count = data.get_uvalues_count();
+        push_userdata_uv::<RefCell<T>>(self.state, RefCell::new(data), uvalues_count)?;
 
         ffi::lua_rawgeti(
             self.state,

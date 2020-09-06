@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::os::raw::{c_int};
 
 use rlua::{
     AnyUserData, ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods,
@@ -178,17 +179,25 @@ fn detroys_userdata() {
     assert_eq!(Arc::strong_count(&rc), 1);
 }
 
-// TODO: add tests for the 'n' parameter
 #[test]
 fn user_value() {
     struct MyUserData;
-    impl UserData for MyUserData {}
+    impl UserData for MyUserData {
+        fn get_uvalues_count(&self) -> c_int {2}
+    }
 
     Lua::new().context(|lua| {
         let ud = lua.create_userdata(MyUserData).unwrap();
         ud.set_i_user_value("hello", 1).unwrap();
+        ud.set_i_user_value("world", 2).unwrap();
         assert_eq!(ud.get_i_user_value::<String>(1).unwrap(), "hello");
+        assert_eq!(ud.get_i_user_value::<String>(2).unwrap(), "world");
         assert!(ud.get_i_user_value::<u32>(1).is_err());
+        assert!(ud.get_i_user_value::<u32>(2).is_err());
+        assert!(ud.get_i_user_value::<String>(0).is_err());
+        assert!(ud.get_i_user_value::<String>(3).is_err());
+        assert!(ud.get_i_user_value::<u32>(0).is_err());
+        assert!(ud.get_i_user_value::<u32>(3).is_err());
     });
 }
 

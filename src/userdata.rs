@@ -279,6 +279,10 @@ pub trait UserDataMethods<'lua, T: UserData> {
 pub trait UserData: Sized {
     /// Adds custom methods and operators specific to this userdata.
     fn add_methods<'lua, T: UserDataMethods<'lua, Self>>(_methods: &mut T) {}
+
+    /// Used to determine how many user values this userdata should have.
+    /// Defaults to a single user value.
+    fn get_uvalues_count(&self) -> c_int {1}
 }
 
 /// Handle to an internal Lua userdata for any type that implements [`UserData`].
@@ -339,7 +343,6 @@ impl<'lua> AnyUserData<'lua> {
     /// The value may be any Lua value whatsoever, and can be retrieved with [`get_i_user_value`].
     ///
     /// [`get_i_user_value`]: #method.get_i_user_value
-    // TODO: error-check the 'n' parameter
     pub fn set_i_user_value<V: ToLua<'lua>>(&self, v: V, n: c_int) -> Result<()> {
         let lua = self.0.lua;
         let v = v.to_lua(lua)?;
@@ -348,22 +351,27 @@ impl<'lua> AnyUserData<'lua> {
             assert_stack(lua.state, 2);
             lua.push_ref(&self.0);
             lua.push_value(v)?;
-            ffi::lua_setiuservalue(lua.state, -2, n);
-            Ok(())
+            if ffi::lua_setiuservalue(lua.state, -2, n) == 0 {
+                Err(Error::RuntimeError(format!("userdata does not have user value {}", n)))
+            } else {
+                Ok(())
+            }
         }
     }
 
     /// Returns an associated value set by [`set_i_user_value`].
     ///
     /// [`set_i_user_value`]: #method.set_i_user_value
-    // TODO: error-check the 'n' parameter
     pub fn get_i_user_value<V: FromLua<'lua>>(&self, n: c_int) -> Result<V> {
         let lua = self.0.lua;
         let res = unsafe {
             let _sg = StackGuard::new(lua.state);
             assert_stack(lua.state, 3);
             lua.push_ref(&self.0);
-            ffi::lua_getiuservalue(lua.state, -1, n);
+            if ffi::lua_getiuservalue(lua.state, -1, n) == ffi::LUA_TNIL {
+                lua.pop_value(); // remove the nil from the stack
+                return Err(Error::RuntimeError(format!("userdata does not have user value {}", n)))
+            }
             lua.pop_value()
         };
         V::from_lua(res, lua)

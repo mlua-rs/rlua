@@ -221,11 +221,10 @@ pub unsafe fn push_string<S: ?Sized + AsRef<[u8]>>(
 }
 
 // Internally uses 4 stack spaces, does not call checkstack
-// TODO: check the above still applies
-// TODO: check nuvalues parameter limits?
-pub unsafe fn push_userdatauv<T>(state: *mut ffi::lua_State, t: T, nuvalues: c_int) -> Result<()> {
+pub unsafe fn push_userdata_uv<T>(state: *mut ffi::lua_State, t: T, uvalues_count: c_int) -> Result<()> {
+    rlua_debug_assert!(uvalues_count > 0, "userdata user values cannot be below zero");
     let ud = protect_lua_closure(state, 0, 1, move |state| {
-        ffi::lua_newuserdatauv(state, mem::size_of::<T>(), nuvalues) as *mut T
+        ffi::lua_newuserdatauv(state, mem::size_of::<T>(), uvalues_count) as *mut T
     })?;
     ptr::write(ud, t);
     Ok(())
@@ -348,7 +347,6 @@ pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c
 // This function uses some of the bottom of the stack for error handling, the given callback will be
 // given the number of arguments available as an argument, and should return the number of returns
 // as normal, but cannot assume that the arguments available start at 0.
-// TODO: make use of the nuvalue parameter in lua_newuserdatauv, check the above still applies
 pub unsafe fn callback_error<R, F>(state: *mut ffi::lua_State, f: F) -> R
 where
     F: FnOnce(c_int) -> Result<R>,
@@ -366,9 +364,11 @@ where
 
     // We cannot shadow rust errors with Lua ones, we pre-allocate enough memory to store a wrapped
     // error or panic *before* we proceed.
+    // We don't need any user values in this userdata
     let ud = ffi::lua_newuserdatauv(
         state,
         mem::size_of::<WrappedError>().max(mem::size_of::<WrappedPanic>()),
+        // TODO: temp
         1,
     );
     ffi::lua_rotate(state, 1, 1);
@@ -402,7 +402,6 @@ where
 // triggering another error and shadowing previous rust errors, but it may trigger Lua errors that
 // shadow rust errors under certain memory conditions.  This function ensures that such behavior
 // will *never* occur with a rust panic, however.
-// TODO: make use of the nuvalue parameter in lua_newuserdatauv, check the above still applies
 pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     // I believe luaL_traceback requires this much free stack to not error.
     const LUA_TRACEBACK_STACK: c_int = 11;
@@ -413,6 +412,8 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     } else if let Some(error) = get_wrapped_error(state, -1).as_ref() {
         // lua_newuserdatauv and luaL_traceback may error, but nothing that implements Drop should be
         // on the rust stack at this time.
+        // We don't need any user values in this userdata
+        // TODO: temp
         let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 1) as *mut WrappedError;
         let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             ffi::luaL_traceback(state, state, ptr::null(), 0);
@@ -513,8 +514,9 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
 
 // Pushes a WrappedError to the top of the stack.  Uses two stack spaces and does not call
 // lua_checkstack.
-// TODO: make use of the nuvalue parameter in lua_newuserdatauv, check the above still applies
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) -> Result<()> {
+    // We don't need any user values in this userdata
+    // TODO: temp
     let ud = protect_lua_closure(state, 0, 1, move |state| {
         ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 1) as *mut WrappedError
     })?;
@@ -626,9 +628,10 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
 
     // Create destructed userdata metatable
 
-    // TODO: make use of the nuvalue parameter in lua_newuserdatauv, check the above still applies
     unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
         ffi::luaL_checkstack(state, 2, ptr::null());
+        // We don't need any user values in this userdata
+        // TODO: temp
         let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 1) as *mut WrappedError;
 
         ptr::write(ud, WrappedError(Error::CallbackDestructed));
@@ -681,7 +684,8 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
 
     ffi::lua_pushlightuserdata(state, &ERROR_PRINT_BUFFER_KEY as *const u8 as *mut c_void);
 
-    // TODO: make use of the nuvalue parameter in lua_newuserdatauv, check the above still applies
+    // We don't need any user values in this userdata
+    // TODO: temp
     let ud = ffi::lua_newuserdatauv(state, mem::size_of::<String>(), 1) as *mut String;
     ptr::write(ud, String::new());
 

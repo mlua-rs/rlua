@@ -160,7 +160,7 @@ extern "C" {
     pub fn lua_newuserdatauv(state: *mut lua_State, size: usize, nuvalue: c_int) -> *mut c_void;
     pub fn lua_newthread(state: *mut lua_State) -> *mut lua_State;
 
-    pub fn lua_setiuservalue(state: *mut lua_State, index: c_int, n: c_int);
+    pub fn lua_setiuservalue(state: *mut lua_State, index: c_int, n: c_int) -> c_int;
     pub fn lua_getiuservalue(state: *mut lua_State, index: c_int, n: c_int) -> c_int;
 
     pub fn lua_getupvalue(state: *mut lua_State, funcindex: c_int, n: c_int) -> *const c_char;
