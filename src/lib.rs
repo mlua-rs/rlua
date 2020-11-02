@@ -58,6 +58,7 @@ mod table;
 mod thread;
 mod types;
 mod userdata;
+mod userdata_wrappers;
 mod util;
 mod value;
 
