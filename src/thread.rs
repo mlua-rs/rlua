@@ -99,7 +99,8 @@ impl<'lua> Thread<'lua> {
             }
             ffi::lua_xmove(lua.state, thread_state, nargs);
 
-            let ret = ffi::lua_resume(thread_state, lua.state, nargs);
+            let mut nresults = 0;
+            let ret = ffi::lua_resume(thread_state, lua.state, nargs, &mut nresults);
             if ret != ffi::LUA_OK && ret != ffi::LUA_YIELD {
                 protect_lua_closure(lua.state, 0, 0, |_| {
                     error_traceback(thread_state);
@@ -108,7 +109,6 @@ impl<'lua> Thread<'lua> {
                 return Err(pop_error(thread_state, ret));
             }
 
-            let nresults = ffi::lua_gettop(thread_state);
             let mut results = MultiValue::new();
             ffi::lua_xmove(thread_state, lua.state, nresults);
 

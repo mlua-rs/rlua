@@ -3,10 +3,11 @@
 #![allow(unused)]
 
 use std::mem;
-use std::os::raw::{c_char, c_double, c_int, c_longlong, c_uchar, c_void};
+use std::os::raw::{c_char, c_double, c_int, c_longlong, c_uchar, c_uint, c_ulonglong, c_ushort, c_void};
 use std::ptr;
 
 pub type lua_Integer = c_longlong;
+pub type lua_Unsigned = c_ulonglong;
 pub type lua_Number = c_double;
 
 pub enum lua_State {}
@@ -29,6 +30,7 @@ pub struct lua_Debug {
     pub namewhat: *const c_char,
     pub what: *const c_char,
     pub source: *const c_char,
+    pub srclen: usize,
     pub currentline: c_int,
     pub linedefined: c_int,
     pub lastlinedefined: c_int,
@@ -36,6 +38,8 @@ pub struct lua_Debug {
     pub nparams: c_uchar,
     pub isvararg: c_char,
     pub istailcall: c_char,
+    pub ftransfer: c_ushort,
+    pub ntransfer: c_ushort,
     pub short_src: [c_char; LUA_IDSIZE as usize],
     i_ci: *mut c_void,
 }
@@ -45,8 +49,7 @@ pub const LUA_YIELD: c_int = 1;
 pub const LUA_ERRRUN: c_int = 2;
 pub const LUA_ERRSYNTAX: c_int = 3;
 pub const LUA_ERRMEM: c_int = 4;
-pub const LUA_ERRGCMM: c_int = 5;
-pub const LUA_ERRERR: c_int = 6;
+pub const LUA_ERRERR: c_int = 5;
 
 pub const LUA_NOREF: c_int = -2;
 pub const LUA_REFNIL: c_int = -1;
@@ -78,9 +81,13 @@ pub const LUA_GCCOLLECT: c_int = 2;
 pub const LUA_GCCOUNT: c_int = 3;
 pub const LUA_GCCOUNTB: c_int = 4;
 pub const LUA_GCSTEP: c_int = 5;
+#[deprecated(note="please use `LUA_GCINC` instead")]
 pub const LUA_GCSETPAUSE: c_int = 6;
+#[deprecated(note="please use `LUA_GCINC` instead")]
 pub const LUA_GCSETSTEPMUL: c_int = 7;
 pub const LUA_GCISRUNNING: c_int = 9;
+pub const LUA_GCGEN: c_int = 10;
+pub const LUA_GCINC: c_int = 11;
 
 pub const LUA_MASKCALL: c_int = 1;
 pub const LUA_MASKRET: c_int = 2;
@@ -106,7 +113,7 @@ extern "C" {
         ctx: lua_KContext,
         k: Option<lua_KFunction>,
     ) -> c_int;
-    pub fn lua_resume(state: *mut lua_State, from: *mut lua_State, nargs: c_int) -> c_int;
+    pub fn lua_resume(state: *mut lua_State, from: *mut lua_State, nargs: c_int, nresults: *mut c_int) -> c_int;
     pub fn lua_status(state: *mut lua_State) -> c_int;
 
     pub fn lua_pushnil(state: *mut lua_State);
@@ -151,11 +158,11 @@ extern "C" {
     pub fn lua_getmetatable(state: *mut lua_State, index: c_int) -> c_int;
 
     pub fn lua_createtable(state: *mut lua_State, narr: c_int, nrec: c_int);
-    pub fn lua_newuserdata(state: *mut lua_State, size: usize) -> *mut c_void;
+    pub fn lua_newuserdatauv(state: *mut lua_State, size: usize, nuvalue: c_int) -> *mut c_void;
     pub fn lua_newthread(state: *mut lua_State) -> *mut lua_State;
 
-    pub fn lua_setuservalue(state: *mut lua_State, index: c_int);
-    pub fn lua_getuservalue(state: *mut lua_State, index: c_int) -> c_int;
+    pub fn lua_setiuservalue(state: *mut lua_State, index: c_int, n: c_int) -> c_int;
+    pub fn lua_getiuservalue(state: *mut lua_State, index: c_int, n: c_int) -> c_int;
 
     pub fn lua_getupvalue(state: *mut lua_State, funcindex: c_int, n: c_int) -> *const c_char;
     pub fn lua_setupvalue(state: *mut lua_State, funcindex: c_int, n: c_int) -> *const c_char;
@@ -165,15 +172,16 @@ extern "C" {
     pub fn lua_setmetatable(state: *mut lua_State, index: c_int);
 
     pub fn lua_len(state: *mut lua_State, index: c_int);
-    pub fn lua_rawlen(state: *mut lua_State, index: c_int) -> usize;
+    pub fn lua_rawlen(state: *mut lua_State, index: c_int) -> lua_Unsigned;
     pub fn lua_next(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_rawequal(state: *mut lua_State, index1: c_int, index2: c_int) -> c_int;
 
     pub fn lua_error(state: *mut lua_State) -> !;
     pub fn lua_atpanic(state: *mut lua_State, panic: lua_CFunction) -> lua_CFunction;
-    pub fn lua_gc(state: *mut lua_State, what: c_int, data: c_int) -> c_int;
+    pub fn lua_gc(state: *mut lua_State, what: c_int, ...) -> c_int;
     pub fn lua_getinfo(state: *mut lua_State, what: *const c_char, ar: *mut lua_Debug) -> c_int;
 
+    pub fn lua_setcstacklimit(state: *mut lua_State, limit: c_uint) -> c_int;
     pub fn lua_sethook(state: *mut lua_State, f: Option<lua_Hook>, mask: c_int, count: c_int);
 
     pub fn luaopen_base(state: *mut lua_State) -> c_int;

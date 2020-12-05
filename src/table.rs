@@ -271,7 +271,7 @@ impl<'lua> Table<'lua> {
     /// ```
     ///
     /// [`Result`]: type.Result.html
-    /// [Lua manual]: http://www.lua.org/manual/5.3/manual.html#pdf-next
+    /// [Lua manual]: http://www.lua.org/manual/5.4/manual.html#pdf-next
     pub fn pairs<K: FromLua<'lua>, V: FromLua<'lua>>(self) -> TablePairs<'lua, K, V> {
         TablePairs {
             table: self.0,
@@ -321,7 +321,7 @@ impl<'lua> Table<'lua> {
     ///
     /// [`pairs`]: #method.pairs
     /// [`Result`]: type.Result.html
-    /// [Lua manual]: http://www.lua.org/manual/5.3/manual.html#pdf-next
+    /// [Lua manual]: http://www.lua.org/manual/5.4/manual.html#pdf-next
     pub fn sequence_values<V: FromLua<'lua>>(self) -> TableSequence<'lua, V> {
         TableSequence {
             table: self.0,

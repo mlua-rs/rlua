@@ -2,7 +2,7 @@ use std::any::TypeId;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::os::raw::{c_int, c_void};
+use std::os::raw::{c_int, c_uint, c_void};
 use std::ptr;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -57,6 +57,13 @@ bitflags! {
             | StdLib::PACKAGE.bits;
     }
 }
+
+// at 812, tests pass
+// at 813, tests fail
+// at 700, it should be somewhat safe
+// TODO: move this somewhere nicer
+// TODO: make this configurable?
+const SAFE_CSTACK_SIZE: c_uint = 700;
 
 /// Top level Lua struct which holds the Lua state itself.
 pub struct Lua {
@@ -343,22 +350,46 @@ impl Lua {
         }
     }
 
-    /// Sets the 'pause' value of the collector.
+    /// Sets the garbage collector to incremental mode.
     ///
-    /// Returns the previous value of 'pause'.  More information can be found in the [Lua 5.3
+    /// Returns the previous mode (`LUA_GCGEN` or `LUA_GCINC`).  More information can be found in the
+    /// [Lua 5.4 documentation][lua_doc].
+    ///
+    /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
+    pub fn gc_set_inc(&self, pause: c_int, step_multiplier: c_int, step_size: c_int) -> c_int {
+        unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCINC, pause, step_multiplier, step_size) }
+    }
+
+    /// Sets the garbage collector to generational mode.
+    ///
+    /// Returns the previous mode (`LUA_GCGEN` or `LUA_GCINC`).  More information can be found in the
+    /// [Lua 5.4 documentation][lua_doc].
+    ///
+    /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
+    pub fn gc_set_gen(&self, minor_multiplier: c_int, major_multiplier: c_int) -> c_int {
+        unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCGEN, minor_multiplier, major_multiplier) }
+    }
+
+    /// Sets the 'pause' value of the incremental collector.
+    ///
+    /// Returns the previous value of 'pause'.  More information can be found in the [Lua 5.4
     /// documentation][lua_doc].
     ///
-    /// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#2.5
+    /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
+    #[deprecated(note="please use `gc_set_inc` instead")]
+    #[allow(deprecated)]
     pub fn gc_set_pause(&self, pause: c_int) -> c_int {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETPAUSE, pause) }
     }
 
-    /// Sets the 'step multiplier' value of the collector.
+    /// Sets the 'step multiplier' value of the incremental collector.
     ///
     /// Returns the previous value of the 'step multiplier'.  More information can be found in the
-    /// [Lua 5.3 documentation][lua_doc].
+    /// [Lua 5.4 documentation][lua_doc].
     ///
-    /// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#2.5
+    /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
+    #[deprecated(note="please use `gc_set_inc` instead")]
+    #[allow(deprecated)]
     pub fn gc_set_step_multiplier(&self, step_multiplier: c_int) -> c_int {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETSTEPMUL, step_multiplier) }
     }
@@ -447,6 +478,8 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
     });
 
     let state = ffi::lua_newstate(allocator, &mut *extra as *mut ExtraData as *mut c_void);
+
+    ffi::lua_setcstacklimit(state, SAFE_CSTACK_SIZE);
 
     extra.ref_thread = rlua_expect!(
         protect_lua_closure(state, 0, 0, |state| {

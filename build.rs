@@ -31,7 +31,6 @@ fn main() {
             .file("lua/lapi.c")
             .file("lua/lauxlib.c")
             .file("lua/lbaselib.c")
-            .file("lua/lbitlib.c")
             .file("lua/lcode.c")
             .file("lua/lcorolib.c")
             .file("lua/lctype.c")
@@ -61,13 +60,13 @@ fn main() {
             .file("lua/lutf8lib.c")
             .file("lua/lvm.c")
             .file("lua/lzio.c")
-            .compile("liblua5.3.a");
+            .compile("liblua5.4.a");
     }
 
     #[cfg(feature = "system-lua")]
     {
         pkg_config::Config::new()
-            .atleast_version("5.3")
+            .atleast_version("5.4")
             .probe("lua")
             .unwrap();
     }

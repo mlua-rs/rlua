@@ -12,9 +12,9 @@ use crate::util::callback_error;
 /// The `Debug` structure is provided as a parameter to the hook function set with
 /// [`Lua::set_hook`].  You may call the methods on this structure to retrieve information about the
 /// Lua code executing at the time that the hook function was called.  Further information can be
-/// found in the [Lua 5.3 documentaton][lua_doc].
+/// found in the [Lua 5.4 documentaton][lua_doc].
 ///
-/// [lua_doc]: https://www.lua.org/manual/5.3/manual.html#lua_Debug
+/// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#lua_Debug
 /// [`Lua::set_hook`]: struct.Lua.html#method.set_hook
 #[derive(Clone)]
 pub struct Debug<'a> {
@@ -38,7 +38,7 @@ impl<'a> Debug<'a> {
         }
     }
 
-    /// Corresponds to the `n` what mask.
+    /// Corresponds to the `S` what mask.
     pub fn source(&self) -> DebugSource<'a> {
         unsafe {
             rlua_assert!(

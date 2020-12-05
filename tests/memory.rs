@@ -57,29 +57,3 @@ fn test_gc_control() {
         assert_eq!(Arc::strong_count(&rc), 1);
     });
 }
-
-#[test]
-fn test_gc_error() {
-    Lua::new().context(|lua| {
-        match lua
-            .load(
-                r#"
-                val = nil
-                table = {}
-                setmetatable(table, {
-                    __gc = function()
-                        error("gcwascalled")
-                    end
-                })
-                table = nil
-                collectgarbage("collect")
-            "#,
-            )
-            .exec()
-        {
-            Err(Error::GarbageCollectorError(_)) => {}
-            Err(e) => panic!("__gc error did not result in correct error, instead: {}", e),
-            Ok(()) => panic!("__gc error did not result in error"),
-        }
-    });
-}

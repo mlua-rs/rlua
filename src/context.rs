@@ -20,7 +20,7 @@ use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use crate::util::{
     assert_stack, callback_error, check_stack, get_userdata, get_wrapped_error,
     init_userdata_metatable, pop_error, protect_lua, protect_lua_closure, push_string,
-    push_userdata, push_wrapped_error, StackGuard,
+    push_userdata_uv, push_wrapped_error, StackGuard,
 };
 use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
@@ -786,7 +786,7 @@ impl<'lua> Context<'lua> {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 4);
 
-            push_userdata::<Callback>(self.state, func)?;
+            push_userdata_uv::<Callback>(self.state, func, 1)?;
 
             ffi::lua_pushlightuserdata(
                 self.state,
@@ -812,7 +812,8 @@ impl<'lua> Context<'lua> {
         assert_stack(self.state, 4);
 
         let ud_index = self.userdata_metatable::<T>()?;
-        push_userdata::<RefCell<T>>(self.state, RefCell::new(data))?;
+        let uvalues_count = data.get_uvalues_count();
+        push_userdata_uv::<RefCell<T>>(self.state, RefCell::new(data), uvalues_count)?;
 
         ffi::lua_rawgeti(
             self.state,

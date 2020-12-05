@@ -204,7 +204,6 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
                 Error::RuntimeError(err_string)
             }
             ffi::LUA_ERRMEM => Error::MemoryError(err_string),
-            ffi::LUA_ERRGCMM => Error::GarbageCollectorError(err_string),
             _ => rlua_panic!("unrecognized lua error code"),
         }
     }
@@ -222,9 +221,10 @@ pub unsafe fn push_string<S: ?Sized + AsRef<[u8]>>(
 }
 
 // Internally uses 4 stack spaces, does not call checkstack
-pub unsafe fn push_userdata<T>(state: *mut ffi::lua_State, t: T) -> Result<()> {
+pub unsafe fn push_userdata_uv<T>(state: *mut ffi::lua_State, t: T, uvalues_count: c_int) -> Result<()> {
+    rlua_debug_assert!(uvalues_count > 0, "userdata user values cannot be below zero");
     let ud = protect_lua_closure(state, 0, 1, move |state| {
-        ffi::lua_newuserdata(state, mem::size_of::<T>()) as *mut T
+        ffi::lua_newuserdatauv(state, mem::size_of::<T>(), uvalues_count) as *mut T
     })?;
     ptr::write(ud, t);
     Ok(())
@@ -364,9 +364,11 @@ where
 
     // We cannot shadow rust errors with Lua ones, we pre-allocate enough memory to store a wrapped
     // error or panic *before* we proceed.
-    let ud = ffi::lua_newuserdata(
+    // We don't need any user values in this userdata
+    let ud = ffi::lua_newuserdatauv(
         state,
         mem::size_of::<WrappedError>().max(mem::size_of::<WrappedPanic>()),
+        0,
     );
     ffi::lua_rotate(state, 1, 1);
 
@@ -407,9 +409,10 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         // If we don't have enough stack space to even check the error type, do nothing so we don't
         // risk shadowing a rust panic.
     } else if let Some(error) = get_wrapped_error(state, -1).as_ref() {
-        // lua_newuserdata and luaL_traceback may error, but nothing that implements Drop should be
+        // lua_newuserdatauv and luaL_traceback may error, but nothing that implements Drop should be
         // on the rust stack at this time.
-        let ud = ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as *mut WrappedError;
+        // We don't need any user values in this userdata
+        let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
         let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             ffi::luaL_traceback(state, state, ptr::null(), 0);
 
@@ -510,8 +513,10 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
 // Pushes a WrappedError to the top of the stack.  Uses two stack spaces and does not call
 // lua_checkstack.
 pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) -> Result<()> {
+    // We don't need any user values in this userdata
+    // TODO: temp
     let ud = protect_lua_closure(state, 0, 1, move |state| {
-        ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as *mut WrappedError
+        ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError
     })?;
     ptr::write(ud, WrappedError(err));
     get_error_metatable(state);
@@ -623,7 +628,8 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
 
     unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
         ffi::luaL_checkstack(state, 2, ptr::null());
-        let ud = ffi::lua_newuserdata(state, mem::size_of::<WrappedError>()) as *mut WrappedError;
+        // We don't need any user values in this userdata
+        let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
 
         ptr::write(ud, WrappedError(Error::CallbackDestructed));
         get_error_metatable(state);
@@ -675,7 +681,8 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
 
     ffi::lua_pushlightuserdata(state, &ERROR_PRINT_BUFFER_KEY as *const u8 as *mut c_void);
 
-    let ud = ffi::lua_newuserdata(state, mem::size_of::<String>()) as *mut String;
+    // We don't need any user values in this userdata
+    let ud = ffi::lua_newuserdatauv(state, mem::size_of::<String>(), 0) as *mut String;
     ptr::write(ud, String::new());
 
     ffi::lua_newtable(state);
