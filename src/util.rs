@@ -221,8 +221,15 @@ pub unsafe fn push_string<S: ?Sized + AsRef<[u8]>>(
 }
 
 // Internally uses 4 stack spaces, does not call checkstack
-pub unsafe fn push_userdata_uv<T>(state: *mut ffi::lua_State, t: T, uvalues_count: c_int) -> Result<()> {
-    rlua_debug_assert!(uvalues_count > 0, "userdata user values cannot be below zero");
+pub unsafe fn push_userdata_uv<T>(
+    state: *mut ffi::lua_State,
+    t: T,
+    uvalues_count: c_int,
+) -> Result<()> {
+    rlua_debug_assert!(
+        uvalues_count > 0,
+        "userdata user values cannot be below zero"
+    );
     let ud = protect_lua_closure(state, 0, 1, move |state| {
         ffi::lua_newuserdatauv(state, mem::size_of::<T>(), uvalues_count) as *mut T
     })?;
@@ -412,7 +419,8 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         // lua_newuserdatauv and luaL_traceback may error, but nothing that implements Drop should be
         // on the rust stack at this time.
         // We don't need any user values in this userdata
-        let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
+        let ud =
+            ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
         let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             ffi::luaL_traceback(state, state, ptr::null(), 0);
 
@@ -629,7 +637,8 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
     unsafe extern "C" fn destructed_error(state: *mut ffi::lua_State) -> c_int {
         ffi::luaL_checkstack(state, 2, ptr::null());
         // We don't need any user values in this userdata
-        let ud = ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
+        let ud =
+            ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
 
         ptr::write(ud, WrappedError(Error::CallbackDestructed));
         get_error_metatable(state);

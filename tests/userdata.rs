@@ -1,5 +1,5 @@
+use std::os::raw::c_int;
 use std::sync::Arc;
-use std::os::raw::{c_int};
 
 use rlua::{
     AnyUserData, ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods,
@@ -183,7 +183,9 @@ fn detroys_userdata() {
 fn user_value() {
     struct MyUserData;
     impl UserData for MyUserData {
-        fn get_uvalues_count(&self) -> c_int {2}
+        fn get_uvalues_count(&self) -> c_int {
+            2
+        }
     }
 
     Lua::new().context(|lua| {

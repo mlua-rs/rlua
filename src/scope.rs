@@ -24,6 +24,7 @@ use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 /// See [`Context::scope`] for more details.
 ///
 /// [`Context::scope`]: struct.Context.html#method.scope
+#[derive(Debug)]
 pub struct Scope<'lua, 'scope> {
     lua: Context<'lua>,
     destructors: RefCell<Vec<(LuaRef<'lua>, fn(LuaRef<'lua>) -> Box<dyn Any>)>>,
