@@ -3,7 +3,9 @@
 #![allow(unused)]
 
 use std::mem;
-use std::os::raw::{c_char, c_double, c_int, c_longlong, c_uchar, c_uint, c_ulonglong, c_ushort, c_void};
+use std::os::raw::{
+    c_char, c_double, c_int, c_longlong, c_uchar, c_uint, c_ulonglong, c_ushort, c_void,
+};
 use std::ptr;
 
 pub type lua_Integer = c_longlong;
@@ -11,19 +13,25 @@ pub type lua_Unsigned = c_ulonglong;
 pub type lua_Number = c_double;
 
 pub enum lua_State {}
+
 pub type lua_Alloc = unsafe extern "C" fn(
     ud: *mut c_void,
     ptr: *mut c_void,
     osize: usize,
     nsize: usize,
 ) -> *mut c_void;
+
 pub type lua_KContext = *mut c_void;
+
 pub type lua_KFunction =
     unsafe extern "C" fn(state: *mut lua_State, status: c_int, ctx: lua_KContext) -> c_int;
+
 pub type lua_CFunction = unsafe extern "C" fn(state: *mut lua_State) -> c_int;
+
 pub type lua_Hook = unsafe extern "C" fn(state: *mut lua_State, ar: *mut lua_Debug);
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct lua_Debug {
     pub event: c_int,
     pub name: *const c_char,
@@ -81,9 +89,9 @@ pub const LUA_GCCOLLECT: c_int = 2;
 pub const LUA_GCCOUNT: c_int = 3;
 pub const LUA_GCCOUNTB: c_int = 4;
 pub const LUA_GCSTEP: c_int = 5;
-#[deprecated(note="please use `LUA_GCINC` instead")]
+#[deprecated(note = "please use `LUA_GCINC` instead")]
 pub const LUA_GCSETPAUSE: c_int = 6;
-#[deprecated(note="please use `LUA_GCINC` instead")]
+#[deprecated(note = "please use `LUA_GCINC` instead")]
 pub const LUA_GCSETSTEPMUL: c_int = 7;
 pub const LUA_GCISRUNNING: c_int = 9;
 pub const LUA_GCGEN: c_int = 10;
@@ -113,7 +121,12 @@ extern "C" {
         ctx: lua_KContext,
         k: Option<lua_KFunction>,
     ) -> c_int;
-    pub fn lua_resume(state: *mut lua_State, from: *mut lua_State, nargs: c_int, nresults: *mut c_int) -> c_int;
+    pub fn lua_resume(
+        state: *mut lua_State,
+        from: *mut lua_State,
+        nargs: c_int,
+        nresults: *mut c_int,
+    ) -> c_int;
     pub fn lua_status(state: *mut lua_State) -> c_int;
 
     pub fn lua_pushnil(state: *mut lua_State);

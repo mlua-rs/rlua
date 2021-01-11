@@ -1,5 +1,5 @@
 use std::cell::{Ref, RefCell, RefMut};
-use std::os::raw::{c_int};
+use std::os::raw::c_int;
 
 use crate::context::Context;
 use crate::error::{Error, Result};
@@ -282,7 +282,9 @@ pub trait UserData: Sized {
 
     /// Used to determine how many user values this userdata should have.
     /// Defaults to a single user value.
-    fn get_uvalues_count(&self) -> c_int {1}
+    fn get_uvalues_count(&self) -> c_int {
+        1
+    }
 }
 
 /// Handle to an internal Lua userdata for any type that implements [`UserData`].
@@ -352,7 +354,10 @@ impl<'lua> AnyUserData<'lua> {
             lua.push_ref(&self.0);
             lua.push_value(v)?;
             if ffi::lua_setiuservalue(lua.state, -2, n) == 0 {
-                Err(Error::RuntimeError(format!("userdata does not have user value {}", n)))
+                Err(Error::RuntimeError(format!(
+                    "userdata does not have user value {}",
+                    n
+                )))
             } else {
                 Ok(())
             }
@@ -370,7 +375,10 @@ impl<'lua> AnyUserData<'lua> {
             lua.push_ref(&self.0);
             if ffi::lua_getiuservalue(lua.state, -1, n) == ffi::LUA_TNIL {
                 lua.pop_value(); // remove the nil from the stack
-                return Err(Error::RuntimeError(format!("userdata does not have user value {}", n)))
+                return Err(Error::RuntimeError(format!(
+                    "userdata does not have user value {}",
+                    n
+                )));
             }
             lua.pop_value()
         };

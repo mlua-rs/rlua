@@ -24,7 +24,7 @@ use crate::util::{
 };
 use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Context<'lua> {
     pub(crate) state: *mut ffi::lua_State,
     _lua_invariant: Invariant<'lua>,
