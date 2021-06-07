@@ -849,7 +849,7 @@ impl<'lua> Context<'lua> {
                     source.as_ptr() as *const c_char,
                     source.len(),
                     name.as_ptr() as *const c_char,
-                    cstr!("t"),
+                    cstr!("tb"),
                 )
             } else {
                 ffi::luaL_loadbufferx(
@@ -857,7 +857,7 @@ impl<'lua> Context<'lua> {
                     source.as_ptr() as *const c_char,
                     source.len(),
                     ptr::null(),
-                    cstr!("t"),
+                    cstr!("tb"),
                 )
             } {
                 ffi::LUA_OK => {
