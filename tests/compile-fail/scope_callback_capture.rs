@@ -11,9 +11,8 @@ fn main() {
         lua.scope(|scope| {
             let mut inner: Option<Table> = None;
             let f = scope
+                //~^ error: borrowed data escapes outside of closure
                 .create_function_mut(move |lua, t: Table| {
-                    //~^ error: cannot infer an appropriate lifetime for autoref due to conflicting
-                    // requirements
                     if let Some(old) = inner.take() {
                         // Access old callback `Lua`.
                     }

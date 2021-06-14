@@ -9,8 +9,8 @@ fn test_user_data() {
     struct UserData1(i64);
     struct UserData2(Box<i64>);
 
-    impl UserData for UserData1 {};
-    impl UserData for UserData2 {};
+    impl UserData for UserData1 {}
+    impl UserData for UserData2 {}
 
     Lua::new().context(|lua| {
         let userdata1 = lua.create_userdata(UserData1(1)).unwrap();

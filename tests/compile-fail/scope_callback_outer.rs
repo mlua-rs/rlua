@@ -11,9 +11,10 @@ fn main() {
         let mut outer: Option<Table> = None;
         lua.scope(|scope| {
             let f = scope
+                //~^ error: borrowed data escapes outside of closure
                 .create_function_mut(|_, t: Table| {
-                    //~^^ error: borrowed data cannot be stored outside of its closure
                     outer = Some(t);
+                    //~^ error: `outer` does not live long enough
                     Ok(())
                 })
                 .unwrap();
