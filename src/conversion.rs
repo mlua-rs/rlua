@@ -359,6 +359,17 @@ macro_rules! lua_convert_float {
                         message: Some("expected number or string coercible to number".to_string()),
                     })
                     .and_then(|n| {
+                        // We want out of range f32 to return an error instead
+                        // of inf.
+                        if std::mem::size_of::<$x>() < std::mem::size_of::<f64>() {
+                            if n.is_finite() && n.abs() > (<$x>::MAX as f64) {
+                                return Err(Error::FromLuaConversionError {
+                                    from: ty,
+                                    to: stringify!($x),
+                                    message: Some("number out of range".to_string()),
+                                });
+                            }
+                        }
                         cast(n).ok_or_else(|| Error::FromLuaConversionError {
                             from: ty,
                             to: stringify!($x),

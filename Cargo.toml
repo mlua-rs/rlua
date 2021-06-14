@@ -34,7 +34,7 @@ system-lua = ["pkg-config"]
 
 [dependencies]
 libc = { version = "0.2" }
-num-traits = { version = "0.2.6" }
+num-traits = { version = "0.2.14" }
 bitflags = { version = "1.0.4" }
 bstr = {version = "0.2", features = ["std"], default_features = false }
 
