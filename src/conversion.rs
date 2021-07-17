@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::convert::TryInto;
 use std::ffi::{CStr, CString};
 use std::hash::{BuildHasher, Hash};
 use std::string::String as StdString;
@@ -383,6 +384,50 @@ macro_rules! lua_convert_float {
 
 lua_convert_float!(f32);
 lua_convert_float!(f64);
+
+impl<'lua, T: ToLua<'lua>, const N: usize> ToLua<'lua> for [T; N] {
+    fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
+        Ok(Value::Table(lua.create_sequence_from(self)?))
+    }
+}
+
+impl<'lua, T: FromLua<'lua>, const N: usize> FromLua<'lua> for [T; N] {
+    fn from_lua(value: Value<'lua>, _: Context<'lua>) -> Result<Self> {
+        if let Value::Table(table) = value {
+            // First check the size of the Lua array
+            let len = table.len()?;
+            if len as usize != N {
+                return Err(Error::FromLuaConversionError {
+                    from: "Table",
+                    to: "Array",
+                    message: Some(format!(
+                        "Expected array of exactly length {}, got {}",
+                        N, len
+                    )),
+                });
+            }
+
+            // Now create a vector out of the Lua array. The use of collect here
+            // lets us transform a sequence of Result<T>s into a Result of Vec<T>
+            let vec: Vec<T> = table.sequence_values().collect::<Result<Vec<T>>>()?;
+
+            // Finally, turn the Vec<T> into a [T; N]. Unwrap here requires T
+            // be Debug, so instead manually match on the result. Note that the
+            // Error branch is unreachable since we checked above that the size
+            // of the array matches N.
+            match vec.try_into() {
+                Ok(array) => Ok(array),
+                Err(_) => unreachable!(),
+            }
+        } else {
+            Err(Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "Array",
+                message: Some("expected table".to_string()),
+            })
+        }
+    }
+}
 
 impl<'lua, T: ToLua<'lua>> ToLua<'lua> for Vec<T> {
     fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
