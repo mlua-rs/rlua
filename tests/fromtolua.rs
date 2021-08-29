@@ -11,21 +11,15 @@ fn test_to_array() {
         )
         .exec()
         .unwrap();
-        let res = globals
-            .get::<_, Vec<usize>>("a")
-            .unwrap();
+        let res = globals.get::<_, Vec<usize>>("a").unwrap();
         assert_eq!(res, vec![1, 2, 3, 4]);
 
-        let res = globals
-            .get::<_, [usize;4]>("a")
-            .unwrap();
+        let res = globals.get::<_, [usize; 4]>("a").unwrap();
         assert_eq!(res, [1, 2, 3, 4]);
 
-        let res = globals
-            .get::<_, [usize;3]>("a");
+        let res = globals.get::<_, [usize; 3]>("a");
         assert!(res.is_err());
-        let res = globals
-            .get::<_, [usize;5]>("a");
+        let res = globals.get::<_, [usize; 5]>("a");
         assert!(res.is_err());
     });
 }
@@ -34,12 +28,8 @@ fn test_to_array() {
 fn test_from_array() {
     Lua::new().context(|lua| {
         let globals = lua.globals();
-        globals
-            .set("a", [1usize, 2, 3])
-            .unwrap();
-        globals
-            .set("v", vec![1usize, 2, 3])
-            .unwrap();
+        globals.set("a", [1usize, 2, 3]).unwrap();
+        globals.set("v", vec![1usize, 2, 3]).unwrap();
         lua.load(
             r#"
                 correct = 0
@@ -55,9 +45,7 @@ fn test_from_array() {
         )
         .exec()
         .unwrap();
-        let correct = globals
-            .get::<_, usize>("correct")
-            .unwrap();
+        let correct = globals.get::<_, usize>("correct").unwrap();
         assert_eq!(correct, 6);
     });
 }
