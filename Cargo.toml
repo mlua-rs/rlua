@@ -31,6 +31,9 @@ builtin-lua = ["cc"]
 # the final binary manually.  The builtin-lua and system-lua features are
 # mutually exclusive and enabling both will cause an error at build time.
 system-lua = ["pkg-config"]
+# Enabled functions from the math module that have been deprecated
+lua-compat-mathlib = []
+
 
 [dependencies]
 libc = { version = "0.2" }
