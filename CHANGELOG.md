@@ -1,3 +1,9 @@
+## [0.17.1]
+- Add "lua-compat-mathlib" feature, which enables Lua's LUA_COMPAT_MATHLIB
+  option.
+- Bump num-traits version to 0.2.14 and fix some incompatibilities
+- Fix some tests from improved diagnostics in recent rustc.
+
 ## [0.17]
 - API incompatible change: depend on `bstr` crate and implement `ToLua` /
   `FromLua` for `BString` and `BStr` types (thanks @azdle!)
