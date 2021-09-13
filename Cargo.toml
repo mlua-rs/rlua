@@ -1,17 +1,17 @@
 [package]
 name = "rlua"
-version = "0.17.1-alpha.0"
+version = "0.17.1"
 authors = ["kyren <kerriganw@gmail.com>"]
 edition = "2018"
 description = "High level bindings to Lua 5.3"
-repository = "https://github.com/kyren/rlua"
+repository = "https://github.com/amethyst/rlua"
 documentation = "https://docs.rs/rlua"
 readme = "README.md"
 keywords = ["lua"]
 license = "MIT"
 
 [badges]
-circle-ci = { repository = "kyren/rlua", branch = "master" }
+circle-ci = { repository = "amethyst/rlua", branch = "master" }
 
 [features]
 default = ["builtin-lua"]
