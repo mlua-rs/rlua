@@ -14,7 +14,7 @@ license = "MIT"
 circle-ci = { repository = "kyren/rlua", branch = "master" }
 
 [features]
-default = ["builtin-lua"]
+default = ["builtin-lua54"]
 # Builds the correct version of Lua 5.4 inside the crate. If you want to link a
 # specialized version of lua into your binary, you can disable this feature to
 # do that, but care must be taken.  `rlua` makes at least the following
@@ -23,7 +23,16 @@ default = ["builtin-lua"]
 #   * LUA_NUMBER as double
 #   * LUA_EXTRASPACE is at least pointer sized and has at least pointer alignment.
 #   * LUAI_MAXSTACK is 1_000_000
-builtin-lua = ["cc"]
+builtin-lua54 = ["cc"]
+# Builds the correct version of Lua 5.3 inside the crate. If you want to link a
+# specialized version of lua into your binary, you can disable this feature to
+# do that, but care must be taken.  `rlua` makes at least the following
+# assumptions about the linked lua library:
+#   * LUA_INTEGER is long long
+#   * LUA_NUMBER as double
+#   * LUA_EXTRASPACE is at least pointer sized and has at least pointer alignment.
+#   * LUAI_MAXSTACK is 1_000_000
+builtin-lua53 = ["cc"]
 # Uses pkg-config to find an appropriate lua 5.4 library to link with.  All of
 # the caveats about disabling the default builtin-lua feature apply here as
 # well.  If neither the builtin-lua nor the system-lua feature is enabled, then
