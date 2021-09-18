@@ -220,6 +220,7 @@ pub unsafe fn push_string<S: ?Sized + AsRef<[u8]>>(
     })
 }
 
+#[cfg(rlua_lua54)]
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata_uv<T>(
     state: *mut ffi::lua_State,
@@ -237,6 +238,24 @@ pub unsafe fn push_userdata_uv<T>(
     Ok(())
 }
 
+#[cfg(rlua_lua53)]
+// Internally uses 4 stack spaces, does not call checkstack
+pub unsafe fn push_userdata_uv<T>(
+    state: *mut ffi::lua_State,
+    t: T,
+    uvalues_count: c_int,
+) -> Result<()> {
+    rlua_debug_assert!(
+        uvalues_count > 0,
+        "userdata user values cannot be below zero"
+    );
+    assert!(uvalues_count == 1, "This version of Lua only supports one user value.");
+    let ud = protect_lua_closure(state, 0, 1, move |state| {
+        ffi::lua_newuserdata(state, mem::size_of::<T>()) as *mut T
+    })?;
+    ptr::write(ud, t);
+    Ok(())
+}
 pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
     let ud = ffi::lua_touserdata(state, index) as *mut T;
     rlua_debug_assert!(!ud.is_null(), "userdata pointer is null");

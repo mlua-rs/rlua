@@ -73,6 +73,7 @@ fn main() {
             .file("lua5.4/lvm.c")
             .file("lua5.4/lzio.c")
             .compile("liblua5.4.a");
+        println!("cargo:rustc-cfg=rlua_lua54");
     }
 
     #[cfg(feature = "builtin-lua53")]
@@ -134,6 +135,7 @@ fn main() {
             .file("lua5.3/src/lvm.c")
             .file("lua5.3/src/lzio.c")
             .compile("liblua5.3.a");
+        println!("cargo:rustc-cfg=rlua_lua53");
     }
 
     #[cfg(feature = "system-lua")]

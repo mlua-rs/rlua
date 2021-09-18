@@ -46,6 +46,8 @@ mod macros;
 mod context;
 mod conversion;
 mod error;
+#[cfg_attr(rlua_lua54, path = "ffi_lua54.rs")]
+#[cfg_attr(rlua_lua53, path = "ffi_lua53.rs")]
 mod ffi;
 mod function;
 mod hook;
