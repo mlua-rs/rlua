@@ -404,6 +404,32 @@ pub unsafe fn setiuservalue(
     ffi::lua_setuservalue(state, index);
 }
 
+#[cfg(rlua_lua54)]
+// Wrapper around lua_resume(), with slight API differences ironed out.
+pub unsafe fn do_resume(
+    state: *mut ffi::lua_State,
+    from: *mut ffi::lua_State,
+    nargs: c_int,
+    nresults: *mut c_int,
+) -> c_int {
+    ffi::lua_resume(state, from, nargs, nresults)
+}
+
+#[cfg(rlua_lua53)]
+// Wrapper around lua_resume(), with slight API differences ironed out.
+pub unsafe fn do_resume(
+    state: *mut ffi::lua_State,
+    from: *mut ffi::lua_State,
+    nargs: c_int,
+    nresults: *mut c_int,
+) -> c_int {
+    let res = ffi::lua_resume(state, from, nargs);
+    if res == ffi::LUA_OK || res == ffi::LUA_YIELD {
+        *nresults = ffi::lua_gettop(state);
+    }
+    res
+}
+
 // In the context of a lua callback, this will call the given function and if the given function
 // returns an error, *or if the given function panics*, this will result in a call to lua_error (a
 // longjmp).  The error or panic is wrapped in such a way that when calling pop_error back on
