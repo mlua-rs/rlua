@@ -351,6 +351,7 @@ impl Lua {
         }
     }
 
+    #[cfg(rlua_lua54)]
     /// Sets the garbage collector to incremental mode.
     ///
     /// Returns the previous mode (`LUA_GCGEN` or `LUA_GCINC`).  More information can be found in the
@@ -369,6 +370,7 @@ impl Lua {
         }
     }
 
+    #[cfg(rlua_lua54)]
     /// Sets the garbage collector to generational mode.
     ///
     /// Returns the previous mode (`LUA_GCGEN` or `LUA_GCINC`).  More information can be found in the
@@ -392,7 +394,7 @@ impl Lua {
     /// documentation][lua_doc].
     ///
     /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
-    #[deprecated(note = "please use `gc_set_inc` instead")]
+    #[cfg_attr(rlua_lua54, deprecated(note = "please use `gc_set_inc` instead"))]
     #[allow(deprecated)]
     pub fn gc_set_pause(&self, pause: c_int) -> c_int {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETPAUSE, pause) }
@@ -404,7 +406,7 @@ impl Lua {
     /// [Lua 5.4 documentation][lua_doc].
     ///
     /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
-    #[deprecated(note = "please use `gc_set_inc` instead")]
+    #[cfg_attr(rlua_lua54, deprecated(note = "please use `gc_set_inc` instead"))]
     #[allow(deprecated)]
     pub fn gc_set_step_multiplier(&self, step_multiplier: c_int) -> c_int {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETSTEPMUL, step_multiplier) }
@@ -495,6 +497,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
 
     let state = ffi::lua_newstate(allocator, &mut *extra as *mut ExtraData as *mut c_void);
 
+    #[cfg(rlua_lua54)]
     ffi::lua_setcstacklimit(state, SAFE_CSTACK_SIZE);
 
     extra.ref_thread = rlua_expect!(

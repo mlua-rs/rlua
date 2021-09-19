@@ -362,6 +362,48 @@ pub unsafe extern "C" fn userdata_destructor<T>(state: *mut ffi::lua_State) -> c
     })
 }
 
+#[cfg(rlua_lua54)]
+// Wrapper around ffi::lua_getiuservalue or ffi::lua_getuservalue depending on the Lua version.
+pub unsafe fn getiuservalue(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    n: c_int) -> c_int
+{
+    ffi::lua_getiuservalue(state, index, n)
+}
+
+#[cfg(rlua_lua53)]
+// Wrapper around ffi::lua_getiuservalue or ffi::lua_getuservalue depending on the Lua version.
+pub unsafe fn getiuservalue(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    n: c_int) -> c_int
+{
+    assert!(n == 1);
+    ffi::lua_getuservalue(state, index)
+}
+
+#[cfg(rlua_lua54)]
+// Wrapper around ffi::lua_setiuservalue or ffi::lua_setuservalue depending on the Lua version.
+pub unsafe fn setiuservalue(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    n: c_int)
+{
+    ffi::lua_setiuservalue(state, index, n);
+}
+
+#[cfg(rlua_lua53)]
+// Wrapper around ffi::lua_setiuservalue or ffi::lua_setuservalue depending on the Lua version.
+pub unsafe fn setiuservalue(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    n: c_int)
+{
+    assert!(n == 1);
+    ffi::lua_setuservalue(state, index);
+}
+
 // In the context of a lua callback, this will call the given function and if the given function
 // returns an error, *or if the given function panics*, this will result in a call to lua_error (a
 // longjmp).  The error or panic is wrapped in such a way that when calling pop_error back on

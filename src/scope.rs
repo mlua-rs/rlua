@@ -14,7 +14,7 @@ use crate::types::{Callback, LuaRef};
 use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use crate::util::{
     assert_stack, init_userdata_metatable, protect_lua_closure, push_string, push_userdata_uv,
-    take_userdata, StackGuard,
+    take_userdata, StackGuard, getiuservalue, setiuservalue,
 };
 use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 
@@ -175,7 +175,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
                         unsafe {
                             assert_stack(lua.state, 1);
                             lua.push_ref(&u.0);
-                            ffi::lua_getiuservalue(lua.state, -1, 1);
+                            getiuservalue(lua.state, -1, 1);
                             return ffi::lua_touserdata(lua.state, -1)
                                 == check_data.as_ptr() as *mut c_void;
                         }
@@ -243,7 +243,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
             // TODO: is there any need for additional user values within this userdata?
             push_userdata_uv(lua.state, (), 1)?;
             ffi::lua_pushlightuserdata(lua.state, data.as_ptr() as *mut c_void);
-            ffi::lua_setiuservalue(lua.state, -2, 1);
+            setiuservalue(lua.state, -2, 1);
 
             protect_lua_closure(lua.state, 0, 1, move |state| {
                 ffi::lua_newtable(state);
