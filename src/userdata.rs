@@ -5,7 +5,7 @@ use crate::context::Context;
 use crate::error::{Error, Result};
 use crate::ffi;
 use crate::types::LuaRef;
-use crate::util::{assert_stack, get_userdata, StackGuard};
+use crate::util::{assert_stack, get_userdata, getiuservalue, setiuservalue, StackGuard};
 use crate::value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
 
 /// Kinds of metamethods that can be overridden.
@@ -353,7 +353,7 @@ impl<'lua> AnyUserData<'lua> {
             assert_stack(lua.state, 2);
             lua.push_ref(&self.0);
             lua.push_value(v)?;
-            if ffi::lua_setiuservalue(lua.state, -2, n) == 0 {
+            if setiuservalue(lua.state, -2, n) == 0 {
                 Err(Error::RuntimeError(format!(
                     "userdata does not have user value {}",
                     n
@@ -373,7 +373,7 @@ impl<'lua> AnyUserData<'lua> {
             let _sg = StackGuard::new(lua.state);
             assert_stack(lua.state, 3);
             lua.push_ref(&self.0);
-            if ffi::lua_getiuservalue(lua.state, -1, n) == ffi::LUA_TNIL {
+            if getiuservalue(lua.state, -1, n) == ffi::LUA_TNIL {
                 lua.pop_value(); // remove the nil from the stack
                 return Err(Error::RuntimeError(format!(
                     "userdata does not have user value {}",

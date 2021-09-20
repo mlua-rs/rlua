@@ -58,6 +58,7 @@ bitflags! {
     }
 }
 
+#[cfg(rlua_lua54)]
 // at 812, tests pass
 // at 813, tests fail
 // at 700, it should be somewhat safe

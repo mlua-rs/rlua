@@ -221,6 +221,25 @@ pub unsafe fn push_string<S: ?Sized + AsRef<[u8]>>(
 }
 
 #[cfg(rlua_lua54)]
+unsafe fn newuserdatauv(
+    state: *mut ffi::lua_State,
+    size: usize,
+    nuvalues: c_int) -> *mut c_void
+{
+    ffi::lua_newuserdatauv(state, size, nuvalues)
+}
+
+#[cfg(rlua_lua53)]
+unsafe fn newuserdatauv(
+    state: *mut ffi::lua_State,
+    size: usize,
+    nuvalues: c_int) -> *mut c_void
+{
+    assert!(nuvalues <= 1 && nuvalues >= 0);
+    ffi::lua_newuserdata(state, size)
+}
+
+#[cfg(rlua_lua54)]
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata_uv<T>(
     state: *mut ffi::lua_State,
@@ -228,7 +247,7 @@ pub unsafe fn push_userdata_uv<T>(
     uvalues_count: c_int,
 ) -> Result<()> {
     rlua_debug_assert!(
-        uvalues_count > 0,
+        uvalues_count >= 0,
         "userdata user values cannot be below zero"
     );
     let ud = protect_lua_closure(state, 0, 1, move |state| {
@@ -246,7 +265,7 @@ pub unsafe fn push_userdata_uv<T>(
     uvalues_count: c_int,
 ) -> Result<()> {
     rlua_debug_assert!(
-        uvalues_count > 0,
+        uvalues_count >= 0,
         "userdata user values cannot be below zero"
     );
     assert!(uvalues_count == 1, "This version of Lua only supports one user value.");
@@ -379,7 +398,9 @@ pub unsafe fn getiuservalue(
     index: c_int,
     n: c_int) -> c_int
 {
-    assert!(n == 1);
+    if n != 1 {
+        return 0;
+    }
     ffi::lua_getuservalue(state, index)
 }
 
@@ -388,9 +409,9 @@ pub unsafe fn getiuservalue(
 pub unsafe fn setiuservalue(
     state: *mut ffi::lua_State,
     index: c_int,
-    n: c_int)
+    n: c_int) -> c_int
 {
-    ffi::lua_setiuservalue(state, index, n);
+    ffi::lua_setiuservalue(state, index, n)
 }
 
 #[cfg(rlua_lua53)]
@@ -398,10 +419,13 @@ pub unsafe fn setiuservalue(
 pub unsafe fn setiuservalue(
     state: *mut ffi::lua_State,
     index: c_int,
-    n: c_int)
+    n: c_int) -> c_int
 {
-    assert!(n == 1);
+    if n != 1 {
+        return 0;
+    }
     ffi::lua_setuservalue(state, index);
+    1
 }
 
 #[cfg(rlua_lua54)]
@@ -459,7 +483,7 @@ where
     // We cannot shadow rust errors with Lua ones, we pre-allocate enough memory to store a wrapped
     // error or panic *before* we proceed.
     // We don't need any user values in this userdata
-    let ud = ffi::lua_newuserdatauv(
+    let ud = newuserdatauv(
         state,
         mem::size_of::<WrappedError>().max(mem::size_of::<WrappedPanic>()),
         0,
@@ -507,7 +531,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         // on the rust stack at this time.
         // We don't need any user values in this userdata
         let ud =
-            ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
+            newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
         let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             ffi::luaL_traceback(state, state, ptr::null(), 0);
 
@@ -611,7 +635,7 @@ pub unsafe fn push_wrapped_error(state: *mut ffi::lua_State, err: Error) -> Resu
     // We don't need any user values in this userdata
     // TODO: temp
     let ud = protect_lua_closure(state, 0, 1, move |state| {
-        ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError
+        newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError
     })?;
     ptr::write(ud, WrappedError(err));
     get_error_metatable(state);
@@ -725,7 +749,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
         ffi::luaL_checkstack(state, 2, ptr::null());
         // We don't need any user values in this userdata
         let ud =
-            ffi::lua_newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
+            newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
 
         ptr::write(ud, WrappedError(Error::CallbackDestructed));
         get_error_metatable(state);
@@ -778,7 +802,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
     ffi::lua_pushlightuserdata(state, &ERROR_PRINT_BUFFER_KEY as *const u8 as *mut c_void);
 
     // We don't need any user values in this userdata
-    let ud = ffi::lua_newuserdatauv(state, mem::size_of::<String>(), 0) as *mut String;
+    let ud = newuserdatauv(state, mem::size_of::<String>(), 0) as *mut String;
     ptr::write(ud, String::new());
 
     ffi::lua_newtable(state);
