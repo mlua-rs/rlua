@@ -179,6 +179,7 @@ fn detroys_userdata() {
     assert_eq!(Arc::strong_count(&rc), 1);
 }
 
+#[cfg(rlua_lua54)]
 #[test]
 fn user_value() {
     struct MyUserData;
@@ -203,6 +204,26 @@ fn user_value() {
     });
 }
 
+#[cfg(rlua_lua53)]
+#[test]
+fn user_value() {
+    struct MyUserData;
+    impl UserData for MyUserData {}
+
+    Lua::new().context(|lua| {
+        let ud = lua.create_userdata(MyUserData).unwrap();
+        ud.set_i_user_value("hello", 1).unwrap();
+        assert!(ud.set_i_user_value("world", 2).is_err());
+        assert_eq!(ud.get_i_user_value::<String>(1).unwrap(), "hello");
+        assert!(ud.get_i_user_value::<String>(2).is_err());
+        assert!(ud.get_i_user_value::<u32>(1).is_err());
+        assert!(ud.get_i_user_value::<u32>(2).is_err());
+        assert!(ud.get_i_user_value::<String>(0).is_err());
+        assert!(ud.get_i_user_value::<String>(3).is_err());
+        assert!(ud.get_i_user_value::<u32>(0).is_err());
+        assert!(ud.get_i_user_value::<u32>(3).is_err());
+    });
+}
 #[test]
 fn test_functions() {
     struct MyUserData(i64);
