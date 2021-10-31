@@ -342,6 +342,17 @@ impl<'lua> AnyUserData<'lua> {
 
     /// Sets an associated value to this `AnyUserData`.
     ///
+    /// The value may be any Lua value whatsoever, and can be retrieved with [`get_user_value`].
+    ///
+    /// Equivalent to set_i_user_value(v, 1)
+    ///
+    /// [`get_i_user_value`]: #method.get_i_user_value
+    pub fn set_user_value<V: ToLua<'lua>>(&self, v: V) -> Result<()> {
+        self.set_i_user_value(v, 1)
+    }
+
+    /// Sets an associated value to this `AnyUserData`.
+    ///
     /// The value may be any Lua value whatsoever, and can be retrieved with [`get_i_user_value`].
     ///
     /// [`get_i_user_value`]: #method.get_i_user_value
@@ -362,6 +373,13 @@ impl<'lua> AnyUserData<'lua> {
                 Ok(())
             }
         }
+    }
+
+    /// Returns an associated value set by [`set_user_value`].
+    ///
+    /// [`set_user_value`]: #method.set_user_value
+    pub fn get_user_value<V: FromLua<'lua>>(&self) -> Result<V> {
+        self.get_i_user_value(1)
     }
 
     /// Returns an associated value set by [`set_i_user_value`].
