@@ -167,7 +167,6 @@ extern "C" {
     pub fn lua_sethook(state: *mut lua_State, f: Option<lua_Hook>, mask: c_int, count: c_int) -> c_int;
 
     pub fn luaopen_base(state: *mut lua_State) -> c_int;
-    pub fn luaopen_coroutine(state: *mut lua_State) -> c_int;
     pub fn luaopen_table(state: *mut lua_State) -> c_int;
     pub fn luaopen_io(state: *mut lua_State) -> c_int;
     pub fn luaopen_os(state: *mut lua_State) -> c_int;
@@ -178,32 +177,16 @@ extern "C" {
     pub fn luaopen_package(state: *mut lua_State) -> c_int;
 
     pub fn luaL_newstate() -> *mut lua_State;
-    pub fn luaL_openlibs(state: *mut lua_State);
-    pub fn luaL_requiref(
-        state: *mut lua_State,
-        modname: *const c_char,
-        openf: lua_CFunction,
-        glb: c_int,
-    );
 
-    pub fn luaL_loadbufferx(
+    pub fn luaL_loadbuffer(
         state: *mut lua_State,
         buf: *const c_char,
         size: usize,
         name: *const c_char,
-        mode: *const c_char,
     ) -> c_int;
     pub fn luaL_ref(state: *mut lua_State, table: c_int) -> c_int;
     pub fn luaL_unref(state: *mut lua_State, table: c_int, lref: c_int);
     pub fn luaL_checkstack(state: *mut lua_State, size: c_int, msg: *const c_char);
-    pub fn luaL_traceback(
-        push_state: *mut lua_State,
-        state: *mut lua_State,
-        msg: *const c_char,
-        level: c_int,
-    );
-    pub fn luaL_len(push_state: *mut lua_State, index: c_int) -> lua_Integer;
-    pub fn luaL_tolstring(state: *mut lua_State, index: c_int, len: *mut usize) -> *const c_char;
 }
 
 // The following are re-implementations of what are macros in the Lua C API
@@ -284,6 +267,3 @@ pub unsafe fn lua_isnone(state: *mut lua_State, index: c_int) -> c_int {
     }
 }
 
-pub unsafe fn luaL_tostring(state: *mut lua_State, index: c_int) -> *const c_char {
-    luaL_tolstring(state, index, ptr::null_mut())
-}

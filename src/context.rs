@@ -21,7 +21,7 @@ use crate::util::{
     assert_stack, callback_error, check_stack, get_userdata, get_wrapped_error,
     init_userdata_metatable, pop_error, protect_lua, protect_lua_closure,
     push_globaltable, push_string, push_userdata_uv, push_wrapped_error, StackGuard,
-    tointegerx, tonumberx, isluainteger,
+    tointegerx, tonumberx, isluainteger, loadbufferx,
 };
 use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
@@ -845,7 +845,7 @@ impl<'lua> Context<'lua> {
             assert_stack(self.state, 1);
 
             match if let Some(name) = name {
-                ffi::luaL_loadbufferx(
+                loadbufferx(
                     self.state,
                     source.as_ptr() as *const c_char,
                     source.len(),
@@ -853,7 +853,7 @@ impl<'lua> Context<'lua> {
                     cstr!("t"),
                 )
             } else {
-                ffi::luaL_loadbufferx(
+                loadbufferx(
                     self.state,
                     source.as_ptr() as *const c_char,
                     source.len(),

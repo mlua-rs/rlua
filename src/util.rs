@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::borrow::Cow;
+use std::ffi::CStr;
 use std::fmt::Write;
 use std::os::raw::{c_char, c_int, c_void};
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
@@ -615,6 +616,53 @@ pub use ffi::lua_rawlen as rawlen;
 pub unsafe fn rawlen(state: *mut ffi::lua_State, index: c_int) -> usize
 {
     ffi::lua_objlen(state, index)
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::luaL_loadbufferx as loadbufferx;
+
+#[cfg(rlua_lua51)]
+// Implementation of luaL_loadbufferx for Lua 5.1.
+pub unsafe fn loadbufferx(
+        state: *mut ffi::lua_State,
+        buf: *const c_char,
+        size: usize,
+        name: *const c_char,
+        mode: *const c_char,
+    ) -> c_int
+{
+    // Lua 5.1 has luaL_loadbuffer(), which is the same but without the mode,
+    // so we need to check manually.
+    let mode = if mode == ptr::null() {
+        "bt"
+    } else {
+        match CStr::from_ptr(mode).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                return ffi::LUA_ERRSYNTAX;
+            }
+        }
+    };
+    let allow_text = mode.contains('t');
+    let allow_binary = mode.contains('b');
+
+    // We want to assume at least one byte.
+    if size < 1 {
+        return ffi::LUA_ERRSYNTAX;
+    }
+    if !allow_binary {
+        // Compiled Lua starts with LUA_SIGNATURE ("\033Lua")
+        if ptr::read(buf) == 27 {
+            return ffi::LUA_ERRSYNTAX;
+        }
+    }
+    if !allow_text {
+        if ptr::read(buf) != 27 {
+            return ffi::LUA_ERRSYNTAX;
+        }
+    }
+    // We've done a basic check, so now foward to luaL_loadbuffer.
+    ffi::luaL_loadbuffer(state, buf, size, name)
 }
 
 // In the context of a lua callback, this will call the given function and if the given function
