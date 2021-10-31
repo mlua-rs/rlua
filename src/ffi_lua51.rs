@@ -149,6 +149,8 @@ extern "C" {
     pub fn lua_settable(state: *mut lua_State, index: c_int);
     pub fn lua_rawset(state: *mut lua_State, index: c_int);
     pub fn lua_setmetatable(state: *mut lua_State, index: c_int);
+    pub fn lua_setfenv(state: *mut lua_State, index: c_int) -> c_int;
+    pub fn lua_getfenv(state: *mut lua_State, index: c_int);
 
     pub fn lua_objlen(state: *mut lua_State, index: c_int) -> usize;
     pub fn lua_next(state: *mut lua_State, index: c_int) -> c_int;

@@ -259,7 +259,7 @@ pub unsafe fn push_userdata_uv<T>(
     Ok(())
 }
 
-#[cfg(rlua_lua53)]
+#[cfg(any(rlua_lua53, rlua_lua51))]
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata_uv<T>(
     state: *mut ffi::lua_State,
@@ -406,6 +406,21 @@ pub unsafe fn getiuservalue(
     ffi::lua_getuservalue(state, index)
 }
 
+#[cfg(rlua_lua51)]
+// Wrapper around ffi::lua_getiuservalue, ffi::lua_getuservalue depending on the Lua version.
+// On Lua 5.1 this is emulated using ffi::lua_getfenv; the index must be 1.
+pub unsafe fn getiuservalue(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    n: c_int) -> c_int
+{
+    if n != 1 {
+        return 0;
+    }
+    ffi::lua_getfenv(state, index);
+    1
+}
+
 #[cfg(rlua_lua54)]
 // Wrapper around ffi::lua_setiuservalue or ffi::lua_setuservalue depending on the Lua version.
 pub unsafe fn setiuservalue(
@@ -428,6 +443,20 @@ pub unsafe fn setiuservalue(
     }
     ffi::lua_setuservalue(state, index);
     1
+}
+
+#[cfg(rlua_lua51)]
+// Wrapper around ffi::lua_setiuservalue or ffi::lua_setuservalue depending on the Lua version.
+// On Lua 5.1 this maps to ffi::lua_setfenv; index must be 1 and the value must be a table.
+pub unsafe fn setiuservalue(
+    state: *mut ffi::lua_State,
+    index: c_int,
+    n: c_int) -> c_int
+{
+    if n != 1 {
+        return 0;
+    }
+    ffi::lua_setfenv(state, index)
 }
 
 #[cfg(rlua_lua54)]
@@ -454,6 +483,86 @@ pub unsafe fn do_resume(
         *nresults = ffi::lua_gettop(state);
     }
     res
+}
+
+#[cfg(rlua_lua51)]
+// Wrapper around lua_resume(), with slight API differences ironed out.
+pub unsafe fn do_resume(
+    state: *mut ffi::lua_State,
+    _from: *mut ffi::lua_State,
+    nargs: c_int,
+    nresults: *mut c_int,
+) -> c_int {
+    let res = ffi::lua_resume(state, nargs);
+    if res == ffi::LUA_OK || res == ffi::LUA_YIELD {
+        *nresults = ffi::lua_gettop(state);
+    }
+    res
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+// Implements the equivalent of the `lua_pushglobaltable()` compatibility macro.
+pub unsafe fn push_globaltable(state: *mut ffi::lua_State)
+{
+    ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
+}
+
+#[cfg(rlua_lua51)]
+// The same as `ffi::lua_pushglobaltable()`
+pub unsafe fn push_globaltable(state: *mut ffi::lua_State)
+{
+    ffi::lua_pushglobaltable(state);
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::lua_tointegerx as tointegerx;
+
+#[cfg(rlua_lua51)]
+// Wrapper implementing the `ffi::lua_tointegerx` API
+pub unsafe fn tointegerx(state: *mut ffi::lua_State, index: c_int, isnum: *mut c_int) -> lua_Integer
+{
+    if (ffi::lua_isnumber(state, index) == 0) {
+        if isnum != ptr::nullptr() {
+            *isnum = 0;
+        }
+        return 0;
+    } else {
+        if isnum != ptr::nullptr() {
+            *isnum = 1;
+        }
+        ffi::lua_tointeger(state, index)
+    }
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::lua_tonumberx as tonumberx;
+
+#[cfg(rlua_lua51)]
+// Wrapper implementing the `ffi::lua_tonumberx` API
+pub unsafe fn tonumberx(state: *mut ffi::lua_State, index: c_int, isnum: *mut c_int) -> lua_Integer
+{
+    if (ffi::lua_isnumber(state, index) == 0) {
+        if isnum != ptr::nullptr() {
+            *isnum = 0;
+        }
+        return 0;
+    } else {
+        if isnum != ptr::nullptr() {
+            *isnum = 1;
+        }
+        ffi::lua_tonumber(state, index)
+    }
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::lua_isinteger as isluainteger;
+
+#[cfg(rlua_lua51)]
+// Implementation of `lua_isinteger()` for Lua 5.1
+pub unsafe fn isluainteger(state: *mut ffi::lua_State, index: c_int) -> c_int
+{
+    // Lua 5.1 doesn't support integers
+    0
 }
 
 // In the context of a lua callback, this will call the given function and if the given function
@@ -831,7 +940,7 @@ unsafe fn to_string<'a>(state: *mut ffi::lua_State, index: c_int) -> Cow<'a, str
         }
         ffi::LUA_TNUMBER => {
             let mut isint = 0;
-            let i = ffi::lua_tointegerx(state, -1, &mut isint);
+            let i = tointegerx(state, -1, &mut isint);
             if isint == 0 {
                 ffi::lua_tonumber(state, index).to_string().into()
             } else {
