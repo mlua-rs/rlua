@@ -1,5 +1,8 @@
 fn main() {
     let mut lua_version_features = 0;
+    if cfg!(feature = "system-lua51") {
+        lua_version_features += 1;
+    }
     if cfg!(feature = "system-lua53") {
         lua_version_features += 1;
     }
@@ -139,6 +142,14 @@ fn main() {
             .file("lua5.3/src/lzio.c")
             .compile("liblua5.3.a");
         println!("cargo:rustc-cfg=rlua_lua53");
+    }
+
+    #[cfg(feature = "system-lua51")]
+    {
+        pkg_config::Config::new()
+            .probe("lua5.1")
+            .unwrap();
+        println!("cargo:rustc-cfg=rlua_lua51");
     }
 
     #[cfg(feature = "system-lua53")]
