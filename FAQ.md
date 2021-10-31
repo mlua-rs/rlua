@@ -11,12 +11,16 @@
 
 Normally, Rust types passed to `Lua` must be `Send`, because `Lua` itself is `Send`, and must be `'static`, because there is no way to tell when Lua might garbage collect them.  There is, however, a limited way to lift both of these restrictions.  You can call `Lua::scope` to create userdata types that do not have to be `Send`, and callback types that do not have to be `Send` OR `'static`.  However, after `scope` returns any `UserData` passed to Lua are invalidated (access from Lua will error).
 
-### How to I store values along-side `Lua`?
+### How can I store Lua values (like `Table`) outside of `Lua::context()`?
 
-> There are two rules about rlua reference types that you're butting up against:
->
-> rlua reference types (Table, Function, etc) hold references to Lua, and are not really designed to be stored along-side Lua, because that would require self borrows. You CAN make structs in Rust that self borrow, but you really don't want to go down that road, it's very complex and you 99.999% of the time don't need it.
->
-> rlua reference types are also not designed to be stored inside userdata inside Lua. When I say userdata here, I mean both actual UserData types and also things like Rust callbacks. For one, there are some actual safety issues if you were able to do that, but more importantly Lua itself is not really designed for this either. Lua's C API does not provide a way of telling Lua that a userdata contains a registry reference, so you would end up potentially making something that cannot be garbage collected. The actual issue is very complicated but you can read about it some here.
+The Lua API in general doesn't give out references to Lua values - you can only interact with them indirectly throught the API.  In `rlua`, types like `rlua::Table` internally store an index into the current `Lua` stack, which is why they are only valid within the `context` callback.
 
-* https://github.com/kyren/rlua/issues/73#issuecomment-370222198
+There are some options for keeping longer references:
+
+#### Store it in the registry.
+
+The Lua registry is a global `Table` available for use through the API.  Add references using `Context::create_registry_value()` which returns a key which can be later used with `Context::registry_value()`, or provide your own key with `Context::set_named_registry_value()`/`Context::named_registry_value()`.
+
+#### Store it with a `UserData` value
+
+A Lua value can be attached with a `UserData` value using `AnyUserData::set_user_value()`/`AnyUserData::get_user_value()`.
