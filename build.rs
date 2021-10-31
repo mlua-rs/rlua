@@ -1,6 +1,9 @@
 fn main() {
     let mut lua_version_features = 0;
-    if cfg!(feature = "system-lua") {
+    if cfg!(feature = "system-lua53") {
+        lua_version_features += 1;
+    }
+    if cfg!(feature = "system-lua54") {
         lua_version_features += 1;
     }
     if cfg!(feature = "builtin-lua53") {
@@ -138,11 +141,19 @@ fn main() {
         println!("cargo:rustc-cfg=rlua_lua53");
     }
 
-    #[cfg(feature = "system-lua")]
+    #[cfg(feature = "system-lua53")]
     {
         pkg_config::Config::new()
-            .atleast_version("5.4")
-            .probe("lua")
+            .probe("lua5.3")
             .unwrap();
+        println!("cargo:rustc-cfg=rlua_lua53");
+    }
+
+    #[cfg(feature = "system-lua54")]
+    {
+        pkg_config::Config::new()
+            .probe("lua5.4")
+            .unwrap();
+        println!("cargo:rustc-cfg=rlua_lua54");
     }
 }
