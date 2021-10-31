@@ -665,6 +665,42 @@ pub unsafe fn loadbufferx(
     ffi::luaL_loadbuffer(state, buf, size, name)
 }
 
+#[cfg(any(rlua_lua53, rlua_lua54))]
+// Like luaL_requiref but doesn't leave the module on the stack.
+pub unsafe fn requiref(
+    state: *mut ffi::lua_State,
+    modname: *const c_char,
+    openf: ffi::lua_CFunction,
+    glb: c_int)
+{
+    ffi::luaL_requiref(state, modname, openf, glb);
+    ffi::lua_pop(state, 1);
+}
+
+#[cfg(rlua_lua51)]
+// Replacement for luaL_requiref in lua 5.1.
+// This is only used internally to open builtin libraries, so isn't
+// a complete implementation.  For example, we don't check whether
+// package.loaded already includes the library.
+pub unsafe fn requiref(
+    state: *mut ffi::lua_State,
+    modname: *const c_char,
+    openf: ffi::lua_CFunction,
+    glb: c_int,
+) {
+    // Lua 5.1 stores the package.loaded table at registry["_LOADED"].
+    ffi::lua_getfield(state, ffi::LUA_REGISTRYINDEX, cstr!("_LOADED"));
+    ffi::lua_pushcfunction(state, openf);
+    ffi::lua_string(state, modname);
+    ffi::lua_call(state, 1, 1);
+    // Stack has package.loaded then the returned value from `openf`
+    ffi::lua_pushvalue(state, -1);
+    // Stack has package.loaded then the module twice
+    ffi::lua_setfield(state, -3, modname);
+    ffi::lua_setglobal(state, modname);
+    ffi::lua_remove(state, -2);
+}
+
 // In the context of a lua callback, this will call the given function and if the given function
 // returns an error, *or if the given function panics*, this will result in a call to lua_error (a
 // longjmp).  The error or panic is wrapped in such a way that when calling pop_error back on

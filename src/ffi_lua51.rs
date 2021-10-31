@@ -141,6 +141,8 @@ extern "C" {
     pub fn lua_rawgeti(state: *mut lua_State, index: c_int, n: lua_Integer);
     pub fn lua_rawseti(state: *mut lua_State, index: c_int, n: c_int);
     pub fn lua_getmetatable(state: *mut lua_State, index: c_int) -> c_int;
+    pub fn lua_setfield(state: *mut lua_State, index: c_int, k: *const c_char);
+    pub fn lua_getfield(state: *mut lua_State, index: c_int, k: *const c_char);
 
     pub fn lua_createtable(state: *mut lua_State, narr: c_int, nrec: c_int);
     pub fn lua_newuserdata(state: *mut lua_State, size: usize) -> *mut c_void;
@@ -267,3 +269,6 @@ pub unsafe fn lua_isnone(state: *mut lua_State, index: c_int) -> c_int {
     }
 }
 
+pub unsafe fn lua_setglobal(state: *mut lua_State, name: *const c_char) {
+    lua_setfield(state, LUA_GLOBALSINDEX, name);
+}

@@ -20,7 +20,7 @@ use crate::markers::NoRefUnwindSafe;
 use crate::types::Callback;
 use crate::util::{
     assert_stack, init_error_registry, protect_lua_closure, safe_pcall, safe_xpcall,
-    userdata_destructor, push_globaltable,
+    userdata_destructor, push_globaltable, requiref,
 };
 
 bitflags! {
@@ -579,44 +579,35 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
 
 unsafe fn load_from_std_lib(state: *mut ffi::lua_State, lua_mod: StdLib) {
     if lua_mod.contains(StdLib::BASE) {
-        ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
     }
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     if lua_mod.contains(StdLib::COROUTINE) {
-        ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
     }
     if lua_mod.contains(StdLib::TABLE) {
-        ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("table"), ffi::luaopen_table, 1);
     }
     if lua_mod.contains(StdLib::IO) {
-        ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("io"), ffi::luaopen_io, 1);
     }
     if lua_mod.contains(StdLib::OS) {
-        ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("os"), ffi::luaopen_os, 1);
     }
     if lua_mod.contains(StdLib::STRING) {
-        ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("string"), ffi::luaopen_string, 1);
     }
     if lua_mod.contains(StdLib::UTF8) {
-        ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
     }
     if lua_mod.contains(StdLib::MATH) {
-        ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("math"), ffi::luaopen_math, 1);
     }
     if lua_mod.contains(StdLib::PACKAGE) {
-        ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("package"), ffi::luaopen_package, 1);
     }
     if lua_mod.contains(StdLib::DEBUG) {
-        ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
     }
 }
 
