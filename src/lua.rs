@@ -2,7 +2,9 @@ use std::any::TypeId;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::os::raw::{c_int, c_uint, c_void};
+use std::os::raw::{c_int, c_void};
+#[cfg(rlua_lua54)]
+use std::os::raw::c_uint;
 use std::ptr;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -441,14 +443,12 @@ pub(crate) struct ExtraData {
 // be the main state, not a substate.
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
     #[cfg(any(rlua_lua53, rlua_lua54))]
-    if cfg!(rlua_lua53) || cfg!(rlua_lua54) {
-        *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
-    } else if cfg!(rlua_lua51) {
+    return *(ffi::lua_getextraspace(state) as *mut *mut ExtraData);
+    #[cfg(rlua_lua51)]
+    {
         let mut extra: *mut c_void = ptr::null_mut();
         let _ = ffi::lua_getallocf(state, &mut extra);
-        extra as *mut ExtraData
-    } else {
-        unreachable!()
+        return extra as *mut ExtraData;
     }
 }
 

@@ -231,7 +231,7 @@ unsafe fn newuserdatauv(
     ffi::lua_newuserdatauv(state, size, nuvalues)
 }
 
-#[cfg(rlua_lua53)]
+#[cfg(any(rlua_lua53, rlua_lua51))]
 unsafe fn newuserdatauv(
     state: *mut ffi::lua_State,
     size: usize,
@@ -340,7 +340,15 @@ pub unsafe fn init_userdata_metatable<T>(
         push_string(state, "__index")?;
         ffi::lua_pushvalue(state, -1);
 
+        // On Lua 5.2+, lua_rawget conveniently returns the type
+        #[cfg(any(rlua_lua53, rlua_lua54))]
         let index_type = ffi::lua_rawget(state, -3);
+        #[cfg(rlua_lua51)]
+        let index_type = {
+            let t = ffi::lua_type(state, -3);
+            ffi::lua_rawget(state, -3);
+            t
+        };
         if index_type == ffi::LUA_TNIL {
             ffi::lua_pop(state, 1);
             ffi::lua_pushvalue(state, members);
@@ -521,7 +529,7 @@ pub use ffi::lua_tointegerx as tointegerx;
 // Wrapper implementing the `ffi::lua_tointegerx` API
 pub unsafe fn tointegerx(state: *mut ffi::lua_State, index: c_int, isnum: *mut c_int) -> ffi::lua_Integer
 {
-    if (ffi::lua_isnumber(state, index) == 0) {
+    if ffi::lua_isnumber(state, index) == 0 {
         if isnum != ptr::null_mut() {
             *isnum = 0;
         }
@@ -541,7 +549,7 @@ pub use ffi::lua_tonumberx as tonumberx;
 // Wrapper implementing the `ffi::lua_tonumberx` API
 pub unsafe fn tonumberx(state: *mut ffi::lua_State, index: c_int, isnum: *mut c_int) -> ffi::lua_Number
 {
-    if (ffi::lua_isnumber(state, index) == 0) {
+    if ffi::lua_isnumber(state, index) == 0 {
         if isnum != ptr::null_mut() {
             *isnum = 0;
         }
@@ -559,7 +567,7 @@ pub use ffi::lua_isinteger as isluainteger;
 
 #[cfg(rlua_lua51)]
 // Implementation of `lua_isinteger()` for Lua 5.1
-pub unsafe fn isluainteger(state: *mut ffi::lua_State, index: c_int) -> c_int
+pub unsafe fn isluainteger(_state: *mut ffi::lua_State, _index: c_int) -> c_int
 {
     // Lua 5.1 doesn't support integers
     0
@@ -570,7 +578,7 @@ pub use ffi::lua_rotate as rotate;
 
 #[cfg(rlua_lua51)]
 // Implementation of `lua_rotate` for Lua 5.1.
-pub fn rotate(state: *mut ffi::lua_State, index: c_int, n: c_int)
+pub unsafe fn rotate(state: *mut ffi::lua_State, index: c_int, n: c_int)
 {
     if n > 0 {
         // Rotate towards the top
@@ -585,6 +593,19 @@ pub fn rotate(state: *mut ffi::lua_State, index: c_int, n: c_int)
             ffi::lua_remove(state, index+1);
         }
     }
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+use ffi::lua_copy as copy;
+
+#[cfg(rlua_lua51)]
+pub unsafe fn copy(state: *mut ffi::lua_State, from: c_int, to: c_int)
+{
+    // First copy the from idx to the top of stack
+    ffi::lua_pushvalue(state, from);
+    // And then put it in the destination (with adjusted count from the
+    // value just pushed).
+    ffi::lua_replace(state, to+1);
 }
 
 #[cfg(any(rlua_lua53, rlua_lua54))]
@@ -753,7 +774,7 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
 
     ffi::lua_pushvalue(state, 2);
     ffi::lua_pushcclosure(state, xpcall_msgh, 1);
-    ffi::lua_copy(state, 1, 2);
+    copy(state, 1, 2);
     ffi::lua_replace(state, 1);
 
     let res = ffi::lua_pcall(state, ffi::lua_gettop(state) - 2, ffi::LUA_MULTRET, 1);
