@@ -18,7 +18,7 @@ use crate::markers::NoRefUnwindSafe;
 use crate::types::Callback;
 use crate::util::{
     assert_stack, init_error_registry, protect_lua_closure, safe_pcall, safe_xpcall,
-    userdata_destructor,
+    userdata_destructor, push_globaltable,
 };
 
 bitflags! {
@@ -302,6 +302,7 @@ impl Lua {
         }
     }
 
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     /// Returns true if the garbage collector is currently running automatically.
     pub fn gc_is_running(&self) -> bool {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCISRUNNING, 0) != 0 }
@@ -436,8 +437,19 @@ pub(crate) struct ExtraData {
     pub hook_callback: Option<Rc<RefCell<dyn FnMut(Context, Debug) -> Result<()>>>>,
 }
 
+// Return the extra data pointer passed to `lua_newstate()`.  `state` must
+// be the main state, not a substate.
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
-    *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
+    #[cfg(any(rlua_lua53, rlua_lua54))]
+    if cfg!(rlua_lua53) || cfg!(rlua_lua54) {
+        *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
+    } else if cfg!(rlua_lua51) {
+        let mut extra: *mut c_void = ptr::null_mut();
+        let _ = ffi::lua_getallocf(state, &mut extra);
+        extra as *mut ExtraData
+    } else {
+        unreachable!()
+    }
 }
 
 unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
@@ -528,7 +540,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
 
             // Override pcall and xpcall with versions that cannot be used to catch rust panics.
 
-            ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
+            push_globaltable(state);
 
             ffi::lua_pushstring(state, cstr!("pcall"));
             ffi::lua_pushcfunction(state, safe_pcall);
@@ -553,8 +565,11 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
     rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
     assert_stack(state, ffi::LUA_MINSTACK);
 
-    // Place pointer to ExtraData in the lua_State "extra space"
-    *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = Box::into_raw(extra);
+    #[cfg(any(rlua_lua53, rlua_lua54))]
+    {
+        // Place pointer to ExtraData in the lua_State "extra space"
+        *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = Box::into_raw(extra);
+    }
 
     Lua {
         main_state: state,

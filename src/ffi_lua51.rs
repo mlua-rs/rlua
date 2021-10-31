@@ -84,6 +84,9 @@ extern "C" {
     pub fn lua_newstate(alloc: lua_Alloc, ud: *mut c_void) -> *mut lua_State;
     pub fn lua_close(state: *mut lua_State);
 
+    pub fn lua_getallocf(state: *mut lua_State, ud: *mut *mut c_void) -> lua_Alloc;
+    pub fn lua_setallocf(state: *mut lua_State, ud: *mut c_void);
+
     pub fn lua_call(state: *mut lua_State, nargs: c_int, nresults: c_int);
     pub fn lua_pcall(
         state: *mut lua_State,

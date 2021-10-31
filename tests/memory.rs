@@ -32,10 +32,13 @@ fn test_memory_limit() {
 #[test]
 fn test_gc_control() {
     let lua = Lua::new();
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     assert!(lua.gc_is_running());
     lua.gc_stop();
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     assert!(!lua.gc_is_running());
     lua.gc_restart();
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     assert!(lua.gc_is_running());
 
     struct MyUserdata(Arc<()>);

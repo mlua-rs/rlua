@@ -75,7 +75,7 @@ pub unsafe fn protect_lua(
     ffi::lua_pushcfunction(state, error_traceback);
     ffi::lua_pushcfunction(state, f);
     if nargs > 0 {
-        ffi::lua_rotate(state, stack_start + 1, 2);
+        rotate(state, stack_start + 1, 2);
     }
 
     let ret = ffi::lua_pcall(state, nargs, ffi::LUA_MULTRET, stack_start + 1);
@@ -138,7 +138,7 @@ where
     ffi::lua_pushcfunction(state, error_traceback);
     ffi::lua_pushcfunction(state, do_call::<F, R>);
     if nargs > 0 {
-        ffi::lua_rotate(state, stack_start + 1, 2);
+        rotate(state, stack_start + 1, 2);
     }
 
     let mut params = Params {
@@ -508,10 +508,10 @@ pub unsafe fn push_globaltable(state: *mut ffi::lua_State)
 }
 
 #[cfg(rlua_lua51)]
-// The same as `ffi::lua_pushglobaltable()`
+// The same as `ffi::lua_pushglobaltable()` in 5.2 onwards.
 pub unsafe fn push_globaltable(state: *mut ffi::lua_State)
 {
-    ffi::lua_pushglobaltable(state);
+    ffi::lua_pushvalue(state, ffi::LUA_GLOBALSINDEX);
 }
 
 #[cfg(any(rlua_lua53, rlua_lua54))]
@@ -519,15 +519,15 @@ pub use ffi::lua_tointegerx as tointegerx;
 
 #[cfg(rlua_lua51)]
 // Wrapper implementing the `ffi::lua_tointegerx` API
-pub unsafe fn tointegerx(state: *mut ffi::lua_State, index: c_int, isnum: *mut c_int) -> lua_Integer
+pub unsafe fn tointegerx(state: *mut ffi::lua_State, index: c_int, isnum: *mut c_int) -> ffi::lua_Integer
 {
     if (ffi::lua_isnumber(state, index) == 0) {
-        if isnum != ptr::nullptr() {
+        if isnum != ptr::null_mut() {
             *isnum = 0;
         }
         return 0;
     } else {
-        if isnum != ptr::nullptr() {
+        if isnum != ptr::null_mut() {
             *isnum = 1;
         }
         ffi::lua_tointeger(state, index)
@@ -539,15 +539,15 @@ pub use ffi::lua_tonumberx as tonumberx;
 
 #[cfg(rlua_lua51)]
 // Wrapper implementing the `ffi::lua_tonumberx` API
-pub unsafe fn tonumberx(state: *mut ffi::lua_State, index: c_int, isnum: *mut c_int) -> lua_Integer
+pub unsafe fn tonumberx(state: *mut ffi::lua_State, index: c_int, isnum: *mut c_int) -> ffi::lua_Number
 {
     if (ffi::lua_isnumber(state, index) == 0) {
-        if isnum != ptr::nullptr() {
+        if isnum != ptr::null_mut() {
             *isnum = 0;
         }
-        return 0;
+        return 0.0;
     } else {
-        if isnum != ptr::nullptr() {
+        if isnum != ptr::null_mut() {
             *isnum = 1;
         }
         ffi::lua_tonumber(state, index)
@@ -563,6 +563,37 @@ pub unsafe fn isluainteger(state: *mut ffi::lua_State, index: c_int) -> c_int
 {
     // Lua 5.1 doesn't support integers
     0
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::lua_rotate as rotate;
+
+#[cfg(rlua_lua51)]
+// Implementation of `lua_rotate` for Lua 5.1.
+pub fn rotate(state: *mut ffi::lua_State, index: c_int, n: c_int)
+{
+    if n > 0 {
+        // Rotate towards the top
+        for _ in 0..n {
+            ffi::lua_insert(state, index);
+        }
+    } else if n < 0 {
+        // Rotate down.
+        for _ in 0..n {
+            ffi::lua_pushvalue(state, index);
+            // The item is now one further down the stack
+            ffi::lua_remove(state, index+1);
+        }
+    }
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::lua_rawlen as rawlen;
+
+#[cfg(rlua_lua51)]
+pub unsafe fn rawlen(state: *mut ffi::lua_State, index: c_int) -> usize
+{
+    ffi::lua_objlen(state, index)
 }
 
 // In the context of a lua callback, this will call the given function and if the given function
@@ -599,11 +630,11 @@ where
         mem::size_of::<WrappedError>().max(mem::size_of::<WrappedPanic>()),
         0,
     );
-    ffi::lua_rotate(state, 1, 1);
+    rotate(state, 1, 1);
 
     match catch_unwind(AssertUnwindSafe(|| f(nargs))) {
         Ok(Ok(r)) => {
-            ffi::lua_rotate(state, 1, -1);
+            rotate(state, 1, -1);
             ffi::lua_pop(state, 1);
             r
         }
