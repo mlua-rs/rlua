@@ -712,6 +712,26 @@ pub unsafe fn requiref(
     ffi::lua_remove(state, -2);
 }
 
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::luaL_tolstring as tolstring;
+
+#[cfg(rlua_lua51)]
+// Implementation of luaL_tolstring
+pub unsafe fn tolstring(state: *mut ffi::lua_State, index: c_int, len: *mut usize)
+    -> *const c_char
+{
+    // First try to call the __tostring metamethod
+    let meta_result = ffi::luaL_callmeta(state, index, cstr!("__tostring"));
+    if meta_result == 1 {
+        // __tostring was called successfully and pushed the result
+    } else {
+        // No __tostring metamethod, so duplicate the result.
+        ffi::lua_pushvalue(state, -1);
+    }
+    // Convert whatever value to a string.
+    ffi::lua_tolstring(state, -1, len)
+}
+
 // In the context of a lua callback, this will call the given function and if the given function
 // returns an error, *or if the given function panics*, this will result in a call to lua_error (a
 // longjmp).  The error or panic is wrapped in such a way that when calling pop_error back on
@@ -814,7 +834,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         ffi::lua_setmetatable(state, -2);
     } else if !is_wrapped_panic(state, -1) {
         if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
-            let s = ffi::luaL_tolstring(state, -1, ptr::null_mut());
+            let s = tolstring(state, -1, ptr::null_mut());
             ffi::luaL_traceback(state, state, s, 0);
             ffi::lua_remove(state, -2);
         }

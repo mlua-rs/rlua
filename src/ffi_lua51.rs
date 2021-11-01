@@ -189,6 +189,7 @@ extern "C" {
     pub fn luaL_ref(state: *mut lua_State, table: c_int) -> c_int;
     pub fn luaL_unref(state: *mut lua_State, table: c_int, lref: c_int);
     pub fn luaL_checkstack(state: *mut lua_State, size: c_int, msg: *const c_char);
+    pub fn luaL_callmeta(state: *mut lua_State, obj: c_int, e: *const c_char) -> c_int;
 }
 
 // The following are re-implementations of what are macros in the Lua C API
