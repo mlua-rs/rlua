@@ -334,7 +334,7 @@ pub unsafe fn init_userdata_metatable<T>(
         }
     }
 
-    let members = members.map(|i| ffi::lua_absindex(state, i));
+    let members = members.map(|i| absindex(state, i));
     ffi::lua_pushvalue(state, metatable);
 
     if let Some(members) = members {
@@ -627,6 +627,21 @@ pub unsafe fn objlen(state: *mut ffi::lua_State, index: c_int) -> ffi::lua_Integ
     let result = ffi::lua_objlen(state, index);
     use std::convert::TryInto;
     result.try_into().unwrap()
+}
+#[cfg(any(rlua_lua53, rlua_lua54))]
+use ffi::lua_absindex as absindex;
+
+#[cfg(rlua_lua51)]
+unsafe fn absindex(state: *mut ffi::lua_State, index: c_int) -> c_int
+{
+    let top = ffi::lua_gettop(state);
+    if index > 0 && index <= top {
+        index
+    } else if index < 0 && index >= -top {
+        top + 1 - index
+    } else {
+        panic!("Invalid index {}, stack top {}", index, top);
+    }
 }
 
 #[cfg(any(rlua_lua53, rlua_lua54))]

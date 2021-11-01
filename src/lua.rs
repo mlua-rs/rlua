@@ -597,6 +597,7 @@ unsafe fn load_from_std_lib(state: *mut ffi::lua_State, lua_mod: StdLib) {
     if lua_mod.contains(StdLib::STRING) {
         requiref(state, cstr!("string"), ffi::luaopen_string, 1);
     }
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     if lua_mod.contains(StdLib::UTF8) {
         requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
     }
