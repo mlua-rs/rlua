@@ -697,7 +697,7 @@ pub unsafe fn requiref(
     state: *mut ffi::lua_State,
     modname: *const c_char,
     openf: ffi::lua_CFunction,
-    glb: c_int,
+    _glb: c_int,
 ) {
     // Lua 5.1 stores the package.loaded table at registry["_LOADED"].
     ffi::lua_getfield(state, ffi::LUA_REGISTRYINDEX, cstr!("_LOADED"));
@@ -730,6 +730,17 @@ pub unsafe fn tolstring(state: *mut ffi::lua_State, index: c_int, len: *mut usiz
     }
     // Convert whatever value to a string.
     ffi::lua_tolstring(state, -1, len)
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::luaL_traceback as traceback;
+
+#[cfg(rlua_lua51)]
+pub unsafe fn traceback(push_state: *mut ffi::lua_State, _state: *mut ffi::lua_State, msg: *const c_char, _level: c_int)
+{
+    // Placeholder - Lua 5.1 doesn't provide luaL_traceback, and debug.traceback may
+    // not be available.  Just return the message.
+    ffi::lua_pushstring(push_state, msg);
 }
 
 // In the context of a lua callback, this will call the given function and if the given function
@@ -811,7 +822,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
         let ud =
             newuserdatauv(state, mem::size_of::<WrappedError>(), 0) as *mut WrappedError;
         let traceback = if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
-            ffi::luaL_traceback(state, state, ptr::null(), 0);
+            traceback(state, state, ptr::null(), 0);
 
             let traceback = to_string(state, -1).into_owned();
             ffi::lua_pop(state, 1);
@@ -835,7 +846,7 @@ pub unsafe extern "C" fn error_traceback(state: *mut ffi::lua_State) -> c_int {
     } else if !is_wrapped_panic(state, -1) {
         if ffi::lua_checkstack(state, LUA_TRACEBACK_STACK) != 0 {
             let s = tolstring(state, -1, ptr::null_mut());
-            ffi::luaL_traceback(state, state, s, 0);
+            traceback(state, state, s, 0);
             ffi::lua_remove(state, -2);
         }
     }
