@@ -645,6 +645,18 @@ unsafe fn absindex(state: *mut ffi::lua_State, index: c_int) -> c_int
 }
 
 #[cfg(any(rlua_lua53, rlua_lua54))]
+use ffi::lua_geti as geti;
+
+#[cfg(rlua_lua51)]
+pub unsafe fn geti(state: *mut ffi::lua_State, index: c_int, i: ffi::lua_Integer) -> c_int
+{
+    let index = absindex(state, index);
+    ffi::lua_pushnumber(state, i as ffi::lua_Number);
+    ffi::lua_gettable(state, index);
+    ffi::lua_type(state, -1)
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
 pub use ffi::luaL_loadbufferx as loadbufferx;
 
 #[cfg(rlua_lua51)]
