@@ -619,6 +619,17 @@ pub unsafe fn rawlen(state: *mut ffi::lua_State, index: c_int) -> usize
 }
 
 #[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::luaL_len as objlen;
+
+#[cfg(rlua_lua51)]
+pub unsafe fn objlen(state: *mut ffi::lua_State, index: c_int) -> ffi::lua_Integer
+{
+    let result = ffi::lua_objlen(state, index);
+    use std::convert::TryInto;
+    result.try_into().unwrap()
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
 pub use ffi::luaL_loadbufferx as loadbufferx;
 
 #[cfg(rlua_lua51)]
@@ -691,7 +702,7 @@ pub unsafe fn requiref(
     // Lua 5.1 stores the package.loaded table at registry["_LOADED"].
     ffi::lua_getfield(state, ffi::LUA_REGISTRYINDEX, cstr!("_LOADED"));
     ffi::lua_pushcfunction(state, openf);
-    ffi::lua_string(state, modname);
+    ffi::lua_pushstring(state, modname);
     ffi::lua_call(state, 1, 1);
     // Stack has package.loaded then the returned value from `openf`
     ffi::lua_pushvalue(state, -1);

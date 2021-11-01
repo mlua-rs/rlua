@@ -4,7 +4,7 @@ use std::os::raw::c_int;
 use crate::error::Result;
 use crate::ffi;
 use crate::types::{Integer, LuaRef};
-use crate::util::{assert_stack, protect_lua, protect_lua_closure, StackGuard, rawlen};
+use crate::util::{assert_stack, protect_lua, protect_lua_closure, StackGuard, objlen, rawlen};
 use crate::value::{FromLua, Nil, ToLua, Value};
 
 /// Handle to an internal Lua table.
@@ -185,7 +185,7 @@ impl<'lua> Table<'lua> {
             let _sg = StackGuard::new(lua.state);
             assert_stack(lua.state, 4);
             lua.push_ref(&self.0);
-            protect_lua_closure(lua.state, 1, 0, |state| ffi::luaL_len(state, -1))
+            protect_lua_closure(lua.state, 1, 0, |state| objlen(state, -1))
         }
     }
 
