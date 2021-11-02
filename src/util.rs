@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::borrow::Cow;
+#[cfg(rlua_lua51)]
 use std::ffi::CStr;
 use std::fmt::Write;
 use std::os::raw::{c_char, c_int, c_void};
@@ -645,7 +646,7 @@ unsafe fn absindex(state: *mut ffi::lua_State, index: c_int) -> c_int
 }
 
 #[cfg(any(rlua_lua53, rlua_lua54))]
-use ffi::lua_geti as geti;
+pub use ffi::lua_geti as geti;
 
 #[cfg(rlua_lua51)]
 pub unsafe fn geti(state: *mut ffi::lua_State, index: c_int, i: ffi::lua_Integer) -> c_int
