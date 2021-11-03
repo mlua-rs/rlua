@@ -649,7 +649,7 @@ unsafe fn absindex(state: *mut ffi::lua_State, index: c_int) -> c_int
     if index > 0 && index <= top {
         index
     } else if index < 0 && index >= -top {
-        top + 1 - index
+        top + 1 + index
     } else {
         panic!("Invalid index {}, stack top {}", index, top);
     }
