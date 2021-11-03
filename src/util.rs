@@ -589,10 +589,15 @@ pub unsafe fn rotate(state: *mut ffi::lua_State, index: c_int, n: c_int)
         }
     } else if n < 0 {
         // Rotate down.
+        let remove_index = if index < 0 {
+            index - 1 // one deeper
+        } else {
+            index // absolute index doesn't depend on what's pushed above
+        };
         for _ in 0..n {
             ffi::lua_pushvalue(state, index);
             // The item is now one further down the stack
-            ffi::lua_remove(state, index+1);
+            ffi::lua_remove(state, remove_index);
         }
     }
 }
@@ -607,7 +612,12 @@ pub unsafe fn copy(state: *mut ffi::lua_State, from: c_int, to: c_int)
     ffi::lua_pushvalue(state, from);
     // And then put it in the destination (with adjusted count from the
     // value just pushed).
-    ffi::lua_replace(state, to+1);
+    let adjusted_index = if to < 0 {
+        to - 1 // one deeper
+    } else {
+        to // absolute index doesn't depend on what's pushed above
+    };
+    ffi::lua_replace(state, adjusted_index);
 }
 
 #[cfg(any(rlua_lua53, rlua_lua54))]
@@ -728,7 +738,9 @@ pub unsafe fn requiref(
     _glb: c_int,
 ) {
     // Lua 5.1 stores the package.loaded table at registry["_LOADED"].
-    ffi::lua_getfield(state, ffi::LUA_REGISTRYINDEX, cstr!("_LOADED"));
+    // luaL_findtable is like `lua_getfield` but creates the table if
+    // needed.  When loading the base lib, _LOADED doesn't yet exist.
+    ffi::luaL_findtable(state, ffi::LUA_REGISTRYINDEX, cstr!("_LOADED"), 2);
     ffi::lua_pushcfunction(state, openf);
     ffi::lua_pushstring(state, modname);
     ffi::lua_call(state, 1, 1);

@@ -133,6 +133,7 @@ extern "C" {
     pub fn lua_iscfunction(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_isuserdata(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_type(state: *mut lua_State, index: c_int) -> c_int;
+    pub fn lua_typename(state: *mut lua_State, tp: c_int) -> *const c_char;
 
     pub fn lua_gettable(state: *mut lua_State, index: c_int);
     pub fn lua_rawget(state: *mut lua_State, index: c_int);
@@ -188,6 +189,12 @@ extern "C" {
     pub fn luaL_unref(state: *mut lua_State, table: c_int, lref: c_int);
     pub fn luaL_checkstack(state: *mut lua_State, size: c_int, msg: *const c_char);
     pub fn luaL_callmeta(state: *mut lua_State, obj: c_int, e: *const c_char) -> c_int;
+    pub fn luaL_findtable(
+        state: *mut lua_State,
+        idx: c_int,
+        fname: *const c_char,
+        szhint: c_int
+    ) -> *const c_char;
 }
 
 // The following are re-implementations of what are macros in the Lua C API
