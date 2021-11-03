@@ -594,7 +594,7 @@ pub unsafe fn rotate(state: *mut ffi::lua_State, index: c_int, n: c_int)
         } else {
             index // absolute index doesn't depend on what's pushed above
         };
-        for _ in 0..n {
+        for _ in 0..-n {
             ffi::lua_pushvalue(state, index);
             // The item is now one further down the stack
             ffi::lua_remove(state, remove_index);
