@@ -749,7 +749,7 @@ pub unsafe fn requiref(
     // Stack has package.loaded then the module twice
     ffi::lua_setfield(state, -3, modname);
     ffi::lua_setglobal(state, modname);
-    ffi::lua_remove(state, -2);
+    ffi::lua_pop(state, 1);
 }
 
 #[cfg(any(rlua_lua53, rlua_lua54))]
