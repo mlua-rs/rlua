@@ -570,6 +570,9 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
         // Place pointer to ExtraData in the lua_State "extra space"
         *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = Box::into_raw(extra);
     }
+    #[cfg(rlua_lua51)]
+    // Prevent extra from being deallocated
+    let _ = Box::into_raw(extra);
 
     Lua {
         main_state: state,
