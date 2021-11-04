@@ -651,9 +651,17 @@ pub use ffi::luaL_len as objlen;
 #[cfg(rlua_lua51)]
 pub unsafe fn objlen(state: *mut ffi::lua_State, index: c_int) -> ffi::lua_Integer
 {
-    let result = ffi::lua_objlen(state, index);
-    use std::convert::TryInto;
-    result.try_into().unwrap()
+    let meta_result = ffi::luaL_callmeta(state, index, cstr!("__len"));
+    if meta_result == 1 {
+        // The result is on the stack
+        let result = ffi::lua_tointeger(state, -1);
+        ffi::lua_pop(state, 1);
+        result
+    } else {
+        let result = ffi::lua_objlen(state, index);
+        use std::convert::TryInto;
+        result.try_into().unwrap()
+    }
 }
 #[cfg(any(rlua_lua53, rlua_lua54))]
 use ffi::lua_absindex as absindex;
