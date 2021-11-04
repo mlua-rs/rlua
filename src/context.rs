@@ -864,7 +864,13 @@ impl<'lua> Context<'lua> {
                 ffi::LUA_OK => {
                     if let Some(env) = env {
                         self.push_value(env)?;
+                        #[cfg(any(rlua_lua53, rlua_lua54))]
                         ffi::lua_setupvalue(self.state, -2, 1);
+                        #[cfg(rlua_lua51)]
+                        {
+                            let res = ffi::lua_setfenv(self.state, -2);
+                            debug_assert!(res == 1);
+                        }
                     }
                     Ok(Function(self.pop_ref()))
                 }
