@@ -25,7 +25,7 @@ impl<'lua> String<'lua> {
     /// let version: String = globals.get("_VERSION")?;
     /// assert!(version.to_str().unwrap().contains("Lua"));
     ///
-    /// let non_utf8: String = lua_context.load(r#"  "test\xff"  "#).eval()?;
+    /// let non_utf8: String = lua_context.load(r#"  "test\255"  "#).eval()?;
     /// assert!(non_utf8.to_str().is_err());
     /// # Ok(())
     /// # })
@@ -50,7 +50,7 @@ impl<'lua> String<'lua> {
     /// # use rlua::{Lua, String, Result};
     /// # fn main() -> Result<()> {
     /// # Lua::new().context(|lua_context| -> Result<()> {
-    /// let non_utf8: String = lua_context.load(r#"  "test\xff"  "#).eval()?;
+    /// let non_utf8: String = lua_context.load(r#"  "test\255"  "#).eval()?;
     /// assert!(non_utf8.to_str().is_err());    // oh no :(
     /// assert_eq!(non_utf8.as_bytes(), &b"test\xff"[..]);
     /// # Ok(())
