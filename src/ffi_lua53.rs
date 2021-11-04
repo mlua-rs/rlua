@@ -142,6 +142,7 @@ extern "C" {
     pub fn lua_iscfunction(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_isuserdata(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_type(state: *mut lua_State, index: c_int) -> c_int;
+    pub fn lua_typename(state: *mut lua_State, tp: c_int) -> *const c_char;
 
     pub fn lua_gettable(state: *mut lua_State, index: c_int) -> c_int;
     pub fn lua_geti(state: *mut lua_State, index: c_int, i: lua_Integer) -> c_int;
