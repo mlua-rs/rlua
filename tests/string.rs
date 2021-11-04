@@ -32,7 +32,7 @@ fn string_views() {
         lua.load(
             r#"
                 ok = "null bytes are valid utf-8, wh\0 knew?"
-                err = "but \xff isn't :("
+                err = "but \255 isn't :("
                 empty = ""
             "#,
         )
