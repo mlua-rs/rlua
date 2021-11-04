@@ -188,13 +188,17 @@ pub unsafe fn pop_error(state: *mut ffi::lua_State, err_code: c_int) -> Error {
         let err_string = to_string(state, -1).into_owned();
         ffi::lua_pop(state, 1);
 
+        #[cfg(rlua_lua51)]
+        const EOF_STR: &'static str = "'<eof>'";
+        #[cfg(any(rlua_lua53, rlua_lua54))]
+        const EOF_STR: &'static str = "<eof>";
         match err_code {
             ffi::LUA_ERRRUN => Error::RuntimeError(err_string),
             ffi::LUA_ERRSYNTAX => {
                 Error::SyntaxError {
                     // This seems terrible, but as far as I can tell, this is exactly what the
                     // stock Lua REPL does.
-                    incomplete_input: err_string.ends_with("<eof>"),
+                    incomplete_input: err_string.ends_with(EOF_STR),
                     message: err_string,
                 }
             }
