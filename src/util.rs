@@ -551,16 +551,25 @@ pub use ffi::lua_tointegerx as tointegerx;
 // Wrapper implementing the `ffi::lua_tointegerx` API
 pub unsafe fn tointegerx(state: *mut ffi::lua_State, index: c_int, isnum: *mut c_int) -> ffi::lua_Integer
 {
+    if isnum != ptr::null_mut() {
+        *isnum = 0;
+    }
     if ffi::lua_isnumber(state, index) == 0 {
-        if isnum != ptr::null_mut() {
-            *isnum = 0;
-        }
         return 0;
     } else {
-        if isnum != ptr::null_mut() {
-            *isnum = 1;
+        // Lua 5.1 happily truncates non-integral floats, but rlua currently expects the conversion
+        // to fail as Lua 5.3+ do.
+        let val = ffi::lua_tonumber(state, index);
+        if val.is_finite() && val.ceil() == val &&
+            val <= ffi::lua_Integer::max_value() as ffi::lua_Number &&
+            val >= ffi::lua_Integer::min_value() as ffi::lua_Number {
+            let ival = val as ffi::lua_Integer;
+            if isnum != ptr::null_mut() {
+                *isnum = 1;
+            }
+            return ival;
         }
-        ffi::lua_tointeger(state, index)
+        return 0;
     }
 }
 
