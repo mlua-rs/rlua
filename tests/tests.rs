@@ -826,6 +826,7 @@ fn chunk_env() {
     });
 }
 
+#[cfg(not(rlua_lua51))]
 #[test]
 fn context_thread() {
     Lua::new().context(|lua_ctx| {
@@ -839,5 +840,28 @@ fn context_thread() {
             .into_function()
             .unwrap();
         f.call::<_, ()>(lua_ctx.current_thread()).unwrap();
+    });
+}
+
+#[cfg(rlua_lua51)]
+#[test]
+fn context_thread_lua51() {
+    Lua::new().context(|lua_ctx| {
+        let f = lua_ctx
+            .load(
+                r#"
+                    local thread = ...
+                    assert(coroutine.running() == thread)
+                "#,
+            )
+            .into_function()
+            .unwrap();
+        // We pass in nothing as coroutine.running() returns nil in Lua 5.1
+        // for the main thread.
+        f.call::<_, ()>(()).unwrap();
+
+        let thrd = lua_ctx.create_thread(f).unwrap();
+        let thrd_cloned = thrd.clone();
+        thrd.resume::<_, ()>(thrd_cloned).unwrap();
     });
 }
