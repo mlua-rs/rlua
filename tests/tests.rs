@@ -209,7 +209,7 @@ fn test_error() {
                     end
 
                     local status, res = xpcall(function()
-                        error(5)
+                        error(5, 0)
                     end, handler)
                     assert(not status)
 
