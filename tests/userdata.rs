@@ -1,3 +1,4 @@
+#[cfg(rlua_lua54)]
 use std::os::raw::c_int;
 use std::sync::Arc;
 

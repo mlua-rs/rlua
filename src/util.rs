@@ -305,19 +305,6 @@ pub unsafe fn take_userdata<T>(state: *mut ffi::lua_State) -> T {
     ffi::lua_pop(state, 1);
     ptr::read(ud)
 }
-#[cfg(rlua_lua54)]
-use std::ffi::CStr;
-fn dump_stack(state: *mut ffi::lua_State, msg: &str)
-{
-    unsafe {
-        let top = ffi::lua_gettop(state);
-        eprintln!("Stack at {}: {} entries", msg, top);
-        for i in 1..=top {
-            eprintln!("Stack pos {}: {}", i, CStr::from_ptr(ffi::lua_typename(state, ffi::lua_type(state, i))).to_str().unwrap());
-        }
-    }
-}
-
 
 // Populates the given table with the appropriate members to be a userdata metatable for the given
 // type.  This function takes the given table at the `metatable` index, and adds an appropriate __gc
@@ -332,7 +319,6 @@ pub unsafe fn init_userdata_metatable<T>(
     metatable: c_int,
     members: Option<c_int>,
 ) -> Result<()> {
-    dump_stack(state, "start of init_userdata_metatable");
     // Used if both an __index metamethod is set and regular methods, checks methods table
     // first, then __index metamethod.
     unsafe extern "C" fn meta_index_impl(state: *mut ffi::lua_State) -> c_int {
@@ -355,12 +341,10 @@ pub unsafe fn init_userdata_metatable<T>(
 
     let members = members.map(|i| absindex(state, i));
     ffi::lua_pushvalue(state, metatable);
-    dump_stack(state, "After pushvalue(metatable)");
 
     if let Some(members) = members {
         push_string(state, "__index")?;
         ffi::lua_pushvalue(state, -1);
-        dump_stack(state, "After push_string/push_value(__index)");
 
         // On Lua 5.2+, lua_rawget conveniently returns the type
         #[cfg(any(rlua_lua53, rlua_lua54))]
@@ -370,7 +354,6 @@ pub unsafe fn init_userdata_metatable<T>(
             ffi::lua_rawget(state, -3);
             ffi::lua_type(state, -1)
         };
-        dump_stack(state, "After lua_rawget");
         if index_type == ffi::LUA_TNIL {
             ffi::lua_pop(state, 1);
             ffi::lua_pushvalue(state, members);
