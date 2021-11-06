@@ -2,9 +2,9 @@
 #![allow(non_snake_case)]
 #![allow(unused)]
 
+use libc::ptrdiff_t;
 use std::mem;
 use std::os::raw::{c_char, c_double, c_int, c_longlong, c_uchar, c_void};
-use libc::ptrdiff_t;
 use std::ptr;
 
 pub type lua_Integer = ptrdiff_t;
@@ -88,12 +88,8 @@ extern "C" {
     pub fn lua_setallocf(state: *mut lua_State, ud: *mut c_void);
 
     pub fn lua_call(state: *mut lua_State, nargs: c_int, nresults: c_int);
-    pub fn lua_pcall(
-        state: *mut lua_State,
-        nargs: c_int,
-        nresults: c_int,
-        errfunc: c_int,
-    ) -> c_int;
+    pub fn lua_pcall(state: *mut lua_State, nargs: c_int, nresults: c_int, errfunc: c_int)
+        -> c_int;
 
     pub fn lua_resume(state: *mut lua_State, nargs: c_int) -> c_int;
     pub fn lua_status(state: *mut lua_State) -> c_int;
@@ -165,7 +161,12 @@ extern "C" {
     pub fn lua_gc(state: *mut lua_State, what: c_int, data: c_int) -> c_int;
     pub fn lua_getinfo(state: *mut lua_State, what: *const c_char, ar: *mut lua_Debug) -> c_int;
 
-    pub fn lua_sethook(state: *mut lua_State, f: Option<lua_Hook>, mask: c_int, count: c_int) -> c_int;
+    pub fn lua_sethook(
+        state: *mut lua_State,
+        f: Option<lua_Hook>,
+        mask: c_int,
+        count: c_int,
+    ) -> c_int;
 
     pub fn luaopen_base(state: *mut lua_State) -> c_int;
     pub fn luaopen_table(state: *mut lua_State) -> c_int;
@@ -193,7 +194,7 @@ extern "C" {
         state: *mut lua_State,
         idx: c_int,
         fname: *const c_char,
-        szhint: c_int
+        szhint: c_int,
     ) -> *const c_char;
 }
 

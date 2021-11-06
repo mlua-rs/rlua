@@ -4,8 +4,8 @@ use crate::error::{Error, Result};
 use crate::ffi;
 use crate::types::LuaRef;
 use crate::util::{
-    assert_stack, check_stack, error_traceback, pop_error, protect_lua_closure, StackGuard,
-    do_resume
+    assert_stack, check_stack, do_resume, error_traceback, pop_error, protect_lua_closure,
+    StackGuard,
 };
 use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti};
 

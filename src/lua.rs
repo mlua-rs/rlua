@@ -2,9 +2,9 @@ use std::any::TypeId;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::os::raw::{c_int, c_void};
 #[cfg(rlua_lua54)]
 use std::os::raw::c_uint;
+use std::os::raw::{c_int, c_void};
 use std::ptr;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -19,8 +19,8 @@ use crate::hook::{hook_proc, Debug, HookTriggers};
 use crate::markers::NoRefUnwindSafe;
 use crate::types::Callback;
 use crate::util::{
-    assert_stack, init_error_registry, protect_lua_closure, safe_pcall, safe_xpcall,
-    userdata_destructor, push_globaltable, requiref,
+    assert_stack, init_error_registry, protect_lua_closure, push_globaltable, requiref, safe_pcall,
+    safe_xpcall, userdata_destructor,
 };
 
 bitflags! {

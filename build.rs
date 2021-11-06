@@ -146,25 +146,19 @@ fn main() {
 
     #[cfg(feature = "system-lua51")]
     {
-        pkg_config::Config::new()
-            .probe("lua5.1")
-            .unwrap();
+        pkg_config::Config::new().probe("lua5.1").unwrap();
         println!("cargo:rustc-cfg=rlua_lua51");
     }
 
     #[cfg(feature = "system-lua53")]
     {
-        pkg_config::Config::new()
-            .probe("lua5.3")
-            .unwrap();
+        pkg_config::Config::new().probe("lua5.3").unwrap();
         println!("cargo:rustc-cfg=rlua_lua53");
     }
 
     #[cfg(feature = "system-lua54")]
     {
-        pkg_config::Config::new()
-            .probe("lua5.4")
-            .unwrap();
+        pkg_config::Config::new().probe("lua5.4").unwrap();
         println!("cargo:rustc-cfg=rlua_lua54");
     }
 }

@@ -19,9 +19,9 @@ use crate::types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey
 use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use crate::util::{
     assert_stack, callback_error, check_stack, get_userdata, get_wrapped_error,
-    init_userdata_metatable, pop_error, protect_lua, protect_lua_closure,
-    push_globaltable, push_string, push_userdata_uv, push_wrapped_error, StackGuard,
-    tointegerx, tonumberx, isluainteger, loadbufferx,
+    init_userdata_metatable, isluainteger, loadbufferx, pop_error, protect_lua,
+    protect_lua_closure, push_globaltable, push_string, push_userdata_uv, push_wrapped_error,
+    tointegerx, tonumberx, StackGuard,
 };
 use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 

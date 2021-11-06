@@ -413,9 +413,15 @@ fn test_num_conversion() {
         assert_eq!(lua.load("1.0").eval::<i64>().unwrap(), 1);
         assert_eq!(lua.load("1.0").eval::<f64>().unwrap(), 1.0);
         #[cfg(not(rlua_lua51))]
-        assert_eq!(lua.load("1.0").eval::<String>().unwrap().to_str().unwrap(), "1.0");
+        assert_eq!(
+            lua.load("1.0").eval::<String>().unwrap().to_str().unwrap(),
+            "1.0"
+        );
         #[cfg(rlua_lua51)]
-        assert_eq!(lua.load("1.0").eval::<String>().unwrap().to_str().unwrap(), "1");
+        assert_eq!(
+            lua.load("1.0").eval::<String>().unwrap().to_str().unwrap(),
+            "1"
+        );
 
         assert_eq!(lua.load("1.5").eval::<i64>().unwrap(), 1);
         assert_eq!(lua.load("1.5").eval::<f64>().unwrap(), 1.5);

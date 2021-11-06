@@ -4,7 +4,9 @@ use std::os::raw::c_int;
 use crate::error::Result;
 use crate::ffi;
 use crate::types::{Integer, LuaRef};
-use crate::util::{assert_stack, protect_lua, protect_lua_closure, StackGuard, objlen, rawlen, geti};
+use crate::util::{
+    assert_stack, geti, objlen, protect_lua, protect_lua_closure, rawlen, StackGuard,
+};
 use crate::value::{FromLua, Nil, ToLua, Value};
 
 /// Handle to an internal Lua table.
@@ -419,8 +421,7 @@ where
                 assert_stack(lua.state, 5);
 
                 lua.push_ref(&self.table);
-                match protect_lua_closure(lua.state, 1, 1, |state| geti(state, -1, index))
-                {
+                match protect_lua_closure(lua.state, 1, 1, |state| geti(state, -1, index)) {
                     Ok(ffi::LUA_TNIL) => None,
                     Ok(_) => {
                         let value = lua.pop_value();

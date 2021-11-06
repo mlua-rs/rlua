@@ -13,8 +13,8 @@ use crate::markers::Invariant;
 use crate::types::{Callback, LuaRef};
 use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use crate::util::{
-    assert_stack, init_userdata_metatable, protect_lua_closure, push_string, push_userdata_uv,
-    take_userdata, StackGuard, getiuservalue, setiuservalue,
+    assert_stack, getiuservalue, init_userdata_metatable, protect_lua_closure, push_string,
+    push_userdata_uv, setiuservalue, take_userdata, StackGuard,
 };
 use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti, Value};
 
