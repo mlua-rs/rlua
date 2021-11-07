@@ -5,7 +5,7 @@ use crate::context::Context;
 use crate::error::{Error, Result};
 use crate::ffi;
 use crate::types::LuaRef;
-use crate::util::{assert_stack, get_userdata, StackGuard};
+use crate::util::{assert_stack, get_userdata, getiuservalue, setiuservalue, StackGuard};
 use crate::value::{FromLua, FromLuaMulti, ToLua, ToLuaMulti};
 
 /// Kinds of metamethods that can be overridden.
@@ -342,6 +342,17 @@ impl<'lua> AnyUserData<'lua> {
 
     /// Sets an associated value to this `AnyUserData`.
     ///
+    /// The value may be any Lua value whatsoever, and can be retrieved with [`get_user_value`].
+    ///
+    /// Equivalent to set_i_user_value(v, 1)
+    ///
+    /// [`get_i_user_value`]: #method.get_i_user_value
+    pub fn set_user_value<V: ToLua<'lua>>(&self, v: V) -> Result<()> {
+        self.set_i_user_value(v, 1)
+    }
+
+    /// Sets an associated value to this `AnyUserData`.
+    ///
     /// The value may be any Lua value whatsoever, and can be retrieved with [`get_i_user_value`].
     ///
     /// [`get_i_user_value`]: #method.get_i_user_value
@@ -353,7 +364,7 @@ impl<'lua> AnyUserData<'lua> {
             assert_stack(lua.state, 2);
             lua.push_ref(&self.0);
             lua.push_value(v)?;
-            if ffi::lua_setiuservalue(lua.state, -2, n) == 0 {
+            if setiuservalue(lua.state, -2, n) == 0 {
                 Err(Error::RuntimeError(format!(
                     "userdata does not have user value {}",
                     n
@@ -362,6 +373,13 @@ impl<'lua> AnyUserData<'lua> {
                 Ok(())
             }
         }
+    }
+
+    /// Returns an associated value set by [`set_user_value`].
+    ///
+    /// [`set_user_value`]: #method.set_user_value
+    pub fn get_user_value<V: FromLua<'lua>>(&self) -> Result<V> {
+        self.get_i_user_value(1)
     }
 
     /// Returns an associated value set by [`set_i_user_value`].
@@ -373,7 +391,7 @@ impl<'lua> AnyUserData<'lua> {
             let _sg = StackGuard::new(lua.state);
             assert_stack(lua.state, 3);
             lua.push_ref(&self.0);
-            if ffi::lua_getiuservalue(lua.state, -1, n) == ffi::LUA_TNIL {
+            if getiuservalue(lua.state, -1, n) == ffi::LUA_TNIL {
                 lua.pop_value(); // remove the nil from the stack
                 return Err(Error::RuntimeError(format!(
                     "userdata does not have user value {}",

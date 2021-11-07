@@ -19,8 +19,9 @@ use crate::types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey
 use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
 use crate::util::{
     assert_stack, callback_error, check_stack, get_userdata, get_wrapped_error,
-    init_userdata_metatable, pop_error, protect_lua, protect_lua_closure, push_string,
-    push_userdata_uv, push_wrapped_error, StackGuard,
+    init_userdata_metatable, isluainteger, loadbufferx, pop_error, protect_lua,
+    protect_lua_closure, push_globaltable, push_string, push_userdata_uv, push_wrapped_error,
+    tointegerx, tonumberx, StackGuard,
 };
 use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
@@ -229,7 +230,7 @@ impl<'lua> Context<'lua> {
         unsafe {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 2);
-            ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
+            push_globaltable(self.state);
             Table(self.pop_ref())
         }
     }
@@ -310,7 +311,7 @@ impl<'lua> Context<'lua> {
 
                 self.push_value(v)?;
                 let mut isint = 0;
-                let i = ffi::lua_tointegerx(self.state, -1, &mut isint);
+                let i = tointegerx(self.state, -1, &mut isint);
                 if isint == 0 {
                     None
                 } else {
@@ -334,7 +335,7 @@ impl<'lua> Context<'lua> {
 
                 self.push_value(v)?;
                 let mut isnum = 0;
-                let n = ffi::lua_tonumberx(self.state, -1, &mut isnum);
+                let n = tonumberx(self.state, -1, &mut isnum);
                 if isnum == 0 {
                     None
                 } else {
@@ -608,7 +609,7 @@ impl<'lua> Context<'lua> {
             }
 
             ffi::LUA_TNUMBER => {
-                if ffi::lua_isinteger(self.state, -1) != 0 {
+                if isluainteger(self.state, -1) != 0 {
                     let i = Value::Integer(ffi::lua_tointeger(self.state, -1));
                     ffi::lua_pop(self.state, 1);
                     i
@@ -844,7 +845,7 @@ impl<'lua> Context<'lua> {
             assert_stack(self.state, 1);
 
             match if let Some(name) = name {
-                ffi::luaL_loadbufferx(
+                loadbufferx(
                     self.state,
                     source.as_ptr() as *const c_char,
                     source.len(),
@@ -852,7 +853,7 @@ impl<'lua> Context<'lua> {
                     cstr!("t"),
                 )
             } else {
-                ffi::luaL_loadbufferx(
+                loadbufferx(
                     self.state,
                     source.as_ptr() as *const c_char,
                     source.len(),
@@ -863,7 +864,13 @@ impl<'lua> Context<'lua> {
                 ffi::LUA_OK => {
                     if let Some(env) = env {
                         self.push_value(env)?;
+                        #[cfg(any(rlua_lua53, rlua_lua54))]
                         ffi::lua_setupvalue(self.state, -2, 1);
+                        #[cfg(rlua_lua51)]
+                        {
+                            let res = ffi::lua_setfenv(self.state, -2);
+                            debug_assert!(res == 1);
+                        }
                     }
                     Ok(Function(self.pop_ref()))
                 }

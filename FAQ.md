@@ -23,4 +23,4 @@ The Lua registry is a global `Table` available for use through the API.  Add ref
 
 #### Store it with a `UserData` value
 
-A Lua value can be attached with a `UserData` value using `AnyUserData::set_user_value()`/`AnyUserData::get_user_value()`.
+A Lua value can be attached with a `UserData` value using `AnyUserData::set_user_value()`/`AnyUserData::get_user_value()`.  With Lua 5.4+ multiple values can be stored using `AnyUserData::set_i_user_value()`/`AnyUserData::get_i_user_value()`.

@@ -5,7 +5,7 @@ use crate::error::{Error, Result};
 use crate::ffi;
 use crate::types::LuaRef;
 use crate::util::{
-    assert_stack, check_stack, error_traceback, pop_error, protect_lua_closure, StackGuard,
+    assert_stack, check_stack, error_traceback, pop_error, protect_lua_closure, rotate, StackGuard,
 };
 use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
@@ -122,7 +122,7 @@ impl<'lua> Function<'lua> {
             ffi::luaL_checkstack(state, nbinds + 2, ptr::null());
 
             ffi::lua_settop(state, nargs + nbinds + 1);
-            ffi::lua_rotate(state, -(nargs + nbinds + 1), nbinds + 1);
+            rotate(state, -(nargs + nbinds + 1), nbinds + 1);
 
             ffi::lua_pushvalue(state, ffi::lua_upvalueindex(1));
             ffi::lua_replace(state, 1);

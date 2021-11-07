@@ -209,7 +209,7 @@ fn test_error() {
                     end
 
                     local status, res = xpcall(function()
-                        error(5)
+                        error(5, 0)
                     end, handler)
                     assert(not status)
 
@@ -412,7 +412,16 @@ fn test_num_conversion() {
 
         assert_eq!(lua.load("1.0").eval::<i64>().unwrap(), 1);
         assert_eq!(lua.load("1.0").eval::<f64>().unwrap(), 1.0);
-        assert_eq!(lua.load("1.0").eval::<String>().unwrap(), "1.0");
+        #[cfg(not(rlua_lua51))]
+        assert_eq!(
+            lua.load("1.0").eval::<String>().unwrap().to_str().unwrap(),
+            "1.0"
+        );
+        #[cfg(rlua_lua51)]
+        assert_eq!(
+            lua.load("1.0").eval::<String>().unwrap().to_str().unwrap(),
+            "1"
+        );
 
         assert_eq!(lua.load("1.5").eval::<i64>().unwrap(), 1);
         assert_eq!(lua.load("1.5").eval::<f64>().unwrap(), 1.5);
@@ -823,6 +832,7 @@ fn chunk_env() {
     });
 }
 
+#[cfg(not(rlua_lua51))]
 #[test]
 fn context_thread() {
     Lua::new().context(|lua_ctx| {
@@ -836,5 +846,28 @@ fn context_thread() {
             .into_function()
             .unwrap();
         f.call::<_, ()>(lua_ctx.current_thread()).unwrap();
+    });
+}
+
+#[cfg(rlua_lua51)]
+#[test]
+fn context_thread_lua51() {
+    Lua::new().context(|lua_ctx| {
+        let f = lua_ctx
+            .load(
+                r#"
+                    local thread = ...
+                    assert(coroutine.running() == thread)
+                "#,
+            )
+            .into_function()
+            .unwrap();
+        // We pass in nothing as coroutine.running() returns nil in Lua 5.1
+        // for the main thread.
+        f.call::<_, ()>(()).unwrap();
+
+        let thrd = lua_ctx.create_thread(f).unwrap();
+        let thrd_cloned = thrd.clone();
+        thrd.resume::<_, ()>(thrd_cloned).unwrap();
     });
 }

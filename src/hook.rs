@@ -87,7 +87,9 @@ impl<'a> Debug<'a> {
             );
             DebugStack {
                 num_ups: (*self.ar).nups as i32,
+                #[cfg(any(rlua_lua53, rlua_lua54))]
                 num_params: (*self.ar).nparams as i32,
+                #[cfg(any(rlua_lua53, rlua_lua54))]
                 is_vararg: (*self.ar).isvararg != 0,
             }
         }
@@ -112,7 +114,9 @@ pub struct DebugSource<'a> {
 #[derive(Copy, Clone, Debug)]
 pub struct DebugStack {
     pub num_ups: i32,
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     pub num_params: i32,
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     pub is_vararg: bool,
 }
 

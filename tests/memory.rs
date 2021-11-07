@@ -18,6 +18,11 @@ fn test_memory_limit() {
             .unwrap();
         f.call::<_, ()>(()).expect("should trigger no memory limit");
 
+        // It's not clear this is needed.  On Lua 5.1, we fail to allocate
+        // memory in the following `f.call` before actually running the
+        // function otherwise.
+        lua.gc_collect().expect("should collect garbage");
+
         lua.set_memory_limit(Some(initial_memory + 10000));
         match f.call::<_, ()>(()) {
             Err(Error::MemoryError(_)) => {}
@@ -32,10 +37,13 @@ fn test_memory_limit() {
 #[test]
 fn test_gc_control() {
     let lua = Lua::new();
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     assert!(lua.gc_is_running());
     lua.gc_stop();
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     assert!(!lua.gc_is_running());
     lua.gc_restart();
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     assert!(lua.gc_is_running());
 
     struct MyUserdata(Arc<()>);

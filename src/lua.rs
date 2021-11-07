@@ -2,7 +2,9 @@ use std::any::TypeId;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::os::raw::{c_int, c_uint, c_void};
+#[cfg(rlua_lua54)]
+use std::os::raw::c_uint;
+use std::os::raw::{c_int, c_void};
 use std::ptr;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -17,8 +19,8 @@ use crate::hook::{hook_proc, Debug, HookTriggers};
 use crate::markers::NoRefUnwindSafe;
 use crate::types::Callback;
 use crate::util::{
-    assert_stack, init_error_registry, protect_lua_closure, safe_pcall, safe_xpcall,
-    userdata_destructor,
+    assert_stack, init_error_registry, protect_lua_closure, push_globaltable, requiref, safe_pcall,
+    safe_xpcall, userdata_destructor,
 };
 
 bitflags! {
@@ -58,6 +60,7 @@ bitflags! {
     }
 }
 
+#[cfg(rlua_lua54)]
 // at 812, tests pass
 // at 813, tests fail
 // at 700, it should be somewhat safe
@@ -301,6 +304,7 @@ impl Lua {
         }
     }
 
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     /// Returns true if the garbage collector is currently running automatically.
     pub fn gc_is_running(&self) -> bool {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCISRUNNING, 0) != 0 }
@@ -351,6 +355,7 @@ impl Lua {
         }
     }
 
+    #[cfg(rlua_lua54)]
     /// Sets the garbage collector to incremental mode.
     ///
     /// Returns the previous mode (`LUA_GCGEN` or `LUA_GCINC`).  More information can be found in the
@@ -369,6 +374,7 @@ impl Lua {
         }
     }
 
+    #[cfg(rlua_lua54)]
     /// Sets the garbage collector to generational mode.
     ///
     /// Returns the previous mode (`LUA_GCGEN` or `LUA_GCINC`).  More information can be found in the
@@ -392,7 +398,7 @@ impl Lua {
     /// documentation][lua_doc].
     ///
     /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
-    #[deprecated(note = "please use `gc_set_inc` instead")]
+    #[cfg_attr(rlua_lua54, deprecated(note = "please use `gc_set_inc` instead"))]
     #[allow(deprecated)]
     pub fn gc_set_pause(&self, pause: c_int) -> c_int {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETPAUSE, pause) }
@@ -404,7 +410,7 @@ impl Lua {
     /// [Lua 5.4 documentation][lua_doc].
     ///
     /// [lua_doc]: https://www.lua.org/manual/5.4/manual.html#2.5
-    #[deprecated(note = "please use `gc_set_inc` instead")]
+    #[cfg_attr(rlua_lua54, deprecated(note = "please use `gc_set_inc` instead"))]
     #[allow(deprecated)]
     pub fn gc_set_step_multiplier(&self, step_multiplier: c_int) -> c_int {
         unsafe { ffi::lua_gc(self.main_state, ffi::LUA_GCSETSTEPMUL, step_multiplier) }
@@ -433,8 +439,17 @@ pub(crate) struct ExtraData {
     pub hook_callback: Option<Rc<RefCell<dyn FnMut(Context, Debug) -> Result<()>>>>,
 }
 
+// Return the extra data pointer passed to `lua_newstate()`.  `state` must
+// be the main state, not a substate.
 pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
-    *(ffi::lua_getextraspace(state) as *mut *mut ExtraData)
+    #[cfg(any(rlua_lua53, rlua_lua54))]
+    return *(ffi::lua_getextraspace(state) as *mut *mut ExtraData);
+    #[cfg(rlua_lua51)]
+    {
+        let mut extra: *mut c_void = ptr::null_mut();
+        let _ = ffi::lua_getallocf(state, &mut extra);
+        return extra as *mut ExtraData;
+    }
 }
 
 unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
@@ -495,6 +510,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
 
     let state = ffi::lua_newstate(allocator, &mut *extra as *mut ExtraData as *mut c_void);
 
+    #[cfg(rlua_lua54)]
     ffi::lua_setcstacklimit(state, SAFE_CSTACK_SIZE);
 
     extra.ref_thread = rlua_expect!(
@@ -524,7 +540,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
 
             // Override pcall and xpcall with versions that cannot be used to catch rust panics.
 
-            ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, ffi::LUA_RIDX_GLOBALS);
+            push_globaltable(state);
 
             ffi::lua_pushstring(state, cstr!("pcall"));
             ffi::lua_pushcfunction(state, safe_pcall);
@@ -549,8 +565,14 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
     rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
     assert_stack(state, ffi::LUA_MINSTACK);
 
-    // Place pointer to ExtraData in the lua_State "extra space"
-    *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = Box::into_raw(extra);
+    #[cfg(any(rlua_lua53, rlua_lua54))]
+    {
+        // Place pointer to ExtraData in the lua_State "extra space"
+        *(ffi::lua_getextraspace(state) as *mut *mut ExtraData) = Box::into_raw(extra);
+    }
+    #[cfg(rlua_lua51)]
+    // Prevent extra from being deallocated
+    let _ = Box::into_raw(extra);
 
     Lua {
         main_state: state,
@@ -560,44 +582,36 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
 
 unsafe fn load_from_std_lib(state: *mut ffi::lua_State, lua_mod: StdLib) {
     if lua_mod.contains(StdLib::BASE) {
-        ffi::luaL_requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
     }
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     if lua_mod.contains(StdLib::COROUTINE) {
-        ffi::luaL_requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
     }
     if lua_mod.contains(StdLib::TABLE) {
-        ffi::luaL_requiref(state, cstr!("table"), ffi::luaopen_table, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("table"), ffi::luaopen_table, 1);
     }
     if lua_mod.contains(StdLib::IO) {
-        ffi::luaL_requiref(state, cstr!("io"), ffi::luaopen_io, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("io"), ffi::luaopen_io, 1);
     }
     if lua_mod.contains(StdLib::OS) {
-        ffi::luaL_requiref(state, cstr!("os"), ffi::luaopen_os, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("os"), ffi::luaopen_os, 1);
     }
     if lua_mod.contains(StdLib::STRING) {
-        ffi::luaL_requiref(state, cstr!("string"), ffi::luaopen_string, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("string"), ffi::luaopen_string, 1);
     }
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     if lua_mod.contains(StdLib::UTF8) {
-        ffi::luaL_requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
     }
     if lua_mod.contains(StdLib::MATH) {
-        ffi::luaL_requiref(state, cstr!("math"), ffi::luaopen_math, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("math"), ffi::luaopen_math, 1);
     }
     if lua_mod.contains(StdLib::PACKAGE) {
-        ffi::luaL_requiref(state, cstr!("package"), ffi::luaopen_package, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("package"), ffi::luaopen_package, 1);
     }
     if lua_mod.contains(StdLib::DEBUG) {
-        ffi::luaL_requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
-        ffi::lua_pop(state, 1);
+        requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
     }
 }
 

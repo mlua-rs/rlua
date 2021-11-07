@@ -99,6 +99,8 @@ fn test_thread() {
     });
 }
 
+// Before Lua 5.3, coroutine.create() could only take a Lua function.
+#[cfg(any(rlua_lua53, rlua_lua54))]
 #[test]
 fn coroutine_from_closure() {
     Lua::new().context(|lua| {
