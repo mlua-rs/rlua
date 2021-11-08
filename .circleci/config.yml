@@ -67,3 +67,9 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cargo-cache-lua53-{{ arch }}-{{ checksum "Cargo.lock" }}
+workflows:
+  version: 2
+  build:
+    jobs:
+      - "build-default"
+      - "build-lua53"
