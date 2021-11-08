@@ -44,7 +44,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version
       - run:
           name: Calculate dependencies
-          command: cargo --no-default-features --features=builtin-lua53 generate-lockfile
+          command: cargo generate-lockfile
       - restore_cache:
           keys:
             - cargo-cache-lua53-{{ arch }}-{{ checksum "Cargo.lock" }}
