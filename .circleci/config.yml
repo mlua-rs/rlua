@@ -75,9 +75,9 @@ jobs:
       - run:
           name: Install Lua
           command: |
-            apt-get update -yqq
-            apt-get install -yqq liblua5.1-0-dev
-            apt-get clean
+            sudo apt-get update -yqq
+            sudo apt-get install -yqq liblua5.1-0-dev
+            sudo apt-get clean
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
