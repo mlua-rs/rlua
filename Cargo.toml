@@ -11,7 +11,7 @@ keywords = ["lua"]
 license = "MIT"
 
 [badges]
-circle-ci = { repository = "kyren/rlua", branch = "master" }
+circle-ci = { repository = "amethyst/rlua", branch = "master" }
 
 [features]
 default = ["builtin-lua54"]

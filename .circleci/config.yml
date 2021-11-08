@@ -1,7 +1,7 @@
 version: 2
 
 jobs:
-  build:
+  build-default:
     docker:
       - image: circleci/rust:latest
     steps:
@@ -34,3 +34,36 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
+  build-lua53:
+    docker:
+      - image: circleci/rust:latest
+    steps:
+      - checkout
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version
+      - run:
+          name: Calculate dependencies
+          command: cargo --no-default-features --features=builtin-lua53 generate-lockfile
+      - restore_cache:
+          keys:
+            - cargo-cache-lua53-{{ arch }}-{{ checksum "Cargo.lock" }}
+      - run:
+          name: Check Formatting
+          command: |
+              rustup component add rustfmt
+              rustfmt --version
+              cargo fmt --all -- --check --color=auto
+      - run:
+          name: Build all targets
+          command: cargo build --no-default-features --features=builtin-lua53 --all --all-targets
+      - run:
+          name: Run all tests
+          command: cargo test --no-default-features --features=builtin-lua53 --all
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target/debug/.fingerprint
+            - target/debug/build
+            - target/debug/deps
+          key: cargo-cache-lua53-{{ arch }}-{{ checksum "Cargo.lock" }}
