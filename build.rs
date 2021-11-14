@@ -104,6 +104,9 @@ fn main() {
         if cfg!(debug_assertions) {
             config.define("LUA_USE_APICHECK", None);
         }
+        if cfg!(feature = "lua-compat-mathlib") {
+            config.define("LUA_COMPAT_MATHLIB", None);
+        }
 
         config
             .include("lua5.3/src")
