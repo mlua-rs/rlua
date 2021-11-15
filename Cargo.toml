@@ -4,7 +4,7 @@ version = "0.18.0-alpha.0"
 authors = ["kyren <kerriganw@gmail.com>"]
 edition = "2018"
 description = "High level bindings to Lua 5.x"
-repository = "https://github.com/kyren/rlua"
+repository = "https://github.com/amethyst/rlua"
 documentation = "https://docs.rs/rlua"
 readme = "README.md"
 keywords = ["lua"]
@@ -44,6 +44,17 @@ builtin-lua53 = ["cc"]
 system-lua51 = ["pkg-config"]
 system-lua53 = ["pkg-config"]
 system-lua54 = ["pkg-config"]
+builtin-lua = ["cc"]
+# Uses pkg-config to find an appropriate lua 5.3 library to link with.  All of
+# the caveats about disabling the default builtin-lua feature apply here as
+# well.  If neither the builtin-lua nor the system-lua feature is enabled, then
+# no lua library will be linked at all and one must be linked with or built into
+# the final binary manually.  The builtin-lua and system-lua features are
+# mutually exclusive and enabling both will cause an error at build time.
+system-lua = ["pkg-config"]
+
+# Enabled functions from the math module that have been deprecated
+lua-compat-mathlib = []
 
 [dependencies]
 libc = { version = "0.2" }

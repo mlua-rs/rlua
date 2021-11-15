@@ -1,6 +1,6 @@
 # rlua -- High level bindings between Rust and Lua
 
-[![Build Status](https://img.shields.io/circleci/project/github/kyren/rlua.svg)](https://circleci.com/gh/kyren/rlua)
+[![Build Status](https://img.shields.io/circleci/project/github/amethyst/rlua.svg)](https://circleci.com/gh/amethyst/rlua)
 [![Latest Version](https://img.shields.io/crates/v/rlua.svg)](https://crates.io/crates/rlua)
 [![API Documentation](https://docs.rs/rlua/badge.svg)](https://docs.rs/rlua)
 
@@ -22,14 +22,34 @@ something you feel could perform better, feel free to file a bug report.
 ## API stability
 
 Currently, this library follows a pre-1.0 semver, so all API changes should be
-accompanied by 0.x version bumps.
+accompanied by 0.x version bumps.  See the [Version 1.0
+milestone](https://github.com/amethyst/rlua/milestone/1) for the work planned
+to be done before a more stable 1.0 release.
 
-*The new 0.16 release has a particularly large amount of API breakage which was
-required to fix several long-standing limitations and bugs.  The biggest change
-by far is that most API usage now takes place through `Lua::context` callbacks
-rather than directly on the main `Lua` state object.  See CHANGELOG.md for
-information about other API changes, and also see the guided tour for an example
-of using the new `Context` API.*
+## Lua versions supported
+
+As of release 0.18, the version of Lua can be configured at build time using
+Cargo features.  Lua 5.4 is the default.  The rlua API stays the same with
+different Lua versions, though there are a small number of limitations.  Lua
+code may, of course, behave a little differently between the versions.
+
+Only one can be selected at a time, so to select anything
+other than the default (built-in Lua 5.4) you will need to disable default
+features.
+
+The available features are:
+
+| Cargo feature | Lua version |
+| ------------- | ----------- |
+| builtin-lua54 | Lua 5.4 (source included in crate, default) |
+| builtin-lua53 | Lua 5.3 (source included in crate) |
+| system-lua51 | Lua 5.1 (installed on host system, found using pkg-config) |
+| system-lua53 | Lua 5.3 (installed on host system, found using pkg-config) |
+| system-lua54 | Lua 5.4 (installed on host system, found using pkg-config) |
+
+At current writing rlua has not been tested with alternative Lua
+implementations (such as Luajit) which share PUC-Rio Lua's C API, but it is
+expected that they can be made to work with little if any change to rlua.
 
 ## Safety and Panics
 
@@ -79,7 +99,7 @@ If you encounter them, a bug report would be very welcome:
     define set.  Any abort caused by this internal Lua API checking is
     definitely a bug, and is likely to be a soundness bug because without
     `LUA_USE_APICHECK` it would likely instead be UB.
-  * Lua C API errors are handled by lonjmp.  All instances where the Lua C API
+  * Lua C API errors are handled by longjmp.  All instances where the Lua C API
     would otherwise longjmp over calling stack frames should be guarded against,
     except in internal callbacks where this is intentional.  If you detect that
     `rlua` is triggering a longjmp over your Rust stack frames, this is a bug!
