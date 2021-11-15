@@ -1,4 +1,4 @@
-## [0.18.0-alpha.0]
+## [0.18.0]
 - Add support for multiple Lua versions, including 5.1, 5.3 and 5.4 (the default)
 - Add implementations of `FromLua` and `ToLua` for `[T;N]`.
 
