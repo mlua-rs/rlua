@@ -68,7 +68,40 @@ fn main() {
     
     if VersionReq::parse("5.4").unwrap().matches(&semvar_lua) {
         wrapper_h = "wrapper_lua54.h";
-        cc_config_build = cc_config_build.file(lua_dir.join("onelua.c"));
+        cc_config_build = cc_config_build
+            .file(lua_dir.join("lapi.c"))
+            .file(lua_dir.join("lbaselib.c"))
+            .file(lua_dir.join("lcode.c"))
+            .file(lua_dir.join("lcorolib.c"))
+            .file(lua_dir.join("lctype.c"))
+            .file(lua_dir.join("ldblib.c"))
+            .file(lua_dir.join("ldebug.c"))
+            .file(lua_dir.join("ldo.c"))
+            .file(lua_dir.join("ldump.c"))
+            .file(lua_dir.join("lfunc.c"))
+            .file(lua_dir.join("lgc.c"))
+            .file(lua_dir.join("linit.c"))
+            .file(lua_dir.join("liolib.c"))
+            .file(lua_dir.join("llex.c"))
+            .file(lua_dir.join("lmathlib.c"))
+            .file(lua_dir.join("lauxlib.c"))
+            .file(lua_dir.join("lmem.c"))
+            .file(lua_dir.join("loadlib.c"))
+            .file(lua_dir.join("lobject.c"))
+            .file(lua_dir.join("lopcodes.c"))
+            .file(lua_dir.join("loslib.c"))
+            .file(lua_dir.join("lparser.c"))
+            .file(lua_dir.join("lstate.c"))
+            .file(lua_dir.join("lstring.c"))
+            .file(lua_dir.join("lstrlib.c"))
+            .file(lua_dir.join("ltable.c"))
+            .file(lua_dir.join("ltablib.c"))
+            .file(lua_dir.join("ltests.c"))
+            .file(lua_dir.join("ltm.c"))
+            .file(lua_dir.join("lundump.c"))
+            .file(lua_dir.join("lutf8lib.c"))
+            .file(lua_dir.join("lvm.c"))
+            .file(lua_dir.join("lzio.c"));
     } else if VersionReq::parse("5.3").unwrap().matches(&semvar_lua) {
         wrapper_h = "wrapper_lua53.h";
         cc_config_build = cc_config_build
@@ -122,4 +155,5 @@ fn main() {
    
     cc_config_build.out_dir(dst.join("lib"))
         .compile("liblua.a");
+        
 }
