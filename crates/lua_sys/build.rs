@@ -8,7 +8,6 @@ use std::path::PathBuf;
 
 fn main() {
     let git_url = "https://github.com/lua/lua.git";
-    let default_version = "v5.4.3";
 
     let dst = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let lua_dir = dst.join("lua");
@@ -30,10 +29,7 @@ fn main() {
 
     let lua_version = match env::var("LUA_VERSION") {
         Ok(val) => val,
-        Err(_e) => {
-            env::set_var("LUA_VERSION", default_version);
-            default_version.to_string()
-        }
+        Err(_e) => panic!("lua version not specified")
     };
 
     let (object, reference) = repo.revparse_ext(&lua_version).expect("Object not found");
