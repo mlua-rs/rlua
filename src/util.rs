@@ -74,8 +74,8 @@ pub unsafe fn protect_lua(
 ) -> Result<()> {
     let stack_start = ffi::lua_gettop(state) - nargs;
 
-    ffi::lua_pushcfunction(state, error_traceback);
-    ffi::lua_pushcfunction(state, f);
+    ffi::lua_pushcfunction(state, Some(error_traceback));
+    ffi::lua_pushcfunction(state, Some(f));
     if nargs > 0 {
         rotate(state, stack_start + 1, 2);
     }
@@ -83,7 +83,7 @@ pub unsafe fn protect_lua(
     let ret = ffi::lua_pcall(state, nargs, ffi::LUA_MULTRET, stack_start + 1);
     ffi::lua_remove(state, stack_start + 1);
 
-    if ret == ffi::LUA_OK {
+    if ret == ffi::LUA_OK as i32{
         Ok(())
     } else {
         Err(pop_error(state, ret))
@@ -137,8 +137,8 @@ where
 
     let stack_start = ffi::lua_gettop(state) - nargs;
 
-    ffi::lua_pushcfunction(state, error_traceback);
-    ffi::lua_pushcfunction(state, do_call::<F, R>);
+    ffi::lua_pushcfunction(state, Some(error_traceback));
+    ffi::lua_pushcfunction(state, Some(do_call::<F, R>));
     if nargs > 0 {
         rotate(state, stack_start + 1, 2);
     }
@@ -321,7 +321,7 @@ pub unsafe fn init_userdata_metatable<T>(
 
         ffi::lua_pushvalue(state, -1);
         ffi::lua_gettable(state, ffi::lua_upvalueindex(2));
-        if ffi::lua_isnil(state, -1) == 0 {
+        if ffi::lua_isnil(state, -1) == false {
             ffi::lua_insert(state, -3);
             ffi::lua_pop(state, 2);
             1
@@ -355,7 +355,7 @@ pub unsafe fn init_userdata_metatable<T>(
         } else if index_type == ffi::LUA_TFUNCTION {
             ffi::lua_pushvalue(state, members);
             protect_lua_closure(state, 2, 1, |state| {
-                ffi::lua_pushcclosure(state, meta_index_impl, 2);
+                ffi::lua_pushcclosure(state, Some(meta_index_impl), 2);
             })?;
         } else {
             rlua_panic!("improper __index type {}", index_type);
@@ -367,7 +367,7 @@ pub unsafe fn init_userdata_metatable<T>(
     }
 
     push_string(state, "__gc")?;
-    ffi::lua_pushcfunction(state, userdata_destructor::<T>);
+    ffi::lua_pushcfunction(state, Some(userdata_destructor::<T>));
     protect_lua_closure(state, 3, 1, |state| {
         ffi::lua_rawset(state, -3);
     })?;
@@ -462,7 +462,8 @@ pub unsafe fn do_resume(
     nargs: c_int,
     nresults: *mut c_int,
 ) -> c_int {
-    let res = ffi::lua_resume(state, from, nargs);
+    let mut _nres: c_int = 0;
+    let res = ffi::lua_resume(state, from, nargs, &_nres);
     if res == ffi::LUA_OK || res == ffi::LUA_YIELD {
         *nresults = ffi::lua_gettop(state);
     }
@@ -818,14 +819,16 @@ where
             ptr::write(ud as *mut WrappedError, WrappedError(err));
             get_error_metatable(state);
             ffi::lua_setmetatable(state, -2);
-            ffi::lua_error(state)
+            ffi::lua_error(state);
+            panic!("code is unreachable")
         }
         Err(p) => {
             ffi::lua_settop(state, 1);
             ptr::write(ud as *mut WrappedPanic, WrappedPanic(Some(p)));
             get_panic_metatable(state);
             ffi::lua_setmetatable(state, -2);
-            ffi::lua_error(state)
+            ffi::lua_error(state);
+            panic!("code is unreachable")
         }
     }
 }
@@ -888,7 +891,9 @@ pub unsafe extern "C" fn safe_pcall(state: *mut ffi::lua_State) -> c_int {
     if top == 0 {
         ffi::lua_pushstring(state, cstr!("not enough arguments to pcall"));
         ffi::lua_error(state);
-    } else if ffi::lua_pcall(state, top - 1, ffi::LUA_MULTRET, 0) != ffi::LUA_OK {
+        assert!(false, "code is unreachable");
+        0
+    } else if ffi::lua_pcall(state, top - 1, ffi::LUA_MULTRET, 0) != ffi::LUA_OK as i32 {
         if is_wrapped_panic(state, -1) {
             ffi::lua_error(state);
         }
@@ -926,7 +931,7 @@ pub unsafe extern "C" fn safe_xpcall(state: *mut ffi::lua_State) -> c_int {
     }
 
     ffi::lua_pushvalue(state, 2);
-    ffi::lua_pushcclosure(state, xpcall_msgh, 1);
+    ffi::lua_pushcclosure(state, Some(xpcall_msgh), 1);
     copy(state, 1, 2);
     ffi::lua_replace(state, 1);
 
@@ -1028,11 +1033,11 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
     ffi::lua_newtable(state);
 
     ffi::lua_pushstring(state, cstr!("__gc"));
-    ffi::lua_pushcfunction(state, userdata_destructor::<WrappedError>);
+    ffi::lua_pushcfunction(state, Some(userdata_destructor::<WrappedError>));
     ffi::lua_rawset(state, -3);
 
     ffi::lua_pushstring(state, cstr!("__tostring"));
-    ffi::lua_pushcfunction(state, error_tostring);
+    ffi::lua_pushcfunction(state, Some(error_tostring));
     ffi::lua_rawset(state, -3);
 
     ffi::lua_pushstring(state, cstr!("__metatable"));
@@ -1050,7 +1055,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
     ffi::lua_newtable(state);
 
     ffi::lua_pushstring(state, cstr!("__gc"));
-    ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
+    ffi::lua_pushcfunction(state, Some(userdata_destructor::<WrappedPanic>));
     ffi::lua_rawset(state, -3);
 
     ffi::lua_pushstring(state, cstr!("__metatable"));
@@ -1106,7 +1111,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
         cstr!("__ipairs"),
     ] {
         ffi::lua_pushstring(state, method);
-        ffi::lua_pushcfunction(state, destructed_error);
+        ffi::lua_pushcfunction(state, Some(destructed_error));
         ffi::lua_rawset(state, -3);
     }
 
@@ -1122,7 +1127,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
 
     ffi::lua_newtable(state);
     ffi::lua_pushstring(state, cstr!("__gc"));
-    ffi::lua_pushcfunction(state, userdata_destructor::<String>);
+    ffi::lua_pushcfunction(state, Some(userdata_destructor::<String>));
     ffi::lua_rawset(state, -3);
     ffi::lua_setmetatable(state, -2);
 

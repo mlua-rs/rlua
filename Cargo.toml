@@ -61,10 +61,12 @@ libc = { version = "0.2" }
 num-traits = { version = "0.2.14" }
 bitflags = { version = "1.0.4" }
 bstr = {version = "0.2", features = ["std"], default_features = false }
+lua_sys = { path = "./crates/lua_sys" }
 
 [build-dependencies]
 cc = { version = "1.0", optional = true }
 pkg-config = { version = "0.3.11", optional = true }
+semver = "1.0.4"
 
 [dev-dependencies]
 rustyline = "6.0"

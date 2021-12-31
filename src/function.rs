@@ -66,14 +66,14 @@ impl<'lua> Function<'lua> {
             let _sg = StackGuard::new(lua.state);
             check_stack(lua.state, nargs + 3)?;
 
-            ffi::lua_pushcfunction(lua.state, error_traceback);
+            ffi::lua_pushcfunction(lua.state, Some(error_traceback));
             let stack_start = ffi::lua_gettop(lua.state);
             lua.push_ref(&self.0);
             for arg in args {
                 lua.push_value(arg)?;
             }
             let ret = ffi::lua_pcall(lua.state, nargs, ffi::LUA_MULTRET, stack_start);
-            if ret != ffi::LUA_OK {
+            if ret != ffi::LUA_OK as i32 {
                 return Err(pop_error(lua.state, ret));
             }
             let nresults = ffi::lua_gettop(lua.state) - stack_start;
@@ -155,7 +155,7 @@ impl<'lua> Function<'lua> {
             }
 
             protect_lua_closure(lua.state, nargs + 2, 1, |state| {
-                ffi::lua_pushcclosure(state, bind_call_impl, nargs + 2);
+                ffi::lua_pushcclosure(state, Some(bind_call_impl), nargs + 2);
             })?;
 
             Ok(Function(lua.pop_ref()))

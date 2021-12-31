@@ -1,0 +1,25 @@
+[package]
+name = "lua_sys"
+version = "0.1.0"
+keywords = ["bindings", "lua"]
+categories = ["external-ffi-bindings"]
+authors = ["Michael Pollind <mpollind@gmail.com>"]
+description = "Bindings to lua's C API"
+repository = "https://github.com/pollend/lua-sys"
+readme = "README.md"
+edition = "2018"
+links = "lua"
+build = "build.rs"
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+cc = "1.0"
+bindgen = "0.59.2"
+git2 = "0.13"
+semver = "1.0.4"
+
+[features]
+# Enable this feature if you want to have a statically linked bzip2
+static = []

@@ -40,16 +40,18 @@
 // warnings at all.
 #![doc(test(attr(deny(warnings))))]
 
+extern crate lua_sys as ffi;
+
 #[macro_use]
 mod macros;
 
 mod context;
 mod conversion;
 mod error;
-#[cfg_attr(rlua_lua54, path = "ffi_lua54.rs")]
-#[cfg_attr(rlua_lua53, path = "ffi_lua53.rs")]
-#[cfg_attr(rlua_lua51, path = "ffi_lua51.rs")]
-mod ffi;
+// #[cfg_attr(rlua_lua54, path = "ffi_lua54.rs")]
+// #[cfg_attr(rlua_lua53, path = "ffi_lua53.rs")]
+// #[cfg_attr(rlua_lua51, path = "ffi_lua51.rs")]
+// mod ffi;
 mod function;
 mod hook;
 mod lua;
