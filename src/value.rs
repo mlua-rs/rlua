@@ -7,7 +7,9 @@ use crate::function::Function;
 use crate::string::String;
 use crate::table::Table;
 use crate::thread::Thread;
-use crate::types::{Integer, LightUserData, Number};
+#[cfg(any(rlua_lua53, rlua_lua54))]
+use crate::types::Integer;
+use crate::types::{LightUserData, Number};
 use crate::userdata::AnyUserData;
 
 /// A dynamically typed Lua value.  The `String`, `Table`, `Function`, `Thread`, and `UserData`
@@ -22,9 +24,11 @@ pub enum Value<'lua> {
     Boolean(bool),
     /// A "light userdata" object, equivalent to a raw pointer.
     LightUserData(LightUserData),
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     /// An integer number.
     ///
     /// Any Lua number convertible to a `Integer` will be represented as this variant.
+    /// (Lua 5.3+ only)
     Integer(Integer),
     /// A floating point number.
     Number(Number),
@@ -52,6 +56,7 @@ impl<'lua> Value<'lua> {
             Value::Nil => "nil",
             Value::Boolean(_) => "boolean",
             Value::LightUserData(_) => "lightuserdata",
+            #[cfg(any(rlua_lua53, rlua_lua54))]
             Value::Integer(_) => "integer",
             Value::Number(_) => "number",
             Value::String(_) => "string",

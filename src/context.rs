@@ -17,12 +17,15 @@ use crate::table::Table;
 use crate::thread::Thread;
 use crate::types::{Callback, Integer, LightUserData, LuaRef, Number, RegistryKey};
 use crate::userdata::{AnyUserData, MetaMethod, UserData, UserDataMethods};
+#[cfg(any(rlua_lua53, rlua_lua54))]
+use crate::util::isluainteger;
 use crate::util::{
     assert_stack, callback_error, check_stack, get_userdata, get_wrapped_error,
-    init_userdata_metatable, isluainteger, loadbufferx, pop_error, protect_lua,
-    protect_lua_closure, push_globaltable, push_string, push_userdata_uv, push_wrapped_error,
-    tointegerx, tonumberx, StackGuard,
+    init_userdata_metatable, loadbufferx, pop_error, protect_lua, protect_lua_closure,
+    push_globaltable, push_string, push_userdata_uv, push_wrapped_error, tointegerx, tonumberx,
+    StackGuard,
 };
+
 use crate::value::{FromLua, FromLuaMulti, MultiValue, Nil, ToLua, ToLuaMulti, Value};
 
 #[derive(Copy, Clone, Debug)]
@@ -304,6 +307,7 @@ impl<'lua> Context<'lua> {
     /// Lua manual for details.
     pub fn coerce_integer(self, v: Value<'lua>) -> Result<Option<Integer>> {
         Ok(match v {
+            #[cfg(any(rlua_lua53, rlua_lua54))]
             Value::Integer(i) => Some(i),
             v => unsafe {
                 let _sg = StackGuard::new(self.state);
@@ -552,6 +556,7 @@ impl<'lua> Context<'lua> {
                 ffi::lua_pushlightuserdata(self.state, ud.0);
             }
 
+            #[cfg(any(rlua_lua53, rlua_lua54))]
             Value::Integer(i) => {
                 ffi::lua_pushinteger(self.state, i);
             }
@@ -609,6 +614,13 @@ impl<'lua> Context<'lua> {
             }
 
             ffi::LUA_TNUMBER => {
+                #[cfg(any(rlua_lua51))]
+                {
+                    let n = Value::Number(ffi::lua_tonumber(self.state, -1));
+                    ffi::lua_pop(self.state, 1);
+                    n
+                }
+                #[cfg(any(rlua_lua53, rlua_lua54))]
                 if isluainteger(self.state, -1) != 0 {
                     let i = Value::Integer(ffi::lua_tointeger(self.state, -1));
                     ffi::lua_pop(self.state, 1);

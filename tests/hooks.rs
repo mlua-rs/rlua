@@ -127,6 +127,9 @@ fn limit_execution_instructions() {
     );
 
     lua.context(|lua| {
+        #[cfg(rlua_lua51)]
+        lua.globals().set("x", Value::Number(0.0)).unwrap();
+        #[cfg(any(rlua_lua53, rlua_lua54))]
         lua.globals().set("x", Value::Integer(0)).unwrap();
         let _ = lua
             .load(
