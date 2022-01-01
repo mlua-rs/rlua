@@ -17,7 +17,7 @@ macro_rules! cstr {
 
 macro_rules! rlua_panic {
     ($msg:expr) => {
-        panic!(bug_msg!($msg));
+        panic!(bug_msg!($msg))
     };
 
     ($msg:expr,) => {
