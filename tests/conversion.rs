@@ -9,6 +9,17 @@ fn valid_float(verify: Result<Value>, expected: f64) {
     };
 }
 
+#[cfg(rlua_lua51)]
+fn valid_int(verify: Result<Value>, expected: Integer) {
+    let verify_unwrap = verify.unwrap();
+    assert_eq!(verify_unwrap.type_name(), "number");
+    match verify_unwrap {
+        Value::Number(value) => assert_eq!(value as Integer, expected),
+        _ => panic!("unexpected type"),
+    };
+}
+
+#[cfg(not(rlua_lua51))]
 fn valid_int(verify: Result<Value>, expected: Integer) {
     let verify_unwrap = verify.unwrap();
     assert_eq!(verify_unwrap.type_name(), "integer");

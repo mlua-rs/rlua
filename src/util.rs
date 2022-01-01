@@ -556,13 +556,6 @@ pub unsafe fn tonumberx(
 #[cfg(any(rlua_lua53, rlua_lua54))]
 pub use ffi::lua_isinteger as isluainteger;
 
-#[cfg(rlua_lua51)]
-// Implementation of `lua_isinteger()` for Lua 5.1
-pub unsafe fn isluainteger(_state: *mut ffi::lua_State, _index: c_int) -> c_int {
-    // Lua 5.1 doesn't support integers
-    0
-}
-
 #[cfg(any(rlua_lua53, rlua_lua54))]
 pub use ffi::lua_rotate as rotate;
 
