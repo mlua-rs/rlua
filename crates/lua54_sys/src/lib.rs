@@ -22,8 +22,10 @@ pub const LUA_REFNIL: c_int = bindings::LUA_REFNIL as c_int;
 pub const LUA_MULTRET: c_int = bindings::LUA_MULTRET as c_int;
 pub const LUAI_MAXSTACK: c_int = bindings::LUAI_MAXSTACK as c_int;
 pub const LUA_REGISTRYINDEX: c_int = bindings::LUA_REGISTRYINDEX as c_int;
-pub const LUA_RIDX_MAINTHREAD: bindings::lua_Integer = bindings::LUA_RIDX_MAINTHREAD as bindings::lua_Integer;
-pub const LUA_RIDX_GLOBALS: bindings::lua_Integer = bindings::LUA_RIDX_GLOBALS as bindings::lua_Integer;
+pub const LUA_RIDX_MAINTHREAD: bindings::lua_Integer =
+    bindings::LUA_RIDX_MAINTHREAD as bindings::lua_Integer;
+pub const LUA_RIDX_GLOBALS: bindings::lua_Integer =
+    bindings::LUA_RIDX_GLOBALS as bindings::lua_Integer;
 pub const LUA_IDSIZE: c_int = bindings::LUA_IDSIZE as c_int;
 pub const LUA_MINSTACK: c_int = bindings::LUA_MINSTACK as c_int;
 // Not actually defined in lua.h / luaconf.h
@@ -57,37 +59,24 @@ pub const LUA_GCINC: c_int = bindings::LUA_GCINC as c_int;
 pub const LUA_MASKCALL: c_int = bindings::LUA_MASKCALL as c_int;
 pub const LUA_MASKRET: c_int = bindings::LUA_MASKRET as c_int;
 pub const LUA_MASKLINE: c_int = bindings::LUA_MASKLINE as c_int;
-pub const LUA_MASKCOUNT: c_int =  bindings::LUA_MASKCOUNT as c_int;
-
+pub const LUA_MASKCOUNT: c_int = bindings::LUA_MASKCOUNT as c_int;
 
 pub use {
-    bindings::LUA_AUTHORS,
-    bindings::LUA_COPYRIGHT,
-    
-    bindings::LUA_VERSION,
-    bindings::LUA_VERSION_MAJOR,
-    bindings::LUA_VERSION_MINOR,
-    bindings::LUA_VERSION_NUM,
-    bindings::LUA_VERSION_RELEASE,
-    bindings::LUA_VERSION_RELEASE_NUM,
+    bindings::LUA_AUTHORS, bindings::LUA_COPYRIGHT, bindings::LUA_VERSION,
+    bindings::LUA_VERSION_MAJOR, bindings::LUA_VERSION_MINOR, bindings::LUA_VERSION_NUM,
+    bindings::LUA_VERSION_RELEASE, bindings::LUA_VERSION_RELEASE_NUM,
 };
 
-
 pub use {
-    bindings::lua_rawequal,
-    bindings::lua_compare,
-    bindings::lua_getinfo,
-    bindings::lua_getlocal,
-    bindings::lua_setlocal,
-    bindings::lua_getupvalue,
+    bindings::lua_compare, bindings::lua_getinfo, bindings::lua_getlocal, bindings::lua_getupvalue,
+    bindings::lua_rawequal, bindings::lua_sethook, bindings::lua_setlocal,
     bindings::lua_setupvalue,
-    bindings::lua_sethook,
 };
 
 pub use {
-    bindings::lua_Alloc, bindings::lua_CFunction, bindings::lua_Integer, bindings::lua_KContext,
-    bindings::lua_Number, bindings::lua_State, bindings::lua_Unsigned, bindings::lua_Debug,
-    bindings::lua_setcstacklimit
+    bindings::lua_Alloc, bindings::lua_CFunction, bindings::lua_Debug, bindings::lua_Integer,
+    bindings::lua_KContext, bindings::lua_Number, bindings::lua_State, bindings::lua_Unsigned,
+    bindings::lua_setcstacklimit,
 };
 
 /*
@@ -171,79 +160,40 @@ pub use bindings::lua_gc;
 /*
 ** miscellaneous functions
 */
-pub use { bindings::lua_concat, bindings::lua_error, bindings::lua_getallocf,
-    bindings::lua_len, bindings::lua_next, bindings::lua_setallocf, bindings::lua_stringtonumber,
+pub use {
+    bindings::lua_concat, bindings::lua_error, bindings::lua_getallocf, bindings::lua_len,
+    bindings::lua_next, bindings::lua_setallocf, bindings::lua_stringtonumber,
     bindings::lua_toclose,
 };
-
 
 /*
 ** lauxlib.h
 */
 pub use {
-    bindings::luaL_checkstack,
-    bindings::luaL_requiref,
-    bindings::luaL_Buffer,
-    bindings::luaL_loadfilex,
-    bindings::luaL_Reg,
-    bindings::luaL_getmetafield,
-    bindings::luaL_callmeta,
-    bindings::luaL_tolstring,
-    bindings::luaL_argerror,
-    bindings::luaL_typeerror,
-    bindings::luaL_checklstring,
-    bindings::luaL_optlstring,
-    bindings::luaL_checknumber,
-    bindings::luaL_optnumber,
-    bindings::luaL_checkinteger,
-    bindings::luaL_optinteger,
-    bindings::luaL_checktype,
-    bindings::luaL_checkany,
-    bindings::luaL_newmetatable,
-    bindings::luaL_setmetatable,
-    bindings::luaL_testudata,
-    bindings::luaL_checkudata,
-    bindings::luaL_where,
-    bindings::luaL_error,
-    bindings::luaL_checkoption,
-    bindings::luaL_execresult,
-    bindings::luaL_ref,
-    bindings::luaL_unref,
-    bindings::luaL_loadbufferx,
-    bindings::luaL_loadstring,
-    bindings::luaL_newstate,
-    bindings::luaL_len,
-    bindings::luaL_addgsub,
-    bindings::luaL_gsub,
-    bindings::luaL_setfuncs,
-    bindings::luaL_getsubtable,
-    bindings::luaL_traceback,
-    bindings::luaL_prepbuffsize,
-    bindings::luaL_buffinit,
-    bindings::luaL_addlstring,
-    bindings::luaL_addstring,
-    bindings::luaL_addvalue,
-    bindings::luaL_pushresult,
-    bindings::luaL_pushresultsize,
-    bindings::luaL_buffinitsize,
-    bindings::luaL_Stream,
+    bindings::luaL_Buffer, bindings::luaL_Reg, bindings::luaL_Stream, bindings::luaL_addgsub,
+    bindings::luaL_addlstring, bindings::luaL_addstring, bindings::luaL_addvalue,
+    bindings::luaL_argerror, bindings::luaL_buffinit, bindings::luaL_buffinitsize,
+    bindings::luaL_callmeta, bindings::luaL_checkany, bindings::luaL_checkinteger,
+    bindings::luaL_checklstring, bindings::luaL_checknumber, bindings::luaL_checkoption,
+    bindings::luaL_checkstack, bindings::luaL_checktype, bindings::luaL_checkudata,
+    bindings::luaL_error, bindings::luaL_execresult, bindings::luaL_getmetafield,
+    bindings::luaL_getsubtable, bindings::luaL_gsub, bindings::luaL_len,
+    bindings::luaL_loadbufferx, bindings::luaL_loadfilex, bindings::luaL_loadstring,
+    bindings::luaL_newmetatable, bindings::luaL_newstate, bindings::luaL_optinteger,
+    bindings::luaL_optlstring, bindings::luaL_optnumber, bindings::luaL_prepbuffsize,
+    bindings::luaL_pushresult, bindings::luaL_pushresultsize, bindings::luaL_ref,
+    bindings::luaL_requiref, bindings::luaL_setfuncs, bindings::luaL_setmetatable,
+    bindings::luaL_testudata, bindings::luaL_tolstring, bindings::luaL_traceback,
+    bindings::luaL_typeerror, bindings::luaL_unref, bindings::luaL_where,
 };
-
 
 /*
 ** lualib.h
 */
 pub use {
-    bindings::luaopen_base,
-    bindings::luaopen_coroutine,
-    bindings::luaopen_table,
-    bindings::luaopen_io,
-    bindings::luaopen_os,
-    bindings::luaopen_string,
-    bindings::luaopen_utf8,
-    bindings::luaopen_math,
-    bindings::luaopen_debug,
-    bindings::luaopen_package,
+    bindings::luaopen_base, bindings::luaopen_coroutine, bindings::luaopen_debug,
+    bindings::luaopen_io, bindings::luaopen_math, bindings::luaopen_os, bindings::luaopen_package,
+    bindings::luaopen_string, bindings::luaopen_table, bindings::luaopen_utf8,
 };
 
 // The following are re-implementations of what are macros in the Lua C API

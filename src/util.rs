@@ -462,8 +462,7 @@ pub unsafe fn do_resume(
     nargs: c_int,
     nresults: *mut c_int,
 ) -> c_int {
-    let mut _nres: c_int = 0;
-    let res = ffi::lua_resume(state, from, nargs, &_nres);
+    let res = ffi::lua_resume(state, from, nargs);
     if res == ffi::LUA_OK || res == ffi::LUA_YIELD {
         *nresults = ffi::lua_gettop(state);
     }

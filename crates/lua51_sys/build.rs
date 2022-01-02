@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 fn main() {
     let git_url = "https://github.com/lua/lua.git";
-    let lua_version = "v5.1.1"
+    let lua_version = "v5.1.1";
     let wrapper_h = "wrapper_lua51.h";
 
     let dst = PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -56,16 +56,13 @@ fn main() {
         cc_config.define("LUA_USE_WINDOWS", None);
     }
 
-    binding_config = binding_config
-        .size_t_is_usize(true);
+    binding_config = binding_config.size_t_is_usize(true);
     let mut cc_config_build = cc_config.include(&lua_dir);
-    
+
     cc_config_build = cc_config_build
         .file(lua_dir.join("lapi.c"))
         .file(lua_dir.join("lbaselib.c"))
         .file(lua_dir.join("lcode.c"))
-        .file(lua_dir.join("lcorolib.c"))
-        .file(lua_dir.join("lctype.c"))
         .file(lua_dir.join("ldblib.c"))
         .file(lua_dir.join("ldebug.c"))
         .file(lua_dir.join("ldo.c"))
@@ -91,11 +88,9 @@ fn main() {
         .file(lua_dir.join("ltests.c"))
         .file(lua_dir.join("ltm.c"))
         .file(lua_dir.join("lundump.c"))
-        .file(lua_dir.join("lutf8lib.c"))
         .file(lua_dir.join("lvm.c"))
         .file(lua_dir.join("lzio.c"));
 
- 
     println!("cargo:rerun-if-changed={}", wrapper_h);
     let bindings = binding_config
         .header(wrapper_h)
@@ -108,8 +103,8 @@ fn main() {
     bindings
         .write_to_file(dst.join("bindings.rs"))
         .expect("Couldn't write bindings!");
-   
-    cc_config_build.out_dir(dst.join("lib"))
+
+    cc_config_build
+        .out_dir(dst.join("lib"))
         .compile("liblua5.1.a");
-        
 }

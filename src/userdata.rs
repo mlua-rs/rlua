@@ -418,10 +418,17 @@ impl<'lua> AnyUserData<'lua> {
             if ffi::lua_getmetatable(lua.state, -1) == 0 {
                 Err(Error::UserDataTypeMismatch)
             } else {
+                #[cfg(any(rlua_lua53, rlua_lua54))]
                 ffi::lua_rawgeti(
                     lua.state,
                     ffi::LUA_REGISTRYINDEX,
                     lua.userdata_metatable::<T>()? as ffi::lua_Integer,
+                );
+                #[cfg(any(rlua_lua51))]
+                ffi::lua_rawgeti(
+                    lua.state,
+                    ffi::LUA_REGISTRYINDEX,
+                    lua.userdata_metatable::<T>()? as c_int,
                 );
 
                 if ffi::lua_rawequal(lua.state, -1, -2) == 0 {
