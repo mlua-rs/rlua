@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rlua::{Lua, String};
+use rlua::{Lua, String, Table};
 
 fn with_str<F>(s: &str, f: F)
 where
@@ -67,5 +67,43 @@ fn raw_string() {
     Lua::new().context(|lua| {
         let rs = lua.create_string(&[0, 1, 2, 3, 0, 1, 2, 3]).unwrap();
         assert_eq!(rs.as_bytes(), &[0, 1, 2, 3, 0, 1, 2, 3]);
+    });
+}
+
+#[test]
+fn string_eq_hash() {
+    use std::collections::HashSet;
+    Lua::new().context(|lua| {
+        lua.load(
+            r#"
+                strlist = {
+                    "foo",
+                    "bar",
+                    "foo",
+                    "bar",
+                    "baz"
+                }
+            "#,
+        )
+        .exec()
+        .unwrap();
+
+        let t: Table = lua.globals().get("strlist").unwrap();
+        let stringset: HashSet<rlua::String> = t.sequence_values().map(|v| v.unwrap()).collect();
+
+        let sorted = lua
+            .create_table_from((1..).zip(stringset.into_iter()))
+            .unwrap();
+        lua.globals().set("filtered", sorted).unwrap();
+        lua.load(
+            r#"
+                table.sort(filtered)
+                result = table.concat(filtered, ",")
+            "#,
+        )
+        .exec()
+        .unwrap();
+        let result: std::string::String = lua.globals().get("result").unwrap();
+        assert_eq!(result, "bar,baz,foo");
     });
 }
