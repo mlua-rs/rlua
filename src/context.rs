@@ -476,7 +476,6 @@ impl<'lua> Context<'lua> {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 2);
 
-
             #[cfg(any(rlua_lua53, rlua_lua54))]
             ffi::lua_rawgeti(
                 self.state,
@@ -484,11 +483,7 @@ impl<'lua> Context<'lua> {
                 key.registry_id as ffi::lua_Integer,
             );
             #[cfg(any(rlua_lua51))]
-            ffi::lua_rawgeti(
-                self.state,
-                ffi::LUA_REGISTRYINDEX,
-                key.registry_id as c_int,
-            );
+            ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, key.registry_id as c_int);
             self.pop_value()
         };
         T::from_lua(value, self)
@@ -842,11 +837,7 @@ impl<'lua> Context<'lua> {
             ud_index as ffi::lua_Integer,
         );
         #[cfg(any(rlua_lua51))]
-        ffi::lua_rawgeti(
-            self.state,
-            ffi::LUA_REGISTRYINDEX,
-            ud_index as c_int,
-        );
+        ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ud_index as c_int);
         ffi::lua_setmetatable(self.state, -2);
 
         Ok(AnyUserData(self.pop_ref()))
