@@ -392,7 +392,7 @@ lua_convert_float!(f64);
 
 impl<'lua, T: ToLua<'lua>, const N: usize> ToLua<'lua> for [T; N] {
     fn to_lua(self, lua: Context<'lua>) -> Result<Value<'lua>> {
-        Ok(Value::Table(lua.create_sequence_from(vec![self])?))
+        Ok(Value::Table(lua.create_sequence_from(Vec::from(self))?))
     }
 }
 
