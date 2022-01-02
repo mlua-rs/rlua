@@ -1213,7 +1213,13 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> bool {
         state,
         &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
     );
+    #[cfg(any(rlua_lua53, rlua_lua54))]
     let mt_type = ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
+    #[cfg(rlua_lua51)]
+    let mt_type = {
+        ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
+        ffi::lua_type(state, -1)
+    };
     if mt_type == ffi::LUA_TTABLE {
         true
     } else {
