@@ -146,6 +146,22 @@ impl Lua {
         create_lua(lua_mod, InitFlags::DEFAULT)
     }
 
+    /// Creates a new Lua state with a subset of the standard libraries and
+    /// modified initialization.
+    ///
+    /// Use the [`StdLib`] flags to specifiy the libraries you want to load.
+    /// Use the [`InitFlags`] to specify non-default Lua configuration.
+    ///
+    /// `unsafe_new_with_flags(mods, InitFlags::DEFAULT)` is equivalent to
+    /// `unsafe_new_with(mods)`.
+    ///
+    /// This function is unsafe because it can be used to load the `debug` library which can be used
+    /// to break the safety guarantees provided by rlua, or to disable some of the safety features
+    /// which rlua provides by default.
+    pub unsafe fn unsafe_new_with_flags(lua_mod: StdLib, init_flags: InitFlags) -> Lua {
+        create_lua(lua_mod, init_flags)
+    }
+
     /// Loads the specified set of safe standard libraries into an existing Lua state.
     ///
     /// Use the [`StdLib`] flags to specifiy the libraries you want to load.
