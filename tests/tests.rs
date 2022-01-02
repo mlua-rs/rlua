@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::{error, f32, f64, fmt};
 
 use rlua::{
-    Error, ExternalError, Function, /* InitFlags, */ Lua, Nil, Result, StdLib, String, Table, UserData, Value,
-    Variadic,
+    Error, ExternalError, Function, /* InitFlags, */ Lua, Nil, Result, StdLib, String, Table,
+    UserData, Value, Variadic,
 };
 
 #[test]
