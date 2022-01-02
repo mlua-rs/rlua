@@ -1217,7 +1217,6 @@ unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> bool {
     if mt_type == ffi::LUA_TTABLE {
         true
     } else {
-        panic!("get_panic_metatable failed: type {}", mt_type);
         ffi::lua_pop(state, 1);
         false
     }
