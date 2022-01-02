@@ -543,7 +543,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
         protect_lua_closure(state, 0, 0, |state| {
             load_from_std_lib(state, lua_mod_to_load);
 
-            init_error_registry(state);
+            init_error_registry(state, init_flags.contains(InitFlags::PCALL_WRAPPERS));
 
             // Create the function metatable
 
