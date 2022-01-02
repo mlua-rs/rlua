@@ -83,7 +83,7 @@ pub unsafe fn protect_lua(
     let ret = ffi::lua_pcall(state, nargs, ffi::LUA_MULTRET, stack_start + 1);
     ffi::lua_remove(state, stack_start + 1);
 
-    if ret == ffi::LUA_OK as i32{
+    if ret == ffi::LUA_OK as i32 {
         Ok(())
     } else {
         Err(pop_error(state, ret))

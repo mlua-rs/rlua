@@ -1,7 +1,4 @@
-
-
 fn main() {
-
     #[cfg(feature = "rlua_lua54")]
     {
         println!("cargo:rustc-cfg=rlua_lua54");

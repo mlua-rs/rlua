@@ -508,7 +508,10 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
         hook_callback: None,
     });
 
-    let state = ffi::lua_newstate(Some(allocator), &mut *extra as *mut ExtraData as *mut c_void);
+    let state = ffi::lua_newstate(
+        Some(allocator),
+        &mut *extra as *mut ExtraData as *mut c_void,
+    );
 
     #[cfg(rlua_lua54)]
     ffi::lua_setcstacklimit(state, SAFE_CSTACK_SIZE);
