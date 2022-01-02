@@ -60,6 +60,16 @@ bitflags! {
     }
 }
 
+bitflags! {
+    /// Flags describing the set of lua modules to load.
+    pub struct InitFlags: u32 {
+        const PCALL_WRAPPERS = 0x1;
+
+        const DEFAULT = InitFlags::PCALL_WRAPPERS.bits;
+        const NONE = 0;
+    }
+}
+
 #[cfg(rlua_lua54)]
 // at 812, tests pass
 // at 813, tests fail
@@ -96,14 +106,14 @@ impl Drop for Lua {
 impl Lua {
     /// Creates a new Lua state and loads standard library without the `debug` library.
     pub fn new() -> Lua {
-        unsafe { create_lua(StdLib::ALL_NO_DEBUG) }
+        unsafe { create_lua(StdLib::ALL_NO_DEBUG, InitFlags::DEFAULT) }
     }
 
     /// Creates a new Lua state and loads the standard library including the `debug` library.
     ///
     /// The debug library is very unsound, it can be used to break the safety guarantees of rlua.
     pub unsafe fn new_with_debug() -> Lua {
-        create_lua(StdLib::ALL)
+        create_lua(StdLib::ALL, InitFlags::DEFAULT)
     }
 
     /// Creates a new Lua state and loads a subset of the standard libraries.
@@ -123,7 +133,7 @@ impl Lua {
             "The lua debug module can't be loaded using `new_with`. Use `unsafe_new_with` instead."
         );
 
-        unsafe { create_lua(lua_mod) }
+        unsafe { create_lua(lua_mod, InitFlags::DEFAULT) }
     }
 
     /// Creates a new Lua state and loads a subset of the standard libraries.
@@ -133,7 +143,7 @@ impl Lua {
     /// This function is unsafe because it can be used to load the `debug` library which can be used
     /// to break the safety guarantees provided by rlua.
     pub unsafe fn unsafe_new_with(lua_mod: StdLib) -> Lua {
-        create_lua(lua_mod)
+        create_lua(lua_mod, InitFlags::DEFAULT)
     }
 
     /// Loads the specified set of safe standard libraries into an existing Lua state.
@@ -452,7 +462,7 @@ pub(crate) unsafe fn extra_data(state: *mut ffi::lua_State) -> *mut ExtraData {
     }
 }
 
-unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
+unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
     unsafe extern "C" fn allocator(
         extra_data: *mut c_void,
         ptr: *mut c_void,
@@ -540,17 +550,19 @@ unsafe fn create_lua(lua_mod_to_load: StdLib) -> Lua {
 
             // Override pcall and xpcall with versions that cannot be used to catch rust panics.
 
-            push_globaltable(state);
+            if init_flags.contains(InitFlags::PCALL_WRAPPERS) {
+                push_globaltable(state);
 
-            ffi::lua_pushstring(state, cstr!("pcall"));
-            ffi::lua_pushcfunction(state, safe_pcall);
-            ffi::lua_rawset(state, -3);
+                ffi::lua_pushstring(state, cstr!("pcall"));
+                ffi::lua_pushcfunction(state, safe_pcall);
+                ffi::lua_rawset(state, -3);
 
-            ffi::lua_pushstring(state, cstr!("xpcall"));
-            ffi::lua_pushcfunction(state, safe_xpcall);
-            ffi::lua_rawset(state, -3);
+                ffi::lua_pushstring(state, cstr!("xpcall"));
+                ffi::lua_pushcfunction(state, safe_xpcall);
+                ffi::lua_rawset(state, -3);
 
-            ffi::lua_pop(state, 1);
+                ffi::lua_pop(state, 1);
+            }
 
             // Create ref stack thread and place it in the registry to prevent it from being garbage
             // collected.
