@@ -771,6 +771,20 @@ pub unsafe fn traceback(
     ffi::lua_pushstring(push_state, msg);
 }
 
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::lua_dump as dump;
+
+#[cfg(rlua_lua51)]
+pub unsafe fn dump(
+    state: *mut ffi::lua_State,
+    writer: ffi::lua_Writer,
+    data: *mut c_void,
+    _strip: c_int,
+) -> c_int
+{
+    ffi::lua_dump(state, writer, data)
+}
+
 // In the context of a lua callback, this will call the given function and if the given function
 // returns an error, *or if the given function panics*, this will result in a call to lua_error (a
 // longjmp).  The error or panic is wrapped in such a way that when calling pop_error back on

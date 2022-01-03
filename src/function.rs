@@ -7,7 +7,7 @@ use crate::error::{Error, Result};
 use crate::ffi;
 use crate::types::LuaRef;
 use crate::util::{
-    assert_stack, check_stack, error_traceback, pop_error, protect_lua_closure, rotate, StackGuard,
+    assert_stack, check_stack, dump, error_traceback, pop_error, protect_lua_closure, rotate, StackGuard,
 };
 use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
@@ -210,10 +210,11 @@ impl<'lua> Function<'lua> {
             let bytes_ptr = &mut bytes as *mut _;
             protect_lua_closure(lua.state, 0, 0, |state| {
                 lua.push_ref(&self.0);
-                let dump_result = ffi::lua_dump(
+                let dump_result = dump(
                     state,
                     writer,
-                    bytes_ptr as *mut c_void);
+                    bytes_ptr as *mut c_void,
+                    0);
                 // It can only return an error from our writer.
                 debug_assert_eq!(dump_result, 0);
             })?;
