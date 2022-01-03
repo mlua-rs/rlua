@@ -19,8 +19,8 @@ use crate::hook::{hook_proc, Debug, HookTriggers};
 use crate::markers::NoRefUnwindSafe;
 use crate::types::Callback;
 use crate::util::{
-    assert_stack, init_error_registry, protect_lua_closure, push_globaltable, requiref, safe_pcall,
-    safe_xpcall, userdata_destructor,
+    assert_stack, init_error_registry, protect_lua_closure, push_globaltable, requiref,
+    dostring, safe_pcall, safe_xpcall, userdata_destructor,
 };
 
 bitflags! {
@@ -64,8 +64,10 @@ bitflags! {
     /// Flags describing the set of lua modules to load.
     pub struct InitFlags: u32 {
         const PCALL_WRAPPERS = 0x1;
+        const LOAD_WRAPPERS = 0x1;
 
-        const DEFAULT = InitFlags::PCALL_WRAPPERS.bits;
+        const DEFAULT = InitFlags::PCALL_WRAPPERS.bits |
+                        InitFlags::LOAD_WRAPPERS.bits;
         const NONE = 0;
     }
 }
@@ -568,7 +570,6 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
             ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
 
             // Override pcall and xpcall with versions that cannot be used to catch rust panics.
-
             if init_flags.contains(InitFlags::PCALL_WRAPPERS) {
                 push_globaltable(state);
 
@@ -581,6 +582,107 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                 ffi::lua_rawset(state, -3);
 
                 ffi::lua_pop(state, 1);
+            }
+
+            // Override dofile, load, and loadfile with versions that won't load
+            // binary files.
+            if init_flags.contains(InitFlags::LOAD_WRAPPERS) {
+                // These are easier to override in Lua.
+                #[cfg(any(rlua_lua53, rlua_lua54))]
+                let wrapload = r#"
+                    do
+                        -- load(chunk [, chunkname [, mode [, env]]])
+                        local real_load = load
+                        load = function(func, chunkname, mode, env)
+                            return real_load(func, chunkname, "t", env)
+                        end
+
+                        -- loadfile ([filename [, mode [, env]]])
+                        local real_loadfile = loadfile
+                        loadfile = function(filename, mode, env)
+                            return real_loadfile(filename, "t", env)
+                        end
+
+                        -- dofile([filename])
+                        local real_dofile = dofile
+                        dofile = function(filename)
+                            -- Note: this is the wrapped loadfile above
+                            local chunk = loadfile(filename)
+                            if chunk then
+                                return chunk()
+                            end
+                        end
+                    end
+                "#;
+                #[cfg(rlua_lua51)]
+                let wrapload = r#"
+                    do
+                        -- load(chunk [, chunkname])
+                        local real_load = load
+                        -- safe type() in case user code replaces it
+                        local real_type = type
+                        local real_error = error
+                        load = function(func, chunkname) 
+                            local first_chunk = true
+                            local wrap_func = function()
+                                if not first_chunk then
+                                    return func()
+                                else
+                                    local data = func()
+                                    if data == nil then return nil end
+                                    assert(real_type(data) == "string")
+                                    if data:len() > 0 then
+                                        if data:byte(1) == 27 then
+                                            real_error("rlua load: loading binary chunks is not allowed")
+                                        end
+                                        first_chunk = false
+                                    end
+                                    return data
+                                end
+                            end
+                            return real_load(wrapfunc, chunkname)
+                        end
+
+                        -- loadstring(string [, chunkname])
+                        local real_loadstring = loadstring
+                        loadstring = function(string, chunkname)
+                            if string:byte(1) == 27 then
+                                -- This is a binary chunk, so disallow
+                                real_error("rlua loadstring: loading binary chunks is not allowed")
+                            else
+                                return real_loadstring(string, chunkname)
+                            end
+                        end
+
+                        -- loadfile ([filename])
+                        local real_loadfile = loadfile
+                        loadfile = function(filename)
+                            local f, err = real_io_open(filename, "rb")
+                            if not f then
+                                return nil, err
+                            end
+                            local first_chunk = true
+                            local func = function()
+                                return f:read(4096)
+                            end
+                            -- Note: the safe load from above.
+                            return load(func, filename)
+                        end
+
+                        -- dofile([filename])
+                        local real_dofile = dofile
+                        dofile = function(filename)
+                            -- Note: this is the wrapped loadfile above
+                            local chunk = loadfile(filename)
+                            if chunk then
+                                return chunk()
+                            end
+                        end
+                    end
+                "#;
+
+                let result = dostring(state, wrapload);
+                assert_eq!(result, 0);
             }
 
             // Create ref stack thread and place it in the registry to prevent it from being garbage

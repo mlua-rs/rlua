@@ -696,6 +696,17 @@ pub unsafe fn loadbufferx(
     ffi::luaL_loadbuffer(state, buf, size, name)
 }
 
+pub unsafe fn dostring(
+    state: *mut ffi::lua_State,
+    s: &str,
+) -> c_int {
+    if loadbufferx(state, s.as_ptr() as *const c_char, s.len(), cstr!(""), cstr!("t")) == 0 {
+        ffi::lua_pcall(state, 0, ffi::LUA_MULTRET, 0)
+    } else {
+        0
+    }
+}
+
 #[cfg(any(rlua_lua53, rlua_lua54))]
 // Like luaL_requiref but doesn't leave the module on the stack.
 pub unsafe fn requiref(
