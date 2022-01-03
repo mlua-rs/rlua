@@ -1,6 +1,8 @@
 use std::os::raw::c_int;
 use std::ptr;
 
+use libc::c_void;
+
 use crate::error::{Error, Result};
 use crate::ffi;
 use crate::types::LuaRef;
@@ -160,5 +162,62 @@ impl<'lua> Function<'lua> {
 
             Ok(Function(lua.pop_ref()))
         }
+    }
+
+    /// Dumps the compiled representation of the function into a binary blob,
+    /// which can later be loaded using the unsafe Chunk::into_function_allow_binary().
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rlua::{Lua, Function, Result};
+    /// # fn main() -> Result<()> {
+    /// # Lua::new().context(|lua_context| {
+    /// let add2: Function = lua_context.load(r#"
+    ///     function(a)
+    ///         return a + 2
+    ///     end
+    /// "#).eval()?;
+    ///
+    /// let dumped = add2.dump()?;
+    ///
+    /// let reloaded = unsafe {
+    ///     lua_context.load(&dumped)
+    ///                .into_function_allow_binary()?
+    /// };
+    /// assert_eq!(reloaded.call::<_, u32>(7)?, 7+2);
+    ///
+    /// # Ok(())
+    /// # })
+    /// # }
+    /// ```
+    pub fn dump(&self) -> Result<Vec<u8>> {
+        unsafe extern "C" fn writer(
+            _state: *mut ffi::lua_State,
+            p: *const c_void,
+            sz: usize,
+            ud: *mut c_void) -> c_int {
+            let input_slice = std::slice::from_raw_parts(p as *const u8, sz);
+            let vec = &mut *(ud as *mut Vec<u8>);
+            vec.extend_from_slice(input_slice);
+            0
+        }
+        let lua = self.0.lua;
+        let mut bytes = Vec::new();
+        unsafe {
+            let _sg = StackGuard::new(lua.state);
+            check_stack(lua.state, 1)?;
+            let bytes_ptr = &mut bytes as *mut _;
+            protect_lua_closure(lua.state, 0, 0, |state| {
+                lua.push_ref(&self.0);
+                let dump_result = ffi::lua_dump(
+                    state,
+                    writer,
+                    bytes_ptr as *mut c_void);
+                // It can only return an error from our writer.
+                debug_assert_eq!(dump_result, 0);
+            })?;
+        }
+        Ok(bytes)
     }
 }
