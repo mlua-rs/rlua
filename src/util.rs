@@ -823,9 +823,16 @@ where
         Err(p) => {
             ffi::lua_settop(state, 1);
             ptr::write(ud as *mut WrappedPanic, WrappedPanic(Some(p)));
-            get_panic_metatable(state);
-            ffi::lua_setmetatable(state, -2);
-            ffi::lua_error(state)
+            if get_panic_metatable(state) {
+                ffi::lua_setmetatable(state, -2);
+                ffi::lua_error(state)
+            } else {
+                // The pcall/xpcall wrappers which allow sending a panic
+                // safeul through Lua have not been enabled.
+                // We can't allow a panic to cross the C/Rust boundary, so the
+                // only choice is to abort.
+                std::process::abort()
+            }
         }
     }
 }
@@ -983,7 +990,7 @@ pub unsafe fn get_wrapped_error(state: *mut ffi::lua_State, index: c_int) -> *co
 }
 
 // Initialize the error, panic, and destructed userdata metatables.
-pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
+pub unsafe fn init_error_registry(state: *mut ffi::lua_State, wrap_panics: bool) {
     assert_stack(state, 8);
 
     // Create error metatable
@@ -1042,22 +1049,23 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State) {
     ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
 
     // Create panic metatable
+    if wrap_panics {
+        ffi::lua_pushlightuserdata(
+            state,
+            &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
+        );
+        ffi::lua_newtable(state);
 
-    ffi::lua_pushlightuserdata(
-        state,
-        &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
-    );
-    ffi::lua_newtable(state);
+        ffi::lua_pushstring(state, cstr!("__gc"));
+        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
+        ffi::lua_rawset(state, -3);
 
-    ffi::lua_pushstring(state, cstr!("__gc"));
-    ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
-    ffi::lua_rawset(state, -3);
+        ffi::lua_pushstring(state, cstr!("__metatable"));
+        ffi::lua_pushboolean(state, 0);
+        ffi::lua_rawset(state, -3);
 
-    ffi::lua_pushstring(state, cstr!("__metatable"));
-    ffi::lua_pushboolean(state, 0);
-    ffi::lua_rawset(state, -3);
-
-    ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+        ffi::lua_rawset(state, ffi::LUA_REGISTRYINDEX);
+    }
 
     // Create destructed userdata metatable
 
@@ -1176,10 +1184,13 @@ unsafe fn is_wrapped_panic(state: *mut ffi::lua_State, index: c_int) -> bool {
         return false;
     }
 
-    get_panic_metatable(state);
-    let res = ffi::lua_rawequal(state, -1, -2) != 0;
-    ffi::lua_pop(state, 2);
-    res
+    if get_panic_metatable(state) {
+        let res = ffi::lua_rawequal(state, -1, -2) != 0;
+        ffi::lua_pop(state, 2);
+        res
+    } else {
+        false
+    }
 }
 
 unsafe fn get_error_metatable(state: *mut ffi::lua_State) {
@@ -1190,12 +1201,31 @@ unsafe fn get_error_metatable(state: *mut ffi::lua_State) {
     ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
 }
 
-unsafe fn get_panic_metatable(state: *mut ffi::lua_State) {
+/// Get the special panic error metatable from the registry.
+///
+/// This may fail if the Lua state was created without the pcall
+/// wrappers.
+///
+/// Returns true if the metatable was pushed to the stack, or false
+/// otherwise (nothing will have been pushed).
+unsafe fn get_panic_metatable(state: *mut ffi::lua_State) -> bool {
     ffi::lua_pushlightuserdata(
         state,
         &PANIC_METATABLE_REGISTRY_KEY as *const u8 as *mut c_void,
     );
-    ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
+    #[cfg(any(rlua_lua53, rlua_lua54))]
+    let mt_type = ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
+    #[cfg(rlua_lua51)]
+    let mt_type = {
+        ffi::lua_rawget(state, ffi::LUA_REGISTRYINDEX);
+        ffi::lua_type(state, -1)
+    };
+    if mt_type == ffi::LUA_TTABLE {
+        true
+    } else {
+        ffi::lua_pop(state, 1);
+        false
+    }
 }
 
 unsafe fn get_destructed_userdata_metatable(state: *mut ffi::lua_State) {
