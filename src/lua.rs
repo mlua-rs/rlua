@@ -593,8 +593,11 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                     do
                         -- load(chunk [, chunkname [, mode [, env]]])
                         local real_load = load
-                        load = function(func, chunkname, mode, env)
-                            return real_load(func, chunkname, "t", env)
+                        load = function(...)
+                            local args = table.pack(...)
+                            args[3] = "t"
+                            if args.n < 3 then args.n = 3 end
+                            return real_load(table.unpack(args))
                         end
 
                         -- loadfile ([filename [, mode [, env]]])

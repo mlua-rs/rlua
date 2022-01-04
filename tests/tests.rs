@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::{error, f32, f64, fmt};
 
 use rlua::{
-    Error, ExternalError, Function, /* InitFlags, */ Lua, Nil, Result, StdLib, String, Table,
+    Error, ExternalError, Function, InitFlags, Lua, Nil, Result, StdLib, String, Table,
     UserData, Value, Variadic,
 };
 
@@ -405,6 +405,97 @@ fn test_error_nopcall_wrap() {
     };
 }
 */
+
+#[test]
+fn test_load_wrappers() {
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        lua.load(
+            r#"
+                assert(type(binchunk) == "string")
+                chunk = load(binchunk, "bad", "bt")
+                assert(chunk == nil)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        lua.load(
+            r#"
+                chunk = load("x = x + 4")
+                assert(chunk ~= nil)
+                chunk()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    });
+}
+
+#[test]
+fn test_no_load_wrappers() {
+    unsafe { Lua::unsafe_new_with_flags(StdLib::ALL_NO_DEBUG, InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS).context(|lua| {
+        let globals = lua.globals();
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        lua.load(
+            r#"
+                assert(type(binchunk) == "string")
+                chunk = load(binchunk, "fail", "t")
+                assert(chunk == nil)
+                chunk = load(binchunk, "good", "bt")
+                assert(chunk ~= nil)
+                chunk()
+                chunk = load("x = x + 3")
+                chunk()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    })};
+}
 
 #[test]
 fn test_result_conversions() {
