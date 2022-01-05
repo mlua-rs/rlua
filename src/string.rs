@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::{slice, str};
 
 use crate::error::{Error, Result};
@@ -105,5 +106,13 @@ where
 {
     fn eq(&self, other: &T) -> bool {
         self.as_bytes() == other.as_ref()
+    }
+}
+
+impl<'lua> Eq for String<'lua> {}
+
+impl<'lua> Hash for String<'lua> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_bytes().hash(state);
     }
 }

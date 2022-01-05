@@ -70,7 +70,7 @@ pub use crate::context::{Chunk, Context};
 pub use crate::error::{Error, ExternalError, ExternalResult, Result};
 pub use crate::function::Function;
 pub use crate::hook::{Debug, DebugNames, DebugSource, DebugStack, HookTriggers};
-pub use crate::lua::{Lua, StdLib};
+pub use crate::lua::{InitFlags, Lua, StdLib};
 pub use crate::multi::Variadic;
 pub use crate::scope::Scope;
 pub use crate::string::String;

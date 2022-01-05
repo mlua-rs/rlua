@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::{error, f32, f64, fmt};
 
 use rlua::{
-    Error, ExternalError, Function, Lua, Nil, Result, StdLib, String, Table, UserData, Value,
-    Variadic,
+    Error, ExternalError, Function, /* InitFlags, */ Lua, Nil, Result, StdLib, String, Table,
+    UserData, Value, Variadic,
 };
 
 #[test]
@@ -255,7 +255,7 @@ fn test_error() {
 
         match return_error.call::<_, Value>(()) {
             Ok(Value::Error(_)) => {}
-            _ => panic!("Value::Error not returned"),
+            e => panic!("Value::Error not returned: got {:?}", e),
         }
 
         assert!(return_string_error.call::<_, Error>(()).is_ok());
@@ -339,6 +339,72 @@ fn test_error() {
         Err(p) => assert!(*p.downcast::<&str>().unwrap() == "test_panic"),
     };
 }
+
+// Test that skipping the pcall/xpcall wrappers works.
+// TODO: The only way to test that the behaviour is correct is to
+// cause it to abort().
+/*
+#[test]
+fn test_error_nopcall_wrap() {
+    match catch_unwind(|| -> Result<()> {
+        unsafe {
+            Lua::unsafe_new_with_flags(StdLib::ALL, InitFlags::DEFAULT - InitFlags::PCALL_WRAPPERS).context(|lua| {
+                let globals = lua.globals();
+
+                lua.load(
+                    r#"
+                        function rust_panic()
+                            pcall(function () rust_panic_function() end)
+                        end
+                    "#,
+                )
+                .exec()?;
+                let rust_panic_function = lua
+                    .create_function(|_, ()| -> Result<()> { panic!("test_panic") })
+                    .unwrap();
+                globals.set("rust_panic_function", rust_panic_function)?;
+
+                let rust_panic = globals.get::<_, Function>("rust_panic")?;
+
+                rust_panic.call::<_, ()>(())
+            })
+        }
+    }) {
+        Ok(Ok(_)) => panic!("no panic was detected, pcall caught it!"),
+        Ok(Err(e)) => panic!("error during panic test {:?}", e),
+        Err(p) => assert!(*p.downcast::<&str>().unwrap() == "test_panic"),
+    };
+
+    match catch_unwind(|| -> Result<()> {
+        unsafe {
+            Lua::unsafe_new_with_flags(StdLib::ALL, InitFlags::DEFAULT - InitFlags::PCALL_WRAPPERS).context(|lua| {
+                let globals = lua.globals();
+
+                lua.load(
+                    r#"
+                        function rust_panic()
+                            xpcall(function() rust_panic_function() end, function() end)
+                        end
+                    "#,
+                )
+                .exec()?;
+                let rust_panic_function = lua
+                    .create_function(|_, ()| -> Result<()> { panic!("test_panic") })
+                    .unwrap();
+                globals.set("rust_panic_function", rust_panic_function)?;
+
+                let rust_panic = globals.get::<_, Function>("rust_panic")?;
+
+                rust_panic.call::<_, ()>(())
+            })
+        }
+    }) {
+        Ok(Ok(_)) => panic!("no panic was detected, xpcall caught it!"),
+        Ok(Err(e)) => panic!("error during panic test {:?}", e),
+        Err(p) => assert!(*p.downcast::<&str>().unwrap() == "test_panic"),
+    };
+}
+*/
 
 #[test]
 fn test_result_conversions() {
