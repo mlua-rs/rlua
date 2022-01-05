@@ -99,11 +99,11 @@ fn main() {
             .file(lua_dir.join("lutf8lib.c"))
             .file(lua_dir.join("lvm.c"))
             .file(lua_dir.join("lzio.c"));
-        
+
         cc_config_build
             .out_dir(dst.join("lib"))
             .compile("liblua5.4.a");
-            
+
         binding_config = binding_config.clang_arg(format!("-I{}", lua_dir.to_string_lossy()));
     }
 
@@ -119,6 +119,4 @@ fn main() {
     bindings
         .write_to_file(dst.join("bindings.rs"))
         .expect("Couldn't write bindings!");
-
-
 }

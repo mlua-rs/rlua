@@ -99,7 +99,7 @@ fn main() {
             .file(lua_dir.join("lutf8lib.c"))
             .file(lua_dir.join("lvm.c"))
             .file(lua_dir.join("lzio.c"));
-        
+
         cc_config_build
             .out_dir(dst.join("lib"))
             .compile("liblua5.3.a");
