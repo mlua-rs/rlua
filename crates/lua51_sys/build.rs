@@ -6,7 +6,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let git_url = "https://github.com/lua/lua.git";
+    let git_url = "http://github.com/lua/lua.git";
     let lua_version = "v5.1.1";
     let wrapper_h = "wrapper_lua51.h";
 
