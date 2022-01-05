@@ -14,14 +14,14 @@ license = "MIT"
 circle-ci = { repository = "amethyst/rlua", branch = "master" }
 
 [features]
-default=[]
-rlua_lua54=["lua54_sys"]
-rlua_lua53=["lua53_sys"]
-rlua_lua51=["lua51_sys"]
+default=["builtin-lua54"]
+builtin-lua54=["lua54_sys"]
+builtin-lua53=["lua53_sys"]
+builtin-lua51=["lua51_sys"]
 
-system-lua54=["rlua_lua54", "lua54_sys/lua54-pkg-config"]
-system-lua53=["rlua_lua53", "lua53_sys/lua53-pkg-config"]
-system-lua51=["rlua_lua51", "lua51_sys/lua51-pkg-config"]
+system-lua54=["builtin-lua54", "lua54_sys/lua54-pkg-config"]
+system-lua53=["builtin-lua53", "lua53_sys/lua53-pkg-config"]
+system-lua51=["builtin-lua51", "lua51_sys/lua51-pkg-config"]
 
 # Enabled functions from the math module that have been deprecated
 lua-compat-mathlib = []
