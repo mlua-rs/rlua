@@ -827,7 +827,8 @@ where
 
             if get_panic_metatable(state) {
                 ffi::lua_setmetatable(state, -2);
-                ffi::lua_error(state)
+                ffi::lua_error(state);
+                panic!("code is unreachable")
             } else {
                 // The pcall/xpcall wrappers which allow sending a panic
                 // safeul through Lua have not been enabled.
@@ -1061,7 +1062,7 @@ pub unsafe fn init_error_registry(state: *mut ffi::lua_State, wrap_panics: bool)
         ffi::lua_newtable(state);
 
         ffi::lua_pushstring(state, cstr!("__gc"));
-        ffi::lua_pushcfunction(state, userdata_destructor::<WrappedPanic>);
+        ffi::lua_pushcfunction(state, Some(userdata_destructor::<WrappedPanic>));
         ffi::lua_rawset(state, -3);
 
         ffi::lua_pushstring(state, cstr!("__metatable"));

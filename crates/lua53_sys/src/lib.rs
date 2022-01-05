@@ -118,32 +118,18 @@ pub use {
 ** get functions (Lua -> stack)
 */
 pub use {
-bindings::lua_getglobal,
-bindings::lua_gettable,
-bindings::lua_getfield,
-bindings::lua_geti,
-bindings::lua_rawget,
-bindings::lua_rawgeti,
-bindings::lua_rawgetp,
-bindings::lua_createtable,
-bindings::lua_newuserdata,
-bindings::lua_getmetatable,
-bindings::lua_getuservalue,
+    bindings::lua_createtable, bindings::lua_getfield, bindings::lua_getglobal, bindings::lua_geti,
+    bindings::lua_getmetatable, bindings::lua_gettable, bindings::lua_getuservalue,
+    bindings::lua_newuserdata, bindings::lua_rawget, bindings::lua_rawgeti, bindings::lua_rawgetp,
 };
 
 /*
 ** set functions (stack -> Lua)
 */
 pub use {
-bindings::lua_setglobal,
-bindings::lua_settable,
-bindings::lua_setfield,
-bindings::lua_seti,
-bindings::lua_rawset,
-bindings::lua_rawseti,
-bindings::lua_rawsetp,
-bindings::lua_setmetatable,
-bindings::lua_setuservalue,
+    bindings::lua_rawset, bindings::lua_rawseti, bindings::lua_rawsetp, bindings::lua_setfield,
+    bindings::lua_setglobal, bindings::lua_seti, bindings::lua_setmetatable,
+    bindings::lua_settable, bindings::lua_setuservalue,
 };
 
 /*

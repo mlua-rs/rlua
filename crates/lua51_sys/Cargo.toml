@@ -18,8 +18,9 @@ libc = "0.2"
 cc = "1.0"
 bindgen = "0.59.2"
 git2 = "0.13"
+pkg-config = "0.3.24"
 
 [features]
 default = []
-# Enable this feature if you want to have a statically linked bzip2
+lua51-pkg-config = []
 static = []
