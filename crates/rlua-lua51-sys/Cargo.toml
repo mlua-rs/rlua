@@ -1,0 +1,24 @@
+[package]
+name = "rlua-lua51-sys"
+version = "0.1.0"
+keywords = ["bindings", "lua"]
+categories = ["external-ffi-bindings"]
+description = "Bindings to lua's C API"
+repository = "https://github.com/amethyst/rlua"
+readme = "README.md"
+edition = "2018"
+links = "lua5.1"
+build = "build.rs"
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+cc = "1.0"
+bindgen = "0.59.2"
+pkg-config = "0.3.24"
+
+[features]
+default = []
+lua51-pkg-config = []
+static = []
