@@ -534,7 +534,10 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
         hook_callback: None,
     });
 
-    let state = ffi::lua_newstate(allocator, &mut *extra as *mut ExtraData as *mut c_void);
+    let state = ffi::lua_newstate(
+        Some(allocator),
+        &mut *extra as *mut ExtraData as *mut c_void,
+    );
 
     #[cfg(rlua_lua54)]
     ffi::lua_setcstacklimit(state, SAFE_CSTACK_SIZE);
@@ -555,7 +558,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
             ffi::lua_newtable(state);
 
             ffi::lua_pushstring(state, cstr!("__gc"));
-            ffi::lua_pushcfunction(state, userdata_destructor::<Callback>);
+            ffi::lua_pushcfunction(state, Some(userdata_destructor::<Callback>));
             ffi::lua_rawset(state, -3);
 
             ffi::lua_pushstring(state, cstr!("__metatable"));
@@ -570,11 +573,11 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                 push_globaltable(state);
 
                 ffi::lua_pushstring(state, cstr!("pcall"));
-                ffi::lua_pushcfunction(state, safe_pcall);
+                ffi::lua_pushcfunction(state, Some(safe_pcall));
                 ffi::lua_rawset(state, -3);
 
                 ffi::lua_pushstring(state, cstr!("xpcall"));
-                ffi::lua_pushcfunction(state, safe_xpcall);
+                ffi::lua_pushcfunction(state, Some(safe_xpcall));
                 ffi::lua_rawset(state, -3);
 
                 ffi::lua_pop(state, 1);
@@ -591,7 +594,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
     );
 
     rlua_debug_assert!(ffi::lua_gettop(state) == 0, "stack leak during creation");
-    assert_stack(state, ffi::LUA_MINSTACK);
+    assert_stack(state, ffi::LUA_MINSTACK as i32);
 
     #[cfg(any(rlua_lua53, rlua_lua54))]
     {
@@ -610,36 +613,36 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
 
 unsafe fn load_from_std_lib(state: *mut ffi::lua_State, lua_mod: StdLib) {
     if lua_mod.contains(StdLib::BASE) {
-        requiref(state, cstr!("_G"), ffi::luaopen_base, 1);
+        requiref(state, cstr!("_G"), Some(ffi::luaopen_base), 1);
     }
     #[cfg(any(rlua_lua53, rlua_lua54))]
     if lua_mod.contains(StdLib::COROUTINE) {
-        requiref(state, cstr!("coroutine"), ffi::luaopen_coroutine, 1);
+        requiref(state, cstr!("coroutine"), Some(ffi::luaopen_coroutine), 1);
     }
     if lua_mod.contains(StdLib::TABLE) {
-        requiref(state, cstr!("table"), ffi::luaopen_table, 1);
+        requiref(state, cstr!("table"), Some(ffi::luaopen_table), 1);
     }
     if lua_mod.contains(StdLib::IO) {
-        requiref(state, cstr!("io"), ffi::luaopen_io, 1);
+        requiref(state, cstr!("io"), Some(ffi::luaopen_io), 1);
     }
     if lua_mod.contains(StdLib::OS) {
-        requiref(state, cstr!("os"), ffi::luaopen_os, 1);
+        requiref(state, cstr!("os"), Some(ffi::luaopen_os), 1);
     }
     if lua_mod.contains(StdLib::STRING) {
-        requiref(state, cstr!("string"), ffi::luaopen_string, 1);
+        requiref(state, cstr!("string"), Some(ffi::luaopen_string), 1);
     }
     #[cfg(any(rlua_lua53, rlua_lua54))]
     if lua_mod.contains(StdLib::UTF8) {
-        requiref(state, cstr!("utf8"), ffi::luaopen_utf8, 1);
+        requiref(state, cstr!("utf8"), Some(ffi::luaopen_utf8), 1);
     }
     if lua_mod.contains(StdLib::MATH) {
-        requiref(state, cstr!("math"), ffi::luaopen_math, 1);
+        requiref(state, cstr!("math"), Some(ffi::luaopen_math), 1);
     }
     if lua_mod.contains(StdLib::PACKAGE) {
-        requiref(state, cstr!("package"), ffi::luaopen_package, 1);
+        requiref(state, cstr!("package"), Some(ffi::luaopen_package), 1);
     }
     if lua_mod.contains(StdLib::DEBUG) {
-        requiref(state, cstr!("debug"), ffi::luaopen_debug, 1);
+        requiref(state, cstr!("debug"), Some(ffi::luaopen_debug), 1);
     }
 }
 

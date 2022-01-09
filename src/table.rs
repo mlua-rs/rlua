@@ -131,7 +131,7 @@ impl<'lua> Table<'lua> {
             }
             protect_lua(lua.state, 2, get_table)?;
 
-            let has = ffi::lua_isnil(lua.state, -1) == 0;
+            let has = ffi::lua_isnil(lua.state, -1) == false;
             Ok(has)
         }
     }

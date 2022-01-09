@@ -476,11 +476,14 @@ impl<'lua> Context<'lua> {
             let _sg = StackGuard::new(self.state);
             assert_stack(self.state, 2);
 
+            #[cfg(any(rlua_lua53, rlua_lua54))]
             ffi::lua_rawgeti(
                 self.state,
                 ffi::LUA_REGISTRYINDEX,
                 key.registry_id as ffi::lua_Integer,
             );
+            #[cfg(any(rlua_lua51))]
+            ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, key.registry_id as c_int);
             self.pop_value()
         };
         T::from_lua(value, self)
@@ -622,7 +625,7 @@ impl<'lua> Context<'lua> {
                 }
                 #[cfg(any(rlua_lua53, rlua_lua54))]
                 if isluainteger(self.state, -1) != 0 {
-                    let i = Value::Integer(ffi::lua_tointeger(self.state, -1));
+                    let i = Value::Integer(ffi::lua_tointeger(self.state, -1) as i64);
                     ffi::lua_pop(self.state, 1);
                     i
                 } else {
@@ -809,7 +812,7 @@ impl<'lua> Context<'lua> {
             ffi::lua_setmetatable(self.state, -2);
 
             protect_lua_closure(self.state, 1, 1, |state| {
-                ffi::lua_pushcclosure(state, call_callback, 1);
+                ffi::lua_pushcclosure(state, Some(call_callback), 1);
             })?;
 
             Ok(Function(self.pop_ref()))
@@ -827,12 +830,14 @@ impl<'lua> Context<'lua> {
         let ud_index = self.userdata_metatable::<T>()?;
         let uvalues_count = data.get_uvalues_count();
         push_userdata_uv::<RefCell<T>>(self.state, RefCell::new(data), uvalues_count)?;
-
+        #[cfg(any(rlua_lua53, rlua_lua54))]
         ffi::lua_rawgeti(
             self.state,
             ffi::LUA_REGISTRYINDEX,
             ud_index as ffi::lua_Integer,
         );
+        #[cfg(any(rlua_lua51))]
+        ffi::lua_rawgeti(self.state, ffi::LUA_REGISTRYINDEX, ud_index as c_int);
         ffi::lua_setmetatable(self.state, -2);
 
         Ok(AnyUserData(self.pop_ref()))

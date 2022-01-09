@@ -14,57 +14,28 @@ license = "MIT"
 circle-ci = { repository = "amethyst/rlua", branch = "master" }
 
 [features]
-default = ["builtin-lua54"]
-# Builds the correct version of Lua 5.4 inside the crate. If you want to link a
-# specialized version of lua into your binary, you can disable this feature to
-# do that, but care must be taken.  `rlua` makes at least the following
-# assumptions about the linked lua library:
-#   * LUA_INTEGER is long long
-#   * LUA_NUMBER as double
-#   * LUA_EXTRASPACE is at least pointer sized and has at least pointer alignment.
-#   * LUAI_MAXSTACK is 1_000_000
-builtin-lua54 = ["cc"]
-# Builds the correct version of Lua 5.3 inside the crate. If you want to link a
-# specialized version of lua into your binary, you can disable this feature to
-# do that, but care must be taken.  `rlua` makes at least the following
-# assumptions about the linked lua library:
-#   * LUA_INTEGER is long long
-#   * LUA_NUMBER as double
-#   * LUA_EXTRASPACE is at least pointer sized and has at least pointer alignment.
-#   * LUAI_MAXSTACK is 1_000_000
-builtin-lua53 = ["cc"]
+default=["builtin-lua54"]
+builtin-lua54=["rlua-lua54-sys"]
+builtin-lua53=["rlua-lua53-sys"]
+builtin-lua51=["rlua-lua51-sys"]
 
-# Uses pkg-config to find an appropriate lua 5.{1,3,4} library to link with as
-# specified.  The caveats about disabling the default builtin-lua feature apply
-# here as well.  If neither the builtin-lua* nor the system-lua* feature is
-# enabled, then no lua library will be linked at all and one must be linked
-# with or built into the final binary manually.  The builtin-lua* and system-lua*
-# features are mutually exclusive and enabling both will cause an error at
-# build time.
-system-lua51 = ["pkg-config"]
-system-lua53 = ["pkg-config"]
-system-lua54 = ["pkg-config"]
-builtin-lua = ["cc"]
-# Uses pkg-config to find an appropriate lua 5.3 library to link with.  All of
-# the caveats about disabling the default builtin-lua feature apply here as
-# well.  If neither the builtin-lua nor the system-lua feature is enabled, then
-# no lua library will be linked at all and one must be linked with or built into
-# the final binary manually.  The builtin-lua and system-lua features are
-# mutually exclusive and enabling both will cause an error at build time.
-system-lua = ["pkg-config"]
+system-lua54=["builtin-lua54", "rlua-lua54-sys/lua54-pkg-config"]
+system-lua53=["builtin-lua53", "rlua-lua53-sys/lua53-pkg-config"]
+system-lua51=["builtin-lua51", "rlua-lua51-sys/lua51-pkg-config"]
 
 # Enabled functions from the math module that have been deprecated
 lua-compat-mathlib = []
+
 
 [dependencies]
 libc = { version = "0.2" }
 num-traits = { version = "0.2.14" }
 bitflags = { version = "1.0.4" }
 bstr = {version = "0.2", features = ["std"], default_features = false }
+rlua-lua54-sys = { path = "./crates/rlua-lua54-sys", optional = true }
+rlua-lua53-sys = { path = "./crates/rlua-lua53-sys", optional = true }
+rlua-lua51-sys = { path = "./crates/rlua-lua51-sys", optional = true }
 
-[build-dependencies]
-cc = { version = "1.0", optional = true }
-pkg-config = { version = "0.3.11", optional = true }
 
 [dev-dependencies]
 rustyline = "6.0"

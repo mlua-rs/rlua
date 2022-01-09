@@ -43,13 +43,15 @@
 #[macro_use]
 mod macros;
 
+#[cfg(rlua_lua51)]
+extern crate rlua_lua51_sys as ffi;
+#[cfg(rlua_lua53)]
+extern crate rlua_lua53_sys as ffi;
+#[cfg(rlua_lua54)]
+extern crate rlua_lua54_sys as ffi;
 mod context;
 mod conversion;
 mod error;
-#[cfg_attr(rlua_lua54, path = "ffi_lua54.rs")]
-#[cfg_attr(rlua_lua53, path = "ffi_lua53.rs")]
-#[cfg_attr(rlua_lua51, path = "ffi_lua51.rs")]
-mod ffi;
 mod function;
 mod hook;
 mod lua;
