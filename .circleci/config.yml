@@ -7,6 +7,11 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Install libclang for bindgen
+          command: |
+            sudo apt-get update
+            sudo apt-get install libclang-dev clang
+      - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
       - run:
@@ -40,6 +45,11 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Install libclang for bindgen
+          command: |
+            sudo apt-get update
+            sudo apt-get install libclang-dev clang
+      - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
       - run:
@@ -72,6 +82,11 @@ jobs:
       - image: circleci/rust:latest
     steps:
       - checkout
+      - run:
+          name: Install libclang for bindgen
+          command: |
+            sudo apt-get update
+            sudo apt-get install libclang-dev clang
       - run:
           name: Install Lua
           command: |

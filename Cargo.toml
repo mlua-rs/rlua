@@ -19,9 +19,9 @@ builtin-lua54=["rlua-lua54-sys"]
 builtin-lua53=["rlua-lua53-sys"]
 builtin-lua51=["rlua-lua51-sys"]
 
-system-lua54=["builtin-lua54", "rlua-lua54-sys/lua54-pkg-config"]
-system-lua53=["builtin-lua53", "rlua-lua53-sys/lua53-pkg-config"]
-system-lua51=["builtin-lua51", "rlua-lua51-sys/lua51-pkg-config"]
+system-lua54=["rlua-lua54-sys", "rlua-lua54-sys/lua54-pkg-config"]
+system-lua53=["rlua-lua53-sys", "rlua-lua53-sys/lua53-pkg-config"]
+system-lua51=["rlua-lua51-sys", "rlua-lua51-sys/lua51-pkg-config"]
 
 # Enabled functions from the math module that have been deprecated
 lua-compat-mathlib = []

@@ -218,7 +218,7 @@ pub unsafe fn lua_tostring(state: *mut lua_State, i: c_int) -> *const c_char {
     return lua_tolstring(state, i, ptr::null_mut());
 }
 pub unsafe fn lua_upvalueindex(index: c_int) -> i32 {
-    return LUA_REGISTRYINDEX - index;
+    return LUA_GLOBALSINDEX - index;
 }
 
 pub unsafe fn lua_register(
