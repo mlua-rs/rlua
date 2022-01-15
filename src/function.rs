@@ -212,7 +212,7 @@ impl<'lua> Function<'lua> {
                 lua.push_ref(&self.0);
                 let dump_result = dump(
                     state,
-                    writer,
+                    Some(writer),
                     bytes_ptr as *mut c_void,
                     0);
                 // It can only return an error from our writer.

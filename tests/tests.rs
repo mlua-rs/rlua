@@ -1,3 +1,4 @@
+use bstr::BString;
 use std::iter::FromIterator;
 use std::panic::catch_unwind;
 use std::sync::Arc;
@@ -488,6 +489,112 @@ fn test_no_load_wrappers() {
                 assert(chunk ~= nil)
                 chunk()
                 chunk = load("x = x + 3")
+                chunk()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    })};
+}
+
+#[test]
+fn test_loadfile_wrappers() {
+    let mut tmppath = std::env::temp_dir();
+    tmppath.push("test_loadfile_wrappers.lua");
+
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        globals.set("filename", tmppath.to_str().unwrap()).unwrap();
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+        let binchunk = globals.get::<_, BString>("binchunk").unwrap();
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        std::fs::write(&tmppath, binchunk).unwrap();
+        lua.load(
+            r#"
+                chunk = loadfile(filename)
+                assert(chunk == nil)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        std::fs::write(&tmppath, "x = x + 4").unwrap();
+        lua.load(
+            r#"
+                chunk = loadfile(filename, "bt", _ENV)
+                assert(chunk ~= nil)
+                chunk()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    });
+}
+
+#[test]
+fn test_no_loadfile_wrappers() {
+    let mut tmppath = std::env::temp_dir();
+    let mut tmppath2 = tmppath.clone();
+    tmppath.push("test_no_loadfile_wrappers.lua");
+    tmppath2.push("test_no_loadfile_wrappers2.lua");
+
+    unsafe { Lua::unsafe_new_with_flags(StdLib::ALL_NO_DEBUG, InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS).context(|lua| {
+        let globals = lua.globals();
+        globals.set("filename", tmppath.to_str().unwrap()).unwrap();
+        globals.set("filename2", tmppath2.to_str().unwrap()).unwrap();
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+        let binchunk = globals.get::<_, BString>("binchunk").unwrap();
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        std::fs::write(&tmppath, binchunk).unwrap();
+        std::fs::write(&tmppath2, "x = x + 3").unwrap();
+        lua.load(
+            r#"
+                chunk = loadfile(filename, "t")
+                assert(chunk == nil)
+                chunk = loadfile(filename, "bt")
+                assert(chunk ~= nil)
+                chunk()
+                chunk = loadfile(filename2)
                 chunk()
             "#,
         )
