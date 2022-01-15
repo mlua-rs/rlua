@@ -602,8 +602,11 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
 
                         -- loadfile ([filename [, mode [, env]]])
                         local real_loadfile = loadfile
-                        loadfile = function(filename, mode, env)
-                            return real_loadfile(filename, "t", env)
+                        loadfile = function(...)
+                            local args = table.pack(...)
+                            args[2] = "t"
+                            if args.n < 2 then args.n = 2 end
+                            return real_loadfile(table.unpack(args))
                         end
 
                         -- dofile([filename])
@@ -648,12 +651,14 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
 
                         -- loadstring(string [, chunkname])
                         local real_loadstring = loadstring
-                        loadstring = function(string, chunkname)
-                            if string:byte(1) == 27 then
+                        loadstring = function(s, chunkname)
+                            if type(s) ~= "string" then
+                                real_error("rlua loadstring: string expected.")
+                            elseif s:byte(1) == 27 then
                                 -- This is a binary chunk, so disallow
                                 real_error("rlua loadstring: loading binary chunks is not allowed")
                             else
-                                return real_loadstring(string, chunkname)
+                                return real_loadstring(s, chunkname)
                             end
                         end
 

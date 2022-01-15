@@ -547,7 +547,7 @@ fn test_loadfile_wrappers() {
         std::fs::write(&tmppath, "x = x + 4").unwrap();
         lua.load(
             r#"
-                chunk = loadfile(filename, "bt", _ENV)
+                chunk = loadfile(filename)
                 assert(chunk ~= nil)
                 chunk()
             "#,
