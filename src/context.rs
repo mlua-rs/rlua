@@ -962,10 +962,12 @@ impl<'lua, 'a> Chunk<'lua, 'a> {
         // actual lua repl does.
         let mut expression_source = b"return ".to_vec();
         expression_source.extend(self.source);
-        if let Ok(function) =
-            self.context
-                .load_chunk(&expression_source, self.name.as_ref(), self.env.clone(), false)
-        {
+        if let Ok(function) = self.context.load_chunk(
+            &expression_source,
+            self.name.as_ref(),
+            self.env.clone(),
+            false,
+        ) {
             function.call(())
         } else {
             self.call(())

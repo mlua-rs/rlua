@@ -7,7 +7,8 @@ use crate::error::{Error, Result};
 use crate::ffi;
 use crate::types::LuaRef;
 use crate::util::{
-    assert_stack, check_stack, dump, error_traceback, pop_error, protect_lua_closure, rotate, StackGuard,
+    assert_stack, check_stack, dump, error_traceback, pop_error, protect_lua_closure, rotate,
+    StackGuard,
 };
 use crate::value::{FromLuaMulti, MultiValue, ToLuaMulti};
 
@@ -196,7 +197,8 @@ impl<'lua> Function<'lua> {
             _state: *mut ffi::lua_State,
             p: *const c_void,
             sz: usize,
-            ud: *mut c_void) -> c_int {
+            ud: *mut c_void,
+        ) -> c_int {
             let input_slice = std::slice::from_raw_parts(p as *const u8, sz);
             let vec = &mut *(ud as *mut Vec<u8>);
             vec.extend_from_slice(input_slice);
@@ -210,11 +212,7 @@ impl<'lua> Function<'lua> {
             let bytes_ptr = &mut bytes as *mut _;
             protect_lua_closure(lua.state, 0, 0, |state| {
                 lua.push_ref(&self.0);
-                let dump_result = dump(
-                    state,
-                    Some(writer),
-                    bytes_ptr as *mut c_void,
-                    0);
+                let dump_result = dump(state, Some(writer), bytes_ptr as *mut c_void, 0);
                 // It can only return an error from our writer.
                 debug_assert_eq!(dump_result, 0);
             })?;

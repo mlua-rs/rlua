@@ -19,8 +19,8 @@ use crate::hook::{hook_proc, Debug, HookTriggers};
 use crate::markers::NoRefUnwindSafe;
 use crate::types::Callback;
 use crate::util::{
-    assert_stack, init_error_registry, protect_lua_closure, push_globaltable, requiref,
-    dostring, safe_pcall, safe_xpcall, userdata_destructor,
+    assert_stack, dostring, init_error_registry, protect_lua_closure, push_globaltable, requiref,
+    safe_pcall, safe_xpcall, userdata_destructor,
 };
 
 bitflags! {
