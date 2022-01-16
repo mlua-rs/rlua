@@ -646,6 +646,119 @@ fn test_no_loadfile_wrappers() {
 }
 
 #[test]
+fn test_dofile_wrappers() {
+    let mut tmppath = std::env::temp_dir();
+    tmppath.push("test_dofile_wrappers.lua");
+
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        globals.set("filename", tmppath.to_str().unwrap()).unwrap();
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+        let binchunk = globals.get::<_, BString>("binchunk").unwrap();
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        std::fs::write(&tmppath, binchunk).unwrap();
+        lua.load(
+            r#"
+                ok, err = pcall(dofile, filename)
+                assert(not ok)
+                assert(err:match("rlua dofile: attempt to load bytecode"))
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        std::fs::write(&tmppath, "x = x + 4").unwrap();
+        lua.load(
+            r#"
+                ok, ret = pcall(dofile, filename)
+                assert(ok)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    });
+}
+
+#[test]
+fn test_no_dofile_wrappers() {
+    let mut tmppath = std::env::temp_dir();
+    tmppath.push("test_dofile_wrappers.lua");
+
+    unsafe {
+        Lua::unsafe_new_with_flags(
+            StdLib::ALL_NO_DEBUG,
+            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        )
+        .context(|lua| {
+            let globals = lua.globals();
+            globals.set("filename", tmppath.to_str().unwrap()).unwrap();
+            lua.load(
+                r#"
+                    x = 0
+                    function incx()
+                        x = x + 1
+                    end
+                    binchunk = string.dump(incx)
+                "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+            let binchunk = globals.get::<_, BString>("binchunk").unwrap();
+
+            lua.load(
+                r#"
+                    incx()
+                "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+            std::fs::write(&tmppath, binchunk).unwrap();
+            lua.load(
+                r#"
+                    ok, ret = pcall(dofile, filename)
+                    assert(ok)
+                "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 2);
+            std::fs::write(&tmppath, "x = x + 4").unwrap();
+            lua.load(
+                r#"
+                    ok, ret = pcall(dofile, filename)
+                    assert(ok)
+                "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 6);
+        });
+    }
+}
+
+#[test]
 fn test_result_conversions() {
     Lua::new().context(|lua| {
         let globals = lua.globals();

@@ -685,6 +685,8 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                             local chunk = loadfile(filename)
                             if chunk then
                                 return chunk()
+                            else
+                                real_error("rlua dofile: attempt to load bytecode")
                             end
                         end
                     end
