@@ -694,7 +694,10 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                 if result != 0 {
                     use std::ffi::CStr;
                     let errmsg = ffi::lua_tostring(state, -1);
-                    eprintln!("Internal error running setup code: {:?}", CStr::from_ptr(errmsg));
+                    eprintln!(
+                        "Internal error running setup code: {:?}",
+                        CStr::from_ptr(errmsg)
+                    );
                 }
                 assert_eq!(result, 0);
             }
