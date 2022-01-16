@@ -68,7 +68,7 @@ pub use {
 
 pub use {
     bindings::lua_Alloc, bindings::lua_CFunction, bindings::lua_Debug, bindings::lua_Integer,
-    bindings::lua_Number, bindings::lua_State,
+    bindings::lua_Number, bindings::lua_State, bindings::lua_Writer,
 };
 
 /*
@@ -143,8 +143,8 @@ pub use bindings::lua_gc;
 ** miscellaneous functions
 */
 pub use {
-    bindings::lua_concat, bindings::lua_error, bindings::lua_getallocf, bindings::lua_next,
-    bindings::lua_setallocf,
+    bindings::lua_concat, bindings::lua_dump, bindings::lua_error, bindings::lua_getallocf,
+    bindings::lua_next, bindings::lua_setallocf,
 };
 
 /*

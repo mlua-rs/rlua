@@ -697,17 +697,17 @@ pub unsafe fn loadbufferx(
 }
 
 pub unsafe fn dostring(state: *mut ffi::lua_State, s: &str) -> c_int {
-    if loadbufferx(
+    let load_result = loadbufferx(
         state,
         s.as_ptr() as *const c_char,
         s.len(),
         cstr!(""),
         cstr!("t"),
-    ) == 0
-    {
+    );
+    if load_result == ffi::LUA_OK {
         ffi::lua_pcall(state, 0, ffi::LUA_MULTRET, 0)
     } else {
-        0
+        load_result
     }
 }
 

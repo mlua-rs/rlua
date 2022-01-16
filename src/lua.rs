@@ -625,7 +625,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                     do
                         -- load(chunk [, chunkname])
                         local real_load = load
-                        -- safe type() in case user code replaces it
+                        -- save type() in case user code replaces it
                         local real_type = type
                         local real_error = error
                         load = function(func, chunkname) 
@@ -646,7 +646,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                                     return data
                                 end
                             end
-                            return real_load(wrapfunc, chunkname)
+                            return real_load(wrap_func, chunkname)
                         end
 
                         -- loadstring(string [, chunkname])
@@ -664,6 +664,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
 
                         -- loadfile ([filename])
                         local real_loadfile = loadfile
+                        local real_io_open = io.open
                         loadfile = function(filename)
                             local f, err = real_io_open(filename, "rb")
                             if not f then
@@ -690,6 +691,11 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                 "#;
 
                 let result = dostring(state, wrapload);
+                if result != 0 {
+                    use std::ffi::CStr;
+                    let errmsg = ffi::lua_tostring(state, -1);
+                    eprintln!("Internal error running setup code: {:?}", CStr::from_ptr(errmsg));
+                }
                 assert_eq!(result, 0);
             }
 

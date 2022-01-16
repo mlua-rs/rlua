@@ -435,7 +435,13 @@ fn test_load_wrappers() {
         lua.load(
             r#"
                 assert(type(binchunk) == "string")
-                chunk = load(binchunk, "bad", "bt")
+                local binchunk_copy = binchunk
+                chunk = load(function ()
+                    local result = binchunk_copy
+                    binchunk_copy = nil
+                    return result
+                end, "bad", "bt")
+                print(chunk)
                 assert(chunk == nil)
             "#,
         )
@@ -444,7 +450,13 @@ fn test_load_wrappers() {
         assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
         lua.load(
             r#"
-                chunk = load("x = x + 4")
+                local s = "x = x + 4"
+                local function loader()
+                    local result = s
+                    s = nil
+                    return result
+                end
+                chunk = load(loader)
                 assert(chunk ~= nil)
                 chunk()
             "#,
@@ -488,12 +500,23 @@ fn test_no_load_wrappers() {
             lua.load(
                 r#"
                 assert(type(binchunk) == "string")
-                chunk = load(binchunk, "fail", "t")
-                assert(chunk == nil)
-                chunk = load(binchunk, "good", "bt")
+                assert(binchunk:byte(1) == 27)
+                local stringsource = binchunk
+                local loader = function ()
+                    local result = stringsource
+                    stringsource = nil
+                    return result
+                end
+                if _VERSION ~= "Lua 5.1" then
+                    -- Lua 5.1 doesn't support the mode parameter.
+                    chunk = load(binchunk, "fail", "t")
+                    assert(chunk == nil)
+                end
+                chunk = load(loader, "good", "bt")
                 assert(chunk ~= nil)
                 chunk()
-                chunk = load("x = x + 3")
+                stringsource = "x = x + 3"
+                chunk = load(loader)
                 chunk()
             "#,
             )
