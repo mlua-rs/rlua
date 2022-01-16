@@ -625,8 +625,12 @@ fn test_no_loadfile_wrappers() {
             std::fs::write(&tmppath2, "x = x + 3").unwrap();
             lua.load(
                 r#"
-                chunk = loadfile(filename, "t")
-                assert(chunk == nil)
+                if _VERSION ~= "Lua 5.1" then
+                    -- Lua 5.1 doesn't have the mode argument, so is
+                    -- effectively always "bt".
+                    chunk = loadfile(filename, "t")
+                    assert(chunk == nil)
+                end
                 chunk = loadfile(filename, "bt")
                 assert(chunk ~= nil)
                 chunk()
