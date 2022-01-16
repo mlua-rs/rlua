@@ -702,7 +702,7 @@ fn test_dofile_wrappers() {
 #[test]
 fn test_no_dofile_wrappers() {
     let mut tmppath = std::env::temp_dir();
-    tmppath.push("test_dofile_wrappers.lua");
+    tmppath.push("test_no_dofile_wrappers.lua");
 
     unsafe {
         Lua::unsafe_new_with_flags(
