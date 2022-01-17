@@ -759,6 +759,113 @@ fn test_no_dofile_wrappers() {
 }
 
 #[test]
+fn test_loadstring_wrappers() {
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        if globals.get::<_, Function>("loadstring").is_err() {
+            // Loadstring is not present in Lua 5.4, and only with a
+            // compatibility mode in Lua 5.3.
+            return;
+        }
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        lua.load(
+            r#"
+                assert(type(binchunk) == "string")
+                chunk = loadstring(binchunk)
+                assert(chunk == nil)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        lua.load(
+            r#"
+                local s = "x = x + 4"
+                chunk = loadstring(s)
+                assert(chunk ~= nil)
+                chunk()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    });
+}
+
+#[test]
+fn test_no_loadstring_wrappers() {
+    unsafe {
+        Lua::unsafe_new_with_flags(
+            StdLib::ALL_NO_DEBUG,
+            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        )
+        .context(|lua| {
+            let globals = lua.globals();
+            if globals.get::<_, Function>("loadstring").is_err() {
+                // Loadstring is not present in Lua 5.4, and only with a
+                // compatibility mode in Lua 5.3.
+                return;
+            }
+            lua.load(
+                r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+
+            lua.load(
+                r#"
+                incx()
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+            lua.load(
+                r#"
+                assert(type(binchunk) == "string")
+                assert(binchunk:byte(1) == 27)
+                chunk = loadstring(binchunk)
+                assert(chunk ~= nil)
+                chunk()
+                chunk = loadstring("x = x + 3")
+                chunk()
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+        })
+    };
+}
+
+#[test]
 fn test_result_conversions() {
     Lua::new().context(|lua| {
         let globals = lua.globals();

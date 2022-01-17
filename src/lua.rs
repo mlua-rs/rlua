@@ -659,7 +659,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                                 real_error("rlua loadstring: string expected.")
                             elseif s:byte(1) == 27 then
                                 -- This is a binary chunk, so disallow
-                                real_error("rlua loadstring: loading binary chunks is not allowed")
+                                return nil, "rlua loadstring: loading binary chunks is not allowed"
                             else
                                 return real_loadstring(s, chunkname)
                             end
