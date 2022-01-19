@@ -866,6 +866,31 @@ fn test_no_loadstring_wrappers() {
 }
 
 #[test]
+fn test_default_loadlib() {
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        let package = globals.get::<_, Table>("package").unwrap();
+        let loadlib = package.get::<_, Function>("loadlib");
+        assert!(loadlib.is_err());
+    });
+}
+
+#[test]
+fn test_no_remove_loadlib() {
+    unsafe {
+        Lua::unsafe_new_with_flags(
+            StdLib::ALL_NO_DEBUG,
+            InitFlags::DEFAULT - InitFlags::REMOVE_LOADLIB,
+        )
+        .context(|lua| {
+            let globals = lua.globals();
+            let package = globals.get::<_, Table>("package").unwrap();
+            let _loadlib = package.get::<_, Function>("loadlib").unwrap();
+        });
+    }
+}
+
+#[test]
 fn test_result_conversions() {
     Lua::new().context(|lua| {
         let globals = lua.globals();

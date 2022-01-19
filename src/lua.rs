@@ -65,9 +65,11 @@ bitflags! {
     pub struct InitFlags: u32 {
         const PCALL_WRAPPERS = 0x1;
         const LOAD_WRAPPERS = 0x2;
+        const REMOVE_LOADLIB = 0x4;
 
         const DEFAULT = InitFlags::PCALL_WRAPPERS.bits |
-                        InitFlags::LOAD_WRAPPERS.bits;
+                        InitFlags::LOAD_WRAPPERS.bits |
+                        InitFlags::REMOVE_LOADLIB.bits;
         const NONE = 0;
     }
 }
@@ -705,6 +707,21 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                     );
                 }
                 assert_eq!(result, 0);
+            }
+
+            if init_flags.contains(InitFlags::REMOVE_LOADLIB) {
+                ffi::lua_getglobal(state, cstr!("package"));
+                let t = ffi::lua_type(state, -1);
+                if t == ffi::LUA_TTABLE {
+                    // Package is loaded
+                    ffi::lua_pushnil(state);
+                    ffi::lua_setfield(state, -2, cstr!("loadlib"));
+                } else {
+                    // Assume it's not present otherwise.
+                    assert_eq!(t, ffi::LUA_TNIL);
+                }
+                // Pop the package (or nil) off the stack.
+                ffi::lua_pop(state, 1);
             }
 
             // Create ref stack thread and place it in the registry to prevent it from being garbage
