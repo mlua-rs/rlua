@@ -64,7 +64,7 @@ bitflags! {
     /// Flags describing the set of lua modules to load.
     pub struct InitFlags: u32 {
         const PCALL_WRAPPERS = 0x1;
-        const LOAD_WRAPPERS = 0x1;
+        const LOAD_WRAPPERS = 0x2;
 
         const DEFAULT = InitFlags::PCALL_WRAPPERS.bits |
                         InitFlags::LOAD_WRAPPERS.bits;
