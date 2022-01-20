@@ -872,6 +872,14 @@ fn test_default_loadlib() {
         let package = globals.get::<_, Table>("package").unwrap();
         let loadlib = package.get::<_, Function>("loadlib");
         assert!(loadlib.is_err());
+
+        lua.load(
+            r#"
+            assert(#(package.loaders or package.searchers) == 2)
+            "#,
+        )
+        .exec()
+        .unwrap();
     });
 }
 
@@ -886,6 +894,14 @@ fn test_no_remove_loadlib() {
             let globals = lua.globals();
             let package = globals.get::<_, Table>("package").unwrap();
             let _loadlib = package.get::<_, Function>("loadlib").unwrap();
+
+            lua.load(
+                r#"
+                assert(#(package.loaders or package.searchers) == 4)
+                "#,
+            )
+            .exec()
+            .unwrap();
         });
     }
 }

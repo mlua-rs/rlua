@@ -19,8 +19,8 @@ use crate::hook::{hook_proc, Debug, HookTriggers};
 use crate::markers::NoRefUnwindSafe;
 use crate::types::Callback;
 use crate::util::{
-    assert_stack, dostring, init_error_registry, protect_lua_closure, push_globaltable, requiref,
-    safe_pcall, safe_xpcall, userdata_destructor,
+    assert_stack, dostring, init_error_registry, protect_lua_closure, push_globaltable, rawlen,
+    requiref, safe_pcall, safe_xpcall, userdata_destructor,
 };
 
 bitflags! {
@@ -713,9 +713,25 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                 ffi::lua_getglobal(state, cstr!("package"));
                 let t = ffi::lua_type(state, -1);
                 if t == ffi::LUA_TTABLE {
-                    // Package is loaded
+                    // Package is loaded.  Remove loadlib.
                     ffi::lua_pushnil(state);
                     ffi::lua_setfield(state, -2, cstr!("loadlib"));
+
+                    #[cfg(rlua_lua51)]
+                    let searchers_name = cstr!("loaders");
+                    #[cfg(any(rlua_lua53, rlua_lua54))]
+                    let searchers_name = cstr!("searchers");
+
+                    ffi::lua_getfield(state, -1, searchers_name);
+                    debug_assert_eq!(ffi::lua_type(state, -1), ffi::LUA_TTABLE);
+                    debug_assert_eq!(rawlen(state, -1), 4);
+                    // Remove the searchers/loaders which will load C libraries.
+                    ffi::lua_pushnil(state);
+                    ffi::lua_seti(state, -2, 4);
+                    ffi::lua_pushnil(state);
+                    ffi::lua_seti(state, -2, 3);
+
+                    ffi::lua_pop(state, 1);
                 } else {
                     // Assume it's not present otherwise.
                     assert_eq!(t, ffi::LUA_TNIL);
