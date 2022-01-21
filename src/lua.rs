@@ -727,9 +727,9 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
                     debug_assert_eq!(rawlen(state, -1), 4);
                     // Remove the searchers/loaders which will load C libraries.
                     ffi::lua_pushnil(state);
-                    ffi::lua_seti(state, -2, 4);
+                    ffi::lua_rawseti(state, -2, 4);
                     ffi::lua_pushnil(state);
-                    ffi::lua_seti(state, -2, 3);
+                    ffi::lua_rawseti(state, -2, 3);
 
                     ffi::lua_pop(state, 1);
                 } else {
