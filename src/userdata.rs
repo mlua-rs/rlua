@@ -342,7 +342,7 @@ impl<'lua> AnyUserData<'lua> {
 
     /// Sets an associated value to this `AnyUserData`.
     ///
-    /// The value may be any Lua value whatsoever, and can be retrieved with [`get_user_value`].
+    /// The value may be any Lua value whatsoever, and can be retrieved with [`AnyUserData::get_user_value`].
     ///
     /// Equivalent to set_i_user_value(v, 1)
     ///
