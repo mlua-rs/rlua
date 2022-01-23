@@ -1,11 +1,12 @@
+use bstr::BString;
 use std::iter::FromIterator;
 use std::panic::catch_unwind;
 use std::sync::Arc;
 use std::{error, f32, f64, fmt};
 
 use rlua::{
-    Error, ExternalError, Function, /* InitFlags, */ Lua, Nil, Result, StdLib, String, Table,
-    UserData, Value, Variadic,
+    Error, ExternalError, Function, InitFlags, Lua, Nil, Result, StdLib, String, Table, UserData,
+    Value, Variadic,
 };
 
 #[test]
@@ -405,6 +406,505 @@ fn test_error_nopcall_wrap() {
     };
 }
 */
+
+#[test]
+fn test_load_wrappers() {
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        lua.load(
+            r#"
+                assert(type(binchunk) == "string")
+                local binchunk_copy = binchunk
+                chunk = load(function ()
+                    local result = binchunk_copy
+                    binchunk_copy = nil
+                    return result
+                end, "bad", "bt")
+                print(chunk)
+                assert(chunk == nil)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        lua.load(
+            r#"
+                local s = "x = x + 4"
+                local function loader()
+                    local result = s
+                    s = nil
+                    return result
+                end
+                chunk = load(loader)
+                assert(chunk ~= nil)
+                chunk()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    });
+}
+
+#[test]
+fn test_no_load_wrappers() {
+    unsafe {
+        Lua::unsafe_new_with_flags(
+            StdLib::ALL_NO_DEBUG,
+            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        )
+        .context(|lua| {
+            let globals = lua.globals();
+            lua.load(
+                r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+
+            lua.load(
+                r#"
+                incx()
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+            lua.load(
+                r#"
+                assert(type(binchunk) == "string")
+                assert(binchunk:byte(1) == 27)
+                local stringsource = binchunk
+                local loader = function ()
+                    local result = stringsource
+                    stringsource = nil
+                    return result
+                end
+                if _VERSION ~= "Lua 5.1" then
+                    -- Lua 5.1 doesn't support the mode parameter.
+                    chunk = load(binchunk, "fail", "t")
+                    assert(chunk == nil)
+                end
+                chunk = load(loader, "good", "bt")
+                assert(chunk ~= nil)
+                chunk()
+                stringsource = "x = x + 3"
+                chunk = load(loader)
+                chunk()
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+        })
+    };
+}
+
+#[test]
+fn test_loadfile_wrappers() {
+    let mut tmppath = std::env::temp_dir();
+    tmppath.push("test_loadfile_wrappers.lua");
+
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        globals.set("filename", tmppath.to_str().unwrap()).unwrap();
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+        let binchunk = globals.get::<_, BString>("binchunk").unwrap();
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        std::fs::write(&tmppath, binchunk).unwrap();
+        lua.load(
+            r#"
+                chunk = loadfile(filename)
+                assert(chunk == nil)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        std::fs::write(&tmppath, "x = x + 4").unwrap();
+        lua.load(
+            r#"
+                chunk = loadfile(filename)
+                assert(chunk ~= nil)
+                chunk()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    });
+}
+
+#[test]
+fn test_no_loadfile_wrappers() {
+    let mut tmppath = std::env::temp_dir();
+    let mut tmppath2 = tmppath.clone();
+    tmppath.push("test_no_loadfile_wrappers.lua");
+    tmppath2.push("test_no_loadfile_wrappers2.lua");
+
+    unsafe {
+        Lua::unsafe_new_with_flags(
+            StdLib::ALL_NO_DEBUG,
+            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        )
+        .context(|lua| {
+            let globals = lua.globals();
+            globals.set("filename", tmppath.to_str().unwrap()).unwrap();
+            globals
+                .set("filename2", tmppath2.to_str().unwrap())
+                .unwrap();
+            lua.load(
+                r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+            let binchunk = globals.get::<_, BString>("binchunk").unwrap();
+
+            lua.load(
+                r#"
+                incx()
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+            std::fs::write(&tmppath, binchunk).unwrap();
+            std::fs::write(&tmppath2, "x = x + 3").unwrap();
+            lua.load(
+                r#"
+                if _VERSION ~= "Lua 5.1" then
+                    -- Lua 5.1 doesn't have the mode argument, so is
+                    -- effectively always "bt".
+                    chunk = loadfile(filename, "t")
+                    assert(chunk == nil)
+                end
+                chunk = loadfile(filename, "bt")
+                assert(chunk ~= nil)
+                chunk()
+                chunk = loadfile(filename2)
+                chunk()
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+        })
+    };
+}
+
+#[test]
+fn test_dofile_wrappers() {
+    let mut tmppath = std::env::temp_dir();
+    tmppath.push("test_dofile_wrappers.lua");
+
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        globals.set("filename", tmppath.to_str().unwrap()).unwrap();
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+        let binchunk = globals.get::<_, BString>("binchunk").unwrap();
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        std::fs::write(&tmppath, binchunk).unwrap();
+        lua.load(
+            r#"
+                ok, err = pcall(dofile, filename)
+                assert(not ok)
+                assert(err:match("rlua dofile: attempt to load bytecode"))
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        std::fs::write(&tmppath, "x = x + 4").unwrap();
+        lua.load(
+            r#"
+                ok, ret = pcall(dofile, filename)
+                assert(ok)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    });
+}
+
+#[test]
+fn test_no_dofile_wrappers() {
+    let mut tmppath = std::env::temp_dir();
+    tmppath.push("test_no_dofile_wrappers.lua");
+
+    unsafe {
+        Lua::unsafe_new_with_flags(
+            StdLib::ALL_NO_DEBUG,
+            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        )
+        .context(|lua| {
+            let globals = lua.globals();
+            globals.set("filename", tmppath.to_str().unwrap()).unwrap();
+            lua.load(
+                r#"
+                    x = 0
+                    function incx()
+                        x = x + 1
+                    end
+                    binchunk = string.dump(incx)
+                "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+            let binchunk = globals.get::<_, BString>("binchunk").unwrap();
+
+            lua.load(
+                r#"
+                    incx()
+                "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+            std::fs::write(&tmppath, binchunk).unwrap();
+            lua.load(
+                r#"
+                    ok, ret = pcall(dofile, filename)
+                    assert(ok)
+                "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 2);
+            std::fs::write(&tmppath, "x = x + 4").unwrap();
+            lua.load(
+                r#"
+                    ok, ret = pcall(dofile, filename)
+                    assert(ok)
+                "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 6);
+        });
+    }
+}
+
+#[test]
+fn test_loadstring_wrappers() {
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        if globals.get::<_, Function>("loadstring").is_err() {
+            // Loadstring is not present in Lua 5.4, and only with a
+            // compatibility mode in Lua 5.3.
+            return;
+        }
+        lua.load(
+            r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+
+        lua.load(
+            r#"
+                incx()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        lua.load(
+            r#"
+                assert(type(binchunk) == "string")
+                chunk = loadstring(binchunk)
+                assert(chunk == nil)
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+        lua.load(
+            r#"
+                local s = "x = x + 4"
+                chunk = loadstring(s)
+                assert(chunk ~= nil)
+                chunk()
+            "#,
+        )
+        .exec()
+        .unwrap();
+        assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+    });
+}
+
+#[test]
+fn test_no_loadstring_wrappers() {
+    unsafe {
+        Lua::unsafe_new_with_flags(
+            StdLib::ALL_NO_DEBUG,
+            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        )
+        .context(|lua| {
+            let globals = lua.globals();
+            if globals.get::<_, Function>("loadstring").is_err() {
+                // Loadstring is not present in Lua 5.4, and only with a
+                // compatibility mode in Lua 5.3.
+                return;
+            }
+            lua.load(
+                r#"
+                x = 0
+                function incx()
+                    x = x + 1
+                end
+                binchunk = string.dump(incx)
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 0);
+
+            lua.load(
+                r#"
+                incx()
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
+            lua.load(
+                r#"
+                assert(type(binchunk) == "string")
+                assert(binchunk:byte(1) == 27)
+                chunk = loadstring(binchunk)
+                assert(chunk ~= nil)
+                chunk()
+                chunk = loadstring("x = x + 3")
+                chunk()
+            "#,
+            )
+            .exec()
+            .unwrap();
+            assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
+        })
+    };
+}
+
+#[test]
+fn test_default_loadlib() {
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        let package = globals.get::<_, Table>("package").unwrap();
+        let loadlib = package.get::<_, Function>("loadlib");
+        assert!(loadlib.is_err());
+
+        lua.load(
+            r#"
+            assert(#(package.loaders or package.searchers) == 2)
+            "#,
+        )
+        .exec()
+        .unwrap();
+    });
+}
+
+#[test]
+fn test_no_remove_loadlib() {
+    unsafe {
+        Lua::unsafe_new_with_flags(
+            StdLib::ALL_NO_DEBUG,
+            InitFlags::DEFAULT - InitFlags::REMOVE_LOADLIB,
+        )
+        .context(|lua| {
+            let globals = lua.globals();
+            let package = globals.get::<_, Table>("package").unwrap();
+            let _loadlib = package.get::<_, Function>("loadlib").unwrap();
+
+            lua.load(
+                r#"
+                assert(#(package.loaders or package.searchers) == 4)
+                "#,
+            )
+            .exec()
+            .unwrap();
+        });
+    }
+}
 
 #[test]
 fn test_result_conversions() {

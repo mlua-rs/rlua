@@ -96,7 +96,7 @@ pub unsafe fn protect_lua(
 // given function return type is not the return value count, instead the inner function return
 // values are assumed to match the `nresults` param.  Internally uses 3 extra stack spaces, and does
 // not call checkstack.  Provided function must *not* panic, and since it will generally be
-// lonjmping, should not contain any values that implement Drop.
+// longjmping, should not contain any values that implement Drop.
 pub unsafe fn protect_lua_closure<F, R>(
     state: *mut ffi::lua_State,
     nargs: c_int,
@@ -696,6 +696,21 @@ pub unsafe fn loadbufferx(
     ffi::luaL_loadbuffer(state, buf, size, name)
 }
 
+pub unsafe fn dostring(state: *mut ffi::lua_State, s: &str) -> c_int {
+    let load_result = loadbufferx(
+        state,
+        s.as_ptr() as *const c_char,
+        s.len(),
+        cstr!(""),
+        cstr!("t"),
+    );
+    if load_result == ffi::LUA_OK {
+        ffi::lua_pcall(state, 0, ffi::LUA_MULTRET, 0)
+    } else {
+        load_result
+    }
+}
+
 #[cfg(any(rlua_lua53, rlua_lua54))]
 // Like luaL_requiref but doesn't leave the module on the stack.
 pub unsafe fn requiref(
@@ -769,6 +784,19 @@ pub unsafe fn traceback(
     // Placeholder - Lua 5.1 doesn't provide luaL_traceback, and debug.traceback may
     // not be available.  Just return the message.
     ffi::lua_pushstring(push_state, msg);
+}
+
+#[cfg(any(rlua_lua53, rlua_lua54))]
+pub use ffi::lua_dump as dump;
+
+#[cfg(rlua_lua51)]
+pub unsafe fn dump(
+    state: *mut ffi::lua_State,
+    writer: ffi::lua_Writer,
+    data: *mut c_void,
+    _strip: c_int,
+) -> c_int {
+    ffi::lua_dump(state, writer, data)
 }
 
 // In the context of a lua callback, this will call the given function and if the given function

@@ -21,17 +21,17 @@ jobs:
           keys:
             - cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
-          name: Check Formatting
-          command: |
-              rustup component add rustfmt
-              rustfmt --version
-              cargo fmt --all -- --check --color=auto
-      - run:
           name: Build all targets
           command: cargo build --all --all-targets
       - run:
           name: Run all tests
           command: cargo test --all
+      - run:
+          name: Check Formatting
+          command: |
+              rustup component add rustfmt
+              rustfmt --version
+              cargo fmt --all -- --check --color=auto
       - save_cache:
           paths:
             - /usr/local/cargo/registry
@@ -59,17 +59,17 @@ jobs:
           keys:
             - cargo-cache-lua53-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
-          name: Check Formatting
-          command: |
-              rustup component add rustfmt
-              rustfmt --version
-              cargo fmt --all -- --check --color=auto
-      - run:
           name: Build all targets
           command: cargo build --no-default-features --features=builtin-lua53 --all --all-targets
       - run:
           name: Run all tests
           command: cargo test --no-default-features --features=builtin-lua53 --all
+      - run:
+          name: Check Formatting
+          command: |
+              rustup component add rustfmt
+              rustfmt --version
+              cargo fmt --all -- --check --color=auto
       - save_cache:
           paths:
             - /usr/local/cargo/registry
@@ -103,17 +103,17 @@ jobs:
           keys:
             - cargo-cache-lua51-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
-          name: Check Formatting
-          command: |
-              rustup component add rustfmt
-              rustfmt --version
-              cargo fmt --all -- --check --color=auto
-      - run:
           name: Build all targets
           command: cargo build --no-default-features --features=system-lua51 --all --all-targets
       - run:
           name: Run all tests
           command: cargo test --no-default-features --features=system-lua51 --all
+      - run:
+          name: Check Formatting
+          command: |
+              rustup component add rustfmt
+              rustfmt --version
+              cargo fmt --all -- --check --color=auto
       - save_cache:
           paths:
             - /usr/local/cargo/registry
