@@ -847,7 +847,7 @@ where
             get_error_metatable(state);
             ffi::lua_setmetatable(state, -2);
             ffi::lua_error(state);
-            panic!("code is unreachable")
+            unreachable!()
         }
         Err(p) => {
             ffi::lua_settop(state, 1);
@@ -856,7 +856,7 @@ where
             if get_panic_metatable(state) {
                 ffi::lua_setmetatable(state, -2);
                 ffi::lua_error(state);
-                panic!("code is unreachable")
+                unreachable!()
             } else {
                 // The pcall/xpcall wrappers which allow sending a panic
                 // safeul through Lua have not been enabled.
