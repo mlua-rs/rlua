@@ -1,6 +1,6 @@
 [package]
 name = "rlua"
-version = "0.18.1-pre0"
+version = "0.19.0"
 authors = ["kyren <kerriganw@gmail.com>"]
 edition = "2018"
 description = "High level bindings to Lua 5.x"
