@@ -24,7 +24,9 @@ something you feel could perform better, feel free to file a bug report.
 Currently, this library follows a pre-1.0 semver, so all API changes should be
 accompanied by 0.x version bumps.  See the [Version 1.0
 milestone](https://github.com/amethyst/rlua/milestone/1) for the work planned
-to be done before a more stable 1.0 release.
+to be done before a more stable 1.0 release.  There may be breaking changes as
+these issues are dealt with on the way (the version number will be bumped as
+needed).
 
 ## Lua versions supported
 
@@ -41,27 +43,29 @@ The available features are:
 
 | Cargo feature | Lua version |
 | ------------- | ----------- |
-| builtin-lua54 | Lua 5.4 (source included in crate, default) |
-| builtin-lua53 | Lua 5.3 (source included in crate) |
-| system-lua51 | Lua 5.1 (installed on host system, found using pkg-config) |
-| system-lua53 | Lua 5.3 (installed on host system, found using pkg-config) |
+| builtin-lua54 | Lua 5.4 (source included in package, default) |
+| builtin-lua53 | Lua 5.3 (source included in package) |
+| builtin-lua51 | Lua 5.1 (source included in package) |
 | system-lua54 | Lua 5.4 (installed on host system, found using pkg-config) |
+| system-lua53 | Lua 5.3 (installed on host system, found using pkg-config) |
+| system-lua51 | Lua 5.1 (installed on host system, found using pkg-config) |
 
 At current writing rlua has not been tested with alternative Lua
 implementations (such as Luajit) which share PUC-Rio Lua's C API, but it is
-expected that they can be made to work with little if any change to rlua.
+expected that they can be made to work with little if any change to rlua, and
+support would be welcome.
 
 ## Safety and Panics
 
-The goal of this library is complete safety: it should not be possible to cause
-undefined behavior with the safe API, even in edge cases.  Unsoundness is
-considered the most serious kind of bug, so if you find the ability to cause UB
-with this API without `unsafe`, please file a bug report.
+The goal of this library is complete safety by default: it should not be
+possible to cause undefined behavior with the safe API, even in edge cases.
+Unsoundness is considered the most serious kind of bug, so if you find the
+ability to cause UB with this API without `unsafe`, please file a bug report.
 
-*NOTE: There are some Lua stdlib functions which are currently not wrapped or
-behind an unsafe boundary and can be used by scripts to cause memory unsafety,
-please see [this issue](https://github.com/kyren/rlua/issues/116) for more
-details.*
+This includes calling functions in the Lua standard library; some unsafe
+functions are wrapped by default (for example to prevent loading binary
+modules), but these wrappers can be disabled using one of the `unsafe`
+constructors for the `Lua` object if required for the application.
 
 Another goal of this library is complete protection from panics: currently, it
 should not be possible for a script to trigger a panic.  There ARE however

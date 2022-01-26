@@ -1,3 +1,27 @@
+## [0.19.0]
+- The Lua C library build now uses separate -sys crates, and bindgen rather than
+  hand-maintained declarations.  (Thanks @pollend!)  The "builtin-lua51" feature
+  is now available.
+- Value::Integer is now no longer available when building for Lua 5.1.  (In Lua 5.1
+  there is no integer type).
+- Add `Function::dump()` which produces the compiled version of a function (like
+  the `string.dump` Lua function or `lua_dump()` C API).
+- Add unsafe `Chunk::into_function_allow_binary()`.  This allows loading a compiled
+  binary generated from `Function::dump()`.
+- Add `Initflags` to control some settings done when `Lua` is initialised.  They
+  can be specified with the new unsafe `Lua::unsafe_new_with_flags()` constructor.
+  The flags available (all set by default with the other constructors):
+  * PCALL_WRAPPERS:
+    - wrap pcall and xpcall so that they don't allow catching Rust panics
+  * LOAD_WRAPPERS:
+    - wrap functions load, loadfile, dofile (and loadstring for lua 5.1) to prevent
+      loading compiled/bytecode modules.
+  * REMOVE_LOADLIB:
+    - Remove `package.loadlib` and the module finding functions which allow loading
+      compiled C libraries.
+- `String<'lua>` now implements `Eq` and `Hash` (can be useful for local collections
+  within a context callback).
+
 ## [0.18.0]
 - Add support for multiple Lua versions, including 5.1, 5.3 and 5.4 (the default)
 - Add implementations of `FromLua` and `ToLua` for `[T;N]`.
