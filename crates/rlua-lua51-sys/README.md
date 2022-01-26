@@ -1,0 +1,9 @@
+# rlua-lua51-sys -- Low level bindings to Lua 5.1.
+
+This is a bindgen-generated binding to Lua 5.1 used by rlua, though is not
+specific to rlua.
+
+Cargo features:
+
+* lua51-pkg-config: Search for Lua 5.1 with pkg-config instead of using the bundled
+  copy.
