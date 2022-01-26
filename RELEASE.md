@@ -8,6 +8,8 @@
 * Check other fields in Cargo.toml are sensible
 * Check that CI is passing
 * Tag the commit for the release
+* Run `cargo publish --dry-run` -sys crates if updated.
+* Run `cargo publish --dry-run` on main crate.
 * Run `cargo publish` on -sys crates if updated.
 * Run `cargo publish`
 * Check that the version from crates.io looks good
