@@ -9,6 +9,7 @@ readme = "README.md"
 edition = "2018"
 links = "lua5.4"
 build = "build.rs"
+license = "MIT"
 
 [dependencies]
 libc = "0.2"
