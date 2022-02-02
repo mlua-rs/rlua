@@ -136,6 +136,18 @@ jobs:
           command: |
             curl https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe --output rustup-init.exe
             ./rustup-init.exe -y
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version
+      - run:
+          name: Calculate dependencies
+          command: cargo generate-lockfile
+      - run:
+          name: Build all targets
+          command: cargo build --all --all-targets
+      - run:
+          name: Run all tests
+          command: cargo test --all
 
 
 workflows:
