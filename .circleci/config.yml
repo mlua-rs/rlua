@@ -145,6 +145,8 @@ jobs:
           name: Calculate dependencies
           command: |
             export PATH=$USERPROFILE/.cargo/bin:$PATH
+            echo "[net]" >> $USERPROFILE/.cargo/config
+            echo "git-fetch-with-cli = true" >> $USERPROFILE/.cargo/config
             cargo generate-lockfile
       - run:
           name: Build all targets
