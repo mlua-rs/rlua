@@ -143,13 +143,19 @@ jobs:
             rustc --version; cargo --version; rustup --version
       - run:
           name: Calculate dependencies
-          command: cargo generate-lockfile
+          command: |
+            export PATH=$USERPROFILE/.cargo/bin:$PATH
+            cargo generate-lockfile
       - run:
           name: Build all targets
-          command: cargo build --all --all-targets
+          command: |
+            export PATH=$USERPROFILE/.cargo/bin:$PATH
+            cargo build --all --all-targets
       - run:
           name: Run all tests
-          command: cargo test --all
+          command: |
+            export PATH=$USERPROFILE/.cargo/bin:$PATH
+            cargo test --all
 
 
 workflows:
