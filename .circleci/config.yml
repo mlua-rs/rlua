@@ -121,6 +121,20 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cargo-cache-lua51-{{ arch }}-{{ checksum "Cargo.lock" }}
+  build-windows:
+    executor:
+      name: win/default
+      size: "medium"
+      shell: bash.exe
+    steps:
+      - checkout
+      - run:
+          name: Install Rust
+          command: |
+            curl https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe --output rustup-init.exe
+            ./rustup-init.exe
+
+
 workflows:
   version: 2
   build:
@@ -128,3 +142,4 @@ workflows:
       - "build-default"
       - "build-lua53"
       - "build-lua51"
+      - "build-windows"
