@@ -138,7 +138,9 @@ jobs:
             ./rustup-init.exe -y
       - run:
           name: Version information
-          command: rustc --version; cargo --version; rustup --version
+          command: |
+            export PATH=$USERPROFILE/.cargo/bin:$PATH
+            rustc --version; cargo --version; rustup --version
       - run:
           name: Calculate dependencies
           command: cargo generate-lockfile
