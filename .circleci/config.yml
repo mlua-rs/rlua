@@ -1,4 +1,7 @@
-version: 2
+version: 2.1
+
+orbs:
+  win: circleci/windows@2.2.0
 
 jobs:
   build-default:
