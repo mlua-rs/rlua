@@ -2,12 +2,10 @@ use std::mem;
 use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 
-pub mod bindings {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
+#[allow(non_upper_case_globals)]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+pub mod bindings;
 
 pub const LUA_REGISTRYINDEX: c_int = bindings::LUA_REGISTRYINDEX as c_int;
 pub const LUA_ENVIRONINDEX: c_int = bindings::LUA_ENVIRONINDEX as c_int;

@@ -5,7 +5,6 @@ use std::path::PathBuf;
 
 fn main() {
     let lua_folder = "lua-5.4.3";
-    let wrapper_h = "wrapper_lua54.h";
 
     let dst = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
@@ -68,6 +67,5 @@ fn main() {
         cc_config_build
             .out_dir(dst.join("lib"))
             .compile("liblua5.4.a");
-
     }
 }
