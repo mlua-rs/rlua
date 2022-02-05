@@ -9,13 +9,8 @@ fn main() {
 
     let dst = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
-    let mut binding_config = bindgen::Builder::default();
-
     if cfg!(feature = "lua54-pkg-config") {
         let library = pkg_config::Config::new().probe("lua5.4").unwrap();
-        for path in &library.include_paths {
-            binding_config = binding_config.clang_arg(format!("-I{}", path.to_string_lossy()));
-        }
     } else {
         let lua_dir = PathBuf::from(lua_folder).join("src");
         let target_os = env::var("CARGO_CFG_TARGET_OS");
@@ -74,19 +69,5 @@ fn main() {
             .out_dir(dst.join("lib"))
             .compile("liblua5.4.a");
 
-        binding_config = binding_config.clang_arg(format!("-I{}", lua_dir.to_string_lossy()));
     }
-
-    println!("cargo:rerun-if-changed={}", wrapper_h);
-    let bindings = binding_config
-        .header(wrapper_h)
-        .size_t_is_usize(true)
-        .clang_arg("-x")
-        .clang_arg("c")
-        .generate()
-        .expect("Unable to generate bindings");
-
-    bindings
-        .write_to_file(dst.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
 }
