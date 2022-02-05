@@ -9,7 +9,7 @@ fn main() {
     let dst = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
     if cfg!(feature = "lua54-pkg-config") {
-        let library = pkg_config::Config::new().probe("lua5.4").unwrap();
+        let _library = pkg_config::Config::new().probe("lua5.4").unwrap();
     } else {
         let lua_dir = PathBuf::from(lua_folder).join("src");
         let target_os = env::var("CARGO_CFG_TARGET_OS");
