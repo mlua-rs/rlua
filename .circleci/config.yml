@@ -30,6 +30,12 @@ jobs:
           name: Run all tests
           command: cargo test --all
       - run:
+          name: Check bindgen
+          command: |
+              cargo install bindgen
+              scripts/update-bindgen.sh
+              git diff --exit-code
+      - run:
           name: Check Formatting
           command: |
               rustup component add rustfmt
@@ -67,6 +73,12 @@ jobs:
       - run:
           name: Run all tests
           command: cargo test --no-default-features --features=builtin-lua53 --all
+      - run:
+          name: Check bindgen
+          command: |
+              cargo install bindgen
+              scripts/update-bindgen.sh
+              git diff --exit-code
       - run:
           name: Check Formatting
           command: |
@@ -111,6 +123,12 @@ jobs:
       - run:
           name: Run all tests
           command: cargo test --no-default-features --features=system-lua51 --all
+      - run:
+          name: Check bindgen
+          command: |
+              cargo install bindgen
+              scripts/update-bindgen.sh
+              git diff --exit-code
       - run:
           name: Check Formatting
           command: |
