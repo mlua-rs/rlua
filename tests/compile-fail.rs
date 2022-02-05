@@ -13,5 +13,6 @@ fn run_mode(mode: &'static str) {
 
 #[test]
 fn compile_test() {
+    #[cfg(target_os = "linux")]
     run_mode("compile-fail");
 }
