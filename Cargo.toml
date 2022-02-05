@@ -32,7 +32,7 @@ libc = { version = "0.2" }
 num-traits = { version = "0.2.14" }
 bitflags = { version = "1.0.4" }
 bstr = {version = "0.2", features = ["std"], default_features = false }
-rlua-lua54-sys = { version = "0.1.0", optional = true }
+rlua-lua54-sys = { version = "0.1.0", optional = true, path = "crates/rlua-lua54-sys" }
 rlua-lua53-sys = { version = "0.1.0", optional = true }
 rlua-lua51-sys = { version = "0.1.0", optional = true }
 
