@@ -1,6 +1,6 @@
 [package]
 name = "rlua-lua53-sys"
-version = "0.1.0"
+version = "0.1.1"
 keywords = ["bindings", "lua"]
 categories = ["external-ffi-bindings"]
 description = "Bindings to lua's C API"
