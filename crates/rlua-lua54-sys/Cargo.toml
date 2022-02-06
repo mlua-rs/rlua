@@ -1,6 +1,6 @@
 [package]
 name = "rlua-lua54-sys"
-version = "0.1.0"
+version = "0.1.1"
 keywords = ["bindings", "lua"]
 categories = ["external-ffi-bindings"]
 description = "Bindings to lua's C API"
@@ -16,10 +16,9 @@ libc = "0.2"
 
 [build-dependencies]
 cc = "1.0"
-bindgen = "0.59.2"
 pkg-config = "0.3.24"
 
 [features]
 default = []
-static = []
 lua54-pkg-config = []
+static = []

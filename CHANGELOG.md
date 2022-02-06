@@ -1,3 +1,9 @@
+## [0.19.1]
+- The -sys crates (bumped to 0.1.1) now use pregenerated bindgen outputs in the
+  package instead of running bindgen at build time.  This means that libclang is
+  no longer needed when building.
+- A Windows build has been added to CI.
+
 ## [0.19.0]
 - The Lua C library build now uses separate -sys crates, and bindgen rather than
   hand-maintained declarations.  (Thanks @pollend!)  The "builtin-lua51" feature

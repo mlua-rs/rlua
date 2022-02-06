@@ -1,4 +1,7 @@
-version: 2
+version: 2.1
+
+orbs:
+  win: circleci/windows@2.2.0
 
 jobs:
   build-default:
@@ -26,6 +29,12 @@ jobs:
       - run:
           name: Run all tests
           command: cargo test --all
+      - run:
+          name: Check bindgen
+          command: |
+              cargo install bindgen
+              scripts/update-bindgen.sh
+              git diff --exit-code
       - run:
           name: Check Formatting
           command: |
@@ -64,6 +73,12 @@ jobs:
       - run:
           name: Run all tests
           command: cargo test --no-default-features --features=builtin-lua53 --all
+      - run:
+          name: Check bindgen
+          command: |
+              cargo install bindgen
+              scripts/update-bindgen.sh
+              git diff --exit-code
       - run:
           name: Check Formatting
           command: |
@@ -109,6 +124,12 @@ jobs:
           name: Run all tests
           command: cargo test --no-default-features --features=system-lua51 --all
       - run:
+          name: Check bindgen
+          command: |
+              cargo install bindgen
+              scripts/update-bindgen.sh
+              git diff --exit-code
+      - run:
           name: Check Formatting
           command: |
               rustup component add rustfmt
@@ -121,6 +142,42 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cargo-cache-lua51-{{ arch }}-{{ checksum "Cargo.lock" }}
+  build-windows:
+    executor:
+      name: win/default
+      size: "medium"
+      shell: bash.exe
+    steps:
+      - checkout
+      - run:
+          name: Install Rust
+          command: |
+            curl https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe --output rustup-init.exe
+            ./rustup-init.exe -y
+      - run:
+          name: Version information
+          command: |
+            export PATH=$USERPROFILE/.cargo/bin:$PATH
+            rustc --version; cargo --version; rustup --version
+      - run:
+          name: Calculate dependencies
+          command: |
+            export PATH=$USERPROFILE/.cargo/bin:$PATH
+            echo "[net]" >> $USERPROFILE/.cargo/config
+            echo "git-fetch-with-cli = true" >> $USERPROFILE/.cargo/config
+            cargo generate-lockfile
+      - run:
+          name: Build all targets
+          command: |
+            export PATH=$USERPROFILE/.cargo/bin:$PATH
+            cargo build --all --all-targets
+      - run:
+          name: Run all tests
+          command: |
+            export PATH=$USERPROFILE/.cargo/bin:$PATH
+            cargo test --all
+
+
 workflows:
   version: 2
   build:
@@ -128,3 +185,4 @@ workflows:
       - "build-default"
       - "build-lua53"
       - "build-lua51"
+      - "build-windows"
