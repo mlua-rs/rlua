@@ -274,3 +274,43 @@ fn test_functions() {
         assert_eq!(get_constant.call::<_, i64>(()).unwrap(), 7);
     });
 }
+
+#[test]
+fn test_align() {
+    #[derive(Clone)]
+    #[repr(align(32))]
+    struct MyUserData(u8);
+
+    assert_eq!(std::mem::align_of_val(&MyUserData(0)), 32);
+
+    impl UserData for MyUserData {
+        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+            methods.add_method_mut("check", |_, this: &mut MyUserData, ()| {
+                let ptr = this as *const MyUserData;
+                let ptrval = ptr as usize;
+                assert_eq!(ptrval & 31, 0);
+                assert_eq!(this.0, 42);
+                this.0 = 99;
+                Ok(77)
+            });
+        }
+    }
+
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        let userdata = lua.create_userdata(MyUserData(42)).unwrap();
+        globals.set("userdata", userdata.clone()).unwrap();
+        lua.load(
+            r#"
+                function f()
+                    return userdata:check()
+                end
+            "#,
+        )
+        .exec()
+        .unwrap();
+        let f = globals.get::<_, Function>("f").unwrap();
+        assert_eq!(f.call::<_, i64>(()).unwrap(), 77);
+        assert_eq!(globals.get::<_, MyUserData>("userdata").unwrap().0, 99);
+    });
+}
