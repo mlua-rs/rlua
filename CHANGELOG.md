@@ -1,3 +1,6 @@
+## [0.19.2]
+- Fix issue #253 (userdata types with alignment > 8 bytes could cause crashes)
+
 ## [0.19.1]
 - The -sys crates (bumped to 0.1.1) now use pregenerated bindgen outputs in the
   package instead of running bindgen at build time.  This means that libclang is
