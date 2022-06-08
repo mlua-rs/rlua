@@ -239,6 +239,39 @@ unsafe fn newuserdatauv(state: *mut ffi::lua_State, size: usize, nuvalues: c_int
     ffi::lua_newuserdata(state, size)
 }
 
+// Return the padded allocation size for a userdata type. Lua itself only guarantees alignment up
+// to the largest type in LUAI_MAXALIGN (which includes double/f64), so we need to pad the
+// allocation and manually align for types with higher alignment requirements.
+fn get_userdata_padded_size<T>() -> usize {
+    let size = mem::size_of::<T>();
+    let align = mem::align_of::<T>();
+
+    if align > mem::align_of::<f64>() {
+        // Enough space to guarantee being able to align the type.
+        size + align - mem::align_of::<f64>()
+    } else {
+        size
+    }
+}
+
+// Convert a *mut u8 pointer returned from lua_newuserdatauv to an aligned
+// pointer to T.  This assumes that extra space was allocated according to
+// get_userdata_padded_size().
+// Returns null if the input is null.
+fn align_userdata_ptr<T>(raw_ptr: *mut u8) -> *mut T {
+    let align = mem::align_of::<T>();
+    if raw_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    if align > mem::align_of::<f64>() {
+        let offset = raw_ptr.align_offset(align);
+        raw_ptr.wrapping_add(offset) as *mut T
+    } else {
+        raw_ptr as *mut T
+    }
+}
+
 #[cfg(rlua_lua54)]
 // Internally uses 4 stack spaces, does not call checkstack
 pub unsafe fn push_userdata_uv<T>(
@@ -251,7 +284,10 @@ pub unsafe fn push_userdata_uv<T>(
         "userdata user values cannot be below zero"
     );
     let ud = protect_lua_closure(state, 0, 1, move |state| {
-        ffi::lua_newuserdatauv(state, mem::size_of::<T>(), uvalues_count) as *mut T
+        let alloc_size = get_userdata_padded_size::<T>();
+        let raw_ptr = ffi::lua_newuserdatauv(state, alloc_size, uvalues_count) as *mut u8;
+
+        align_userdata_ptr(raw_ptr)
     })?;
     ptr::write(ud, t);
     Ok(())
@@ -273,15 +309,19 @@ pub unsafe fn push_userdata_uv<T>(
         "This version of Lua only supports one user value."
     );
     let ud = protect_lua_closure(state, 0, 1, move |state| {
-        ffi::lua_newuserdata(state, mem::size_of::<T>()) as *mut T
+        let alloc_size = get_userdata_padded_size::<T>();
+        let raw_ptr = ffi::lua_newuserdata(state, alloc_size) as *mut u8;
+
+        align_userdata_ptr(raw_ptr)
     })?;
     ptr::write(ud, t);
     Ok(())
 }
+
 pub unsafe fn get_userdata<T>(state: *mut ffi::lua_State, index: c_int) -> *mut T {
-    let ud = ffi::lua_touserdata(state, index) as *mut T;
-    rlua_debug_assert!(!ud.is_null(), "userdata pointer is null");
-    ud
+    let raw_ud = ffi::lua_touserdata(state, index) as *mut u8;
+    rlua_debug_assert!(!raw_ud.is_null(), "userdata pointer is null");
+    align_userdata_ptr(raw_ud)
 }
 
 // Pops the userdata off of the top of the stack and returns it to rust, invalidating the lua
@@ -295,7 +335,7 @@ pub unsafe fn take_userdata<T>(state: *mut ffi::lua_State) -> T {
     // after the first call to __gc.
     get_destructed_userdata_metatable(state);
     ffi::lua_setmetatable(state, -2);
-    let ud = ffi::lua_touserdata(state, -1) as *mut T;
+    let ud = align_userdata_ptr::<T>(ffi::lua_touserdata(state, -1) as *mut u8);
     rlua_debug_assert!(!ud.is_null(), "userdata pointer is null");
     ffi::lua_pop(state, 1);
     ptr::read(ud)
