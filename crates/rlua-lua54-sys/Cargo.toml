@@ -22,3 +22,4 @@ pkg-config = "0.3.24"
 default = []
 lua54-pkg-config = []
 static = []
+lua-no-oslib = []
