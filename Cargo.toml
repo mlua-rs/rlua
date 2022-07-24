@@ -1,6 +1,6 @@
 [package]
 name = "rlua"
-version = "0.19.2"
+version = "0.19.3"
 authors = ["kyren <kerriganw@gmail.com>"]
 edition = "2018"
 description = "High level bindings to Lua 5.x"
@@ -25,6 +25,9 @@ system-lua51=["rlua-lua51-sys", "rlua-lua51-sys/lua51-pkg-config"]
 
 # Remove Lua's os lib
 lua-no-oslib=["rlua-lua54-sys/lua-no-oslib"]
+lua-no-oslib=["rlua-lua53-sys/lua-no-oslib"]
+lua-no-oslib=["rlua-lua51-sys/lua-no-oslib"]
+
 # Enabled functions from the math module that have been deprecated
 lua-compat-mathlib = []
 

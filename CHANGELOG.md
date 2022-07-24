@@ -1,3 +1,7 @@
+## [0.19.3]
+- Add new features `lua-no-oslib` to not compile in the `os` lib to the
+  Lua library.  Useful for targets (e.g. iOS) where the `os` lib is unavailable.
+
 ## [0.19.2]
 - Fix issue #253 (userdata types with alignment > 8 bytes could cause crashes)
 
