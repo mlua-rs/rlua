@@ -1,3 +1,6 @@
+## [0.19.4]
+- Fix the `lua-no-oslib` feature introduced with a bug in 0.19.3.
+
 ## [0.19.3]
 - Add new features `lua-no-oslib` to not compile in the `os` lib to the
   Lua library.  Useful for targets (e.g. iOS) where the `os` lib is unavailable.
