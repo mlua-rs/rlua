@@ -782,7 +782,7 @@ unsafe fn load_from_std_lib(state: *mut ffi::lua_State, lua_mod: StdLib) {
     if lua_mod.contains(StdLib::IO) {
         requiref(state, cstr!("io"), Some(ffi::luaopen_io), 1);
     }
-    #[cfg(feature = "lua-no-oslib")]
+    #[cfg(not(feature = "lua-no-oslib"))]
     if lua_mod.contains(StdLib::OS) {
         requiref(state, cstr!("os"), Some(ffi::luaopen_os), 1);
     }

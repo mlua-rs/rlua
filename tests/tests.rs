@@ -1437,3 +1437,38 @@ fn context_thread_lua51() {
         thrd.resume::<_, ()>(thrd_cloned).unwrap();
     });
 }
+
+// Test the lua-no-oslib feature
+#[cfg(feature = "lua-no-oslib")]
+#[test]
+fn test_no_oslib() {
+    Lua::new().context(|lua_ctx| {
+        let f = lua_ctx
+            .load(
+                r#"
+                    assert(os == nil)
+                "#,
+            )
+            .into_function()
+            .unwrap();
+        f.call::<_, ()>(()).unwrap();
+    });
+}
+
+// Test the lua-no-oslib feature
+#[cfg(not(feature = "lua-no-oslib"))]
+#[test]
+fn test_with_oslib() {
+    Lua::new().context(|lua_ctx| {
+        let f = lua_ctx
+            .load(
+                r#"
+                    local x = os.time()
+                    assert(x > 0)
+                "#,
+            )
+            .into_function()
+            .unwrap();
+        f.call::<_, ()>(()).unwrap();
+    });
+}
