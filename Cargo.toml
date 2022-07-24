@@ -24,9 +24,7 @@ system-lua53=["rlua-lua53-sys", "rlua-lua53-sys/lua53-pkg-config"]
 system-lua51=["rlua-lua51-sys", "rlua-lua51-sys/lua51-pkg-config"]
 
 # Remove Lua's os lib
-lua-no-oslib=["rlua-lua54-sys/lua-no-oslib"]
-lua-no-oslib=["rlua-lua53-sys/lua-no-oslib"]
-lua-no-oslib=["rlua-lua51-sys/lua-no-oslib"]
+lua-no-oslib=["rlua-lua54-sys/lua-no-oslib","rlua-lua53-sys/lua-no-oslib","rlua-lua51-sys/lua-no-oslib"]
 
 # Enabled functions from the math module that have been deprecated
 lua-compat-mathlib = []
