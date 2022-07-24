@@ -40,7 +40,6 @@ fn main() {
             .file(lua_dir.join("ldump.c"))
             .file(lua_dir.join("lfunc.c"))
             .file(lua_dir.join("lgc.c"))
-            .file(lua_dir.join("linit.c"))
             .file(lua_dir.join("liolib.c"))
             .file(lua_dir.join("llex.c"))
             .file(lua_dir.join("lmathlib.c"))
@@ -49,7 +48,6 @@ fn main() {
             .file(lua_dir.join("loadlib.c"))
             .file(lua_dir.join("lobject.c"))
             .file(lua_dir.join("lopcodes.c"))
-            .file(lua_dir.join("loslib.c"))
             .file(lua_dir.join("lparser.c"))
             .file(lua_dir.join("lstate.c"))
             .file(lua_dir.join("lstring.c"))
@@ -60,6 +58,12 @@ fn main() {
             .file(lua_dir.join("lundump.c"))
             .file(lua_dir.join("lvm.c"))
             .file(lua_dir.join("lzio.c"));
+
+        if !cfg!(feature = "lua-no-oslib") {
+            cc_config_build = cc_config_build
+                .file(lua_dir.join("loslib.c"))
+                .file(lua_dir.join("linit.c"));
+        }
 
         cc_config_build
             .out_dir(dst.join("lib"))
