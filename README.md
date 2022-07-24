@@ -55,6 +55,14 @@ implementations (such as Luajit) which share PUC-Rio Lua's C API, but it is
 expected that they can be made to work with little if any change to rlua, and
 support would be welcome.
 
+### Other Lua features
+
+Some other features affect how Lua is built (for the builtin versions):
+
+| Cargo feature | Effect |
+| ------------- | ------ |
+| lua-no-oslib | Don't compile the Lua `os` library at all (builtin Lua libraries). |
+
 ## Safety and Panics
 
 The goal of this library is complete safety by default: it should not be
