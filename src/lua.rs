@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
 use std::marker::PhantomData;
 #[cfg(rlua_lua54)]
 use std::os::raw::c_uint;
@@ -453,9 +454,30 @@ impl Default for Lua {
     }
 }
 
+/// TypeIds are already hashes from the compiler, so they don't need to be hashed again.
+/// This dummy hasher simply returns the value given to it by TypeId.
+#[derive(Default)]
+pub(crate) struct TypeIdHasher(u64);
+
+impl Hasher for TypeIdHasher {
+    fn write(&mut self, _: &[u8]) {
+        unreachable!("TypeId calls write_u64");
+    }
+
+    #[inline]
+    fn write_u64(&mut self, type_id: u64) {
+        self.0 = type_id;
+    }
+
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
 // Data associated with the main lua_State via lua_getextraspace.
 pub(crate) struct ExtraData {
-    pub registered_userdata: HashMap<TypeId, c_int>,
+    pub(crate) registered_userdata: HashMap<TypeId, c_int, BuildHasherDefault<TypeIdHasher>>,
     pub registry_unref_list: Arc<Mutex<Option<Vec<c_int>>>>,
 
     pub ref_thread: *mut ffi::lua_State,
@@ -526,7 +548,7 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
     }
 
     let mut extra = Box::new(ExtraData {
-        registered_userdata: HashMap::new(),
+        registered_userdata: HashMap::default(),
         registry_unref_list: Arc::new(Mutex::new(Some(Vec::new()))),
         ref_thread: ptr::null_mut(),
         // We need 1 extra stack space to move values in and out of the ref stack.
