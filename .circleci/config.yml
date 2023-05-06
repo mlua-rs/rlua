@@ -6,7 +6,7 @@ orbs:
 jobs:
   build-default:
     docker:
-      - image: circleci/rust:latest
+      - image: cimg/rust:1.69.0
     steps:
       - checkout
       - run:
@@ -50,7 +50,7 @@ jobs:
           key: cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-no-oslib:
     docker:
-      - image: circleci/rust:latest
+      - image: cimg/rust:1.69.0
     steps:
       - checkout
       - run:
@@ -82,7 +82,7 @@ jobs:
           key: cargo-cache-no-oslib-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-lua53:
     docker:
-      - image: circleci/rust:latest
+      - image: cimg/rust:1.69.0
     steps:
       - checkout
       - run:
@@ -126,7 +126,7 @@ jobs:
           key: cargo-cache-lua53-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-lua51:
     docker:
-      - image: circleci/rust:latest
+      - image: cimg/rust:1.69.0
     steps:
       - checkout
       - run:
