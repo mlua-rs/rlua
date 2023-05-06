@@ -4,7 +4,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let lua_folder = "lua-5.4.3";
+    let lua_folder = "lua-5.4.4";
 
     let dst = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
