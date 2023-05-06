@@ -102,7 +102,8 @@ impl Drop for Lua {
             );
             *rlua_expect!((*extra).registry_unref_list.lock(), "unref list poisoned") = None;
             ffi::lua_close(self.main_state);
-            Box::from_raw(extra);
+            // Recreate the box so that it will be freed.
+            let _ = Box::from_raw(extra);
         }
     }
 }
