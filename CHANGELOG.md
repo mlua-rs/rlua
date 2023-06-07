@@ -1,3 +1,6 @@
+## [0.19.5]
+- Update to Lua 5.4.6 (thanks @0x2ec)
+
 ## [0.19.4]
 - Fix the `lua-no-oslib` feature introduced with a bug in 0.19.3.
 
