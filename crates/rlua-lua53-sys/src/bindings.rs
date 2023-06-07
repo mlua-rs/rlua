@@ -18,6 +18,10 @@ pub const __USE_POSIX199506: u32 = 1;
 pub const __USE_XOPEN2K: u32 = 1;
 pub const __USE_XOPEN2K8: u32 = 1;
 pub const _ATFILE_SOURCE: u32 = 1;
+pub const __WORDSIZE: u32 = 64;
+pub const __WORDSIZE_TIME64_COMPAT32: u32 = 1;
+pub const __SYSCALL_WORDSIZE: u32 = 64;
+pub const __TIMESIZE: u32 = 64;
 pub const __USE_MISC: u32 = 1;
 pub const __USE_ATFILE: u32 = 1;
 pub const __USE_FORTIFY_LEVEL: u32 = 0;
@@ -25,21 +29,21 @@ pub const __GLIBC_USE_DEPRECATED_GETS: u32 = 0;
 pub const __GLIBC_USE_DEPRECATED_SCANF: u32 = 0;
 pub const _STDC_PREDEF_H: u32 = 1;
 pub const __STDC_IEC_559__: u32 = 1;
+pub const __STDC_IEC_60559_BFP__: u32 = 201404;
 pub const __STDC_IEC_559_COMPLEX__: u32 = 1;
+pub const __STDC_IEC_60559_COMPLEX__: u32 = 201404;
 pub const __STDC_ISO_10646__: u32 = 201706;
 pub const __GNU_LIBRARY__: u32 = 6;
 pub const __GLIBC__: u32 = 2;
-pub const __GLIBC_MINOR__: u32 = 31;
+pub const __GLIBC_MINOR__: u32 = 36;
 pub const _SYS_CDEFS_H: u32 = 1;
 pub const __glibc_c99_flexarr_available: u32 = 1;
-pub const __WORDSIZE: u32 = 64;
-pub const __WORDSIZE_TIME64_COMPAT32: u32 = 1;
-pub const __SYSCALL_WORDSIZE: u32 = 64;
-pub const __LONG_DOUBLE_USES_FLOAT128: u32 = 0;
+pub const __LDOUBLE_REDIRECTS_TO_FLOAT128_ABI: u32 = 0;
 pub const __HAVE_GENERIC_SELECTION: u32 = 1;
 pub const __GLIBC_USE_LIB_EXT2: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_BFP_EXT: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_BFP_EXT_C2X: u32 = 0;
+pub const __GLIBC_USE_IEC_60559_EXT: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_FUNCS_EXT: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_FUNCS_EXT_C2X: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_TYPES_EXT: u32 = 0;
@@ -139,12 +143,12 @@ pub const LUA_NUMBER_FMT: &[u8; 6usize] = b"%.14g\0";
 pub const LUA_INTEGER_FRMLEN: &[u8; 3usize] = b"ll\0";
 pub const _STDINT_H: u32 = 1;
 pub const _BITS_TYPES_H: u32 = 1;
-pub const __TIMESIZE: u32 = 64;
 pub const _BITS_TYPESIZES_H: u32 = 1;
 pub const __OFF_T_MATCHES_OFF64_T: u32 = 1;
 pub const __INO_T_MATCHES_INO64_T: u32 = 1;
 pub const __RLIM_T_MATCHES_RLIM64_T: u32 = 1;
 pub const __STATFS_MATCHES_STATFS64: u32 = 1;
+pub const __KERNEL_OLD_TIMEVAL_MATCHES_TIMEVAL64: u32 = 1;
 pub const __FD_SETSIZE: u32 = 1024;
 pub const _BITS_TIME64_H: u32 = 1;
 pub const _BITS_WCHAR_H: u32 = 1;
@@ -293,6 +297,22 @@ pub const TMP_MAX: u32 = 238328;
 pub const FILENAME_MAX: u32 = 4096;
 pub const L_ctermid: u32 = 9;
 pub const FOPEN_MAX: u32 = 16;
+pub const __HAVE_FLOAT128: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT128: u32 = 0;
+pub const __HAVE_FLOAT64X: u32 = 1;
+pub const __HAVE_FLOAT64X_LONG_DOUBLE: u32 = 1;
+pub const __HAVE_FLOAT16: u32 = 0;
+pub const __HAVE_FLOAT32: u32 = 1;
+pub const __HAVE_FLOAT64: u32 = 1;
+pub const __HAVE_FLOAT32X: u32 = 1;
+pub const __HAVE_FLOAT128X: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT16: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT32: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT64: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT32X: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT64X: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT128X: u32 = 0;
+pub const __HAVE_FLOATN_NOT_TYPEDEF: u32 = 0;
 pub const LUA_ERRFILE: u32 = 7;
 pub const LUA_LOADED_TABLE: &[u8; 8usize] = b"_LOADED\0";
 pub const LUA_PRELOAD_TABLE: &[u8; 9usize] = b"_PRELOAD\0";
@@ -416,6 +436,7 @@ pub type __id_t = ::std::os::raw::c_uint;
 pub type __time_t = ::std::os::raw::c_long;
 pub type __useconds_t = ::std::os::raw::c_uint;
 pub type __suseconds_t = ::std::os::raw::c_long;
+pub type __suseconds64_t = ::std::os::raw::c_long;
 pub type __daddr_t = ::std::os::raw::c_int;
 pub type __key_t = ::std::os::raw::c_int;
 pub type __clockid_t = ::std::os::raw::c_int;
@@ -1697,10 +1718,13 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
+    pub fn fclose(__stream: *mut FILE) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn tmpfile() -> *mut FILE;
 }
 extern "C" {
-    pub fn tmpnam(__s: *mut ::std::os::raw::c_char) -> *mut ::std::os::raw::c_char;
+    pub fn tmpnam(arg1: *mut ::std::os::raw::c_char) -> *mut ::std::os::raw::c_char;
 }
 extern "C" {
     pub fn tmpnam_r(__s: *mut ::std::os::raw::c_char) -> *mut ::std::os::raw::c_char;
@@ -1710,9 +1734,6 @@ extern "C" {
         __dir: *const ::std::os::raw::c_char,
         __pfx: *const ::std::os::raw::c_char,
     ) -> *mut ::std::os::raw::c_char;
-}
-extern "C" {
-    pub fn fclose(__stream: *mut FILE) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn fflush(__stream: *mut FILE) -> ::std::os::raw::c_int;
@@ -1851,6 +1872,10 @@ extern "C" {
         ...
     ) -> ::std::os::raw::c_int;
 }
+pub type _Float32 = f32;
+pub type _Float64 = f64;
+pub type _Float32x = f64;
+pub type _Float64x = u128;
 extern "C" {
     #[link_name = "\u{1}__isoc99_fscanf"]
     pub fn fscanf1(
@@ -2079,25 +2104,19 @@ extern "C" {
     pub fn perror(__s: *const ::std::os::raw::c_char);
 }
 extern "C" {
-    pub static mut sys_nerr: ::std::os::raw::c_int;
-}
-extern "C" {
-    pub static sys_errlist: [*const ::std::os::raw::c_char; 0usize];
-}
-extern "C" {
     pub fn fileno(__stream: *mut FILE) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn fileno_unlocked(__stream: *mut FILE) -> ::std::os::raw::c_int;
 }
 extern "C" {
+    pub fn pclose(__stream: *mut FILE) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn popen(
         __command: *const ::std::os::raw::c_char,
         __modes: *const ::std::os::raw::c_char,
     ) -> *mut FILE;
-}
-extern "C" {
-    pub fn pclose(__stream: *mut FILE) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn ctermid(__s: *mut ::std::os::raw::c_char) -> *mut ::std::os::raw::c_char;
