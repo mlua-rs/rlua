@@ -20,6 +20,7 @@ pkg-config = "0.3.24"
 
 [features]
 default = []
+luajit-pkg-config = []
 lua51-pkg-config = []
 static = []
 lua-no-oslib = []

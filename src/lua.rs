@@ -467,6 +467,8 @@ pub(crate) struct ExtraData {
     memory_limit: Option<usize>,
 
     pub hook_callback: Option<Rc<RefCell<dyn FnMut(Context, Debug) -> Result<()>>>>,
+    pub ud:Option<*mut std::ffi::c_void>,
+    pub uf:ffi::lua_Alloc,
 }
 
 // Return the extra data pointer passed to `lua_newstate()`.  `state` must
@@ -491,37 +493,41 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
     ) -> *mut c_void {
         let extra_data = extra_data as *mut ExtraData;
 
-        // If the `ptr` argument is null, osize instead encodes the allocated object type, which
-        // we currently ignore.
-        let new_used_memory = if ptr.is_null() {
-            (*extra_data).used_memory + nsize
-        } else if nsize >= osize {
-            (*extra_data).used_memory + (nsize - osize)
+        if cfg!(rlua_luajit) {
+            ((*extra_data).uf.unwrap())((*extra_data).ud.unwrap(), ptr, osize, nsize)
         } else {
-            (*extra_data).used_memory - (osize - nsize)
-        };
+            // If the `ptr` argument is null, osize instead encodes the allocated object type, which
+            // we currently ignore.
+            let new_used_memory = if ptr.is_null() {
+                (*extra_data).used_memory + nsize
+            } else if nsize >= osize {
+                (*extra_data).used_memory + (nsize - osize)
+            } else {
+                (*extra_data).used_memory - (osize - nsize)
+            };
 
-        if new_used_memory > (*extra_data).used_memory {
-            // We only check memory limits when memory is allocated, not freed
-            if let Some(memory_limit) = (*extra_data).memory_limit {
-                if new_used_memory > memory_limit {
-                    return ptr::null_mut();
+            if new_used_memory > (*extra_data).used_memory {
+                // We only check memory limits when memory is allocated, not freed
+                if let Some(memory_limit) = (*extra_data).memory_limit {
+                    if new_used_memory > memory_limit {
+                        return ptr::null_mut();
+                    }
                 }
             }
-        }
 
-        if nsize == 0 {
-            (*extra_data).used_memory = new_used_memory;
-            libc::free(ptr as *mut libc::c_void);
-            ptr::null_mut()
-        } else {
-            let p = libc::realloc(ptr as *mut libc::c_void, nsize) as *mut c_void;
-            if !p.is_null() {
-                // Only commit the new used memory if the allocation was successful.  Probably in
-                // reality, libc::realloc will never fail.
+            if nsize == 0 {
                 (*extra_data).used_memory = new_used_memory;
+                libc::free(ptr as *mut libc::c_void);
+                ptr::null_mut()
+            } else {
+                let p = libc::realloc(ptr as *mut libc::c_void, nsize) as *mut c_void;
+                if !p.is_null() {
+                    // Only commit the new used memory if the allocation was successful.  Probably in
+                    // reality, libc::realloc will never fail.
+                    (*extra_data).used_memory = new_used_memory;
+                }
+                p
             }
-            p
         }
     }
 
@@ -536,12 +542,25 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
         used_memory: 0,
         memory_limit: None,
         hook_callback: None,
+        ud:None,
+        uf:None,
     });
 
-    let state = ffi::lua_newstate(
-        Some(allocator),
-        &mut *extra as *mut ExtraData as *mut c_void,
-    );
+    let state = if cfg!(rlua_luajit) {
+        let state = ffi::luaL_newstate();
+        let mut ud = std::ptr::null_mut();
+        let alloc = ffi::lua_getallocf(state, &mut ud as _);
+        extra.ud = Some(ud);
+        extra.uf = alloc;
+        ffi::lua_setallocf(state, Some(allocator), &mut * extra as *mut ExtraData as *mut c_void);
+        state
+    } else {
+        let state = ffi::lua_newstate(
+            Some(allocator),
+            &mut *extra as *mut ExtraData as *mut c_void,
+        );
+        state
+    };
 
     #[cfg(rlua_lua54)]
     ffi::lua_setcstacklimit(state, SAFE_CSTACK_SIZE);

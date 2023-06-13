@@ -22,6 +22,7 @@ builtin-lua51=["rlua-lua51-sys"]
 system-lua54=["rlua-lua54-sys", "rlua-lua54-sys/lua54-pkg-config"]
 system-lua53=["rlua-lua53-sys", "rlua-lua53-sys/lua53-pkg-config"]
 system-lua51=["rlua-lua51-sys", "rlua-lua51-sys/lua51-pkg-config"]
+system-luajit=["rlua-lua51-sys", "rlua-lua51-sys/luajit-pkg-config"]
 
 # Remove Lua's os lib
 lua-no-oslib=["rlua-lua54-sys/lua-no-oslib","rlua-lua53-sys/lua-no-oslib","rlua-lua51-sys/lua-no-oslib"]
@@ -37,7 +38,7 @@ bitflags = { version = "1.0.4" }
 bstr = {version = "0.2", features = ["std"], default_features = false }
 rlua-lua54-sys = { version = "0.1.5", optional = true }
 rlua-lua53-sys = { version = "0.1.5", optional = true }
-rlua-lua51-sys = { version = "0.1.5", optional = true }
+rlua-lua51-sys = { version = "0.1.5", optional = true, path = "crates/rlua-lua51-sys" }
 
 
 [dev-dependencies]

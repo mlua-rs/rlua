@@ -36,6 +36,13 @@ fn main() {
         lua_version_features += 1;
     }
 
+    #[cfg(feature = "system-luajit")]
+    {
+        println!("cargo:rustc-cfg=rlua_lua51");
+        println!("cargo:rustc-cfg=rlua_luajit");
+        lua_version_features += 1;
+    }
+
     if lua_version_features < 1 {
         panic!("No Lua version specified.  Please enable one of the features. use --no-default-features to disable default lua feature.");
     } else if lua_version_features > 1 {
