@@ -55,6 +55,31 @@ implementations (such as Luajit) which share PUC-Rio Lua's C API, but it is
 expected that they can be made to work with little if any change to rlua, and
 support would be welcome.
 
+## Loading external C (or other compiled) modules
+
+By default rlua blocks Lua from loading of external modules written in C (or
+other compiled language) using the Lua C API.  To allow this, a couple of
+things are needed:
+
+1. Initialise Lua using `unsafe_new_with_flags()`, and pass non-default flags
+   not including `LOAD_WRAPPERS` or `REMOVE_LOADLIB`.  This will remove
+   wrappers which block native libraries.
+
+2. Export the Lua C API symbols so that the library can call Lua C API
+   functions.  There are a few options:
+
+   * At time of writing, Rust has an unstable (nightly-only) option to export
+     symbols from an executable:
+     [export-executable-symbols](https://github.com/rust-lang/rfcs/pull/2841)
+
+   * Another option is to do it by adding linker flags.  For example, on Linux,
+     adding this to a `build.rs` asks the linker to export symbols:
+     `println!("cargo:rustc-link-arg-examples=-Wl,-export-dynamic");`
+
+   * Using the system-lua54 (or similar) feature as described above may link
+     against a system shared Lua library instead of building the interpreter
+     into the rlua, making the symbols available.
+
 ### Other Lua features
 
 Some other features affect how Lua is built (for the builtin versions):
