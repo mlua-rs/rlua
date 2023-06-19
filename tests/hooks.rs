@@ -76,7 +76,7 @@ fn function_calls() {
             (None, Some("main".to_string())),
             (Some("len".to_string()), Some("C".to_string()))
         ]
-    )
+    );
     #[cfg(rlua_luajit)]
     assert_eq!(
         *output,
@@ -84,7 +84,7 @@ fn function_calls() {
             (None, Some("main".to_string())),
             (Some("len".to_string()), Some("Lua".to_string()))
         ]
-    )
+    );
 }
 
 #[test]
