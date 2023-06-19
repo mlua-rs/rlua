@@ -255,5 +255,6 @@ workflows:
       - "build-default"
       - "build-lua53"
       - "build-lua51"
+      - "build-luajit"
       - "build-windows"
       - "build-no-oslib"
