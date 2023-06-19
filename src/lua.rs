@@ -467,8 +467,8 @@ pub(crate) struct ExtraData {
     memory_limit: Option<usize>,
 
     pub hook_callback: Option<Rc<RefCell<dyn FnMut(Context, Debug) -> Result<()>>>>,
-    pub ud:Option<*mut std::ffi::c_void>,
-    pub uf:ffi::lua_Alloc,
+    pub ud: Option<*mut std::ffi::c_void>,
+    pub uf: ffi::lua_Alloc,
 }
 
 // Return the extra data pointer passed to `lua_newstate()`.  `state` must
@@ -542,8 +542,8 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
         used_memory: 0,
         memory_limit: None,
         hook_callback: None,
-        ud:None,
-        uf:None,
+        ud: None,
+        uf: None,
     });
 
     let state = if cfg!(rlua_luajit) {
@@ -552,7 +552,11 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
         let alloc = ffi::lua_getallocf(state, &mut ud as _);
         extra.ud = Some(ud);
         extra.uf = alloc;
-        ffi::lua_setallocf(state, Some(allocator), &mut * extra as *mut ExtraData as *mut c_void);
+        ffi::lua_setallocf(
+            state,
+            Some(allocator),
+            &mut *extra as *mut ExtraData as *mut c_void,
+        );
         state
     } else {
         let state = ffi::lua_newstate(
