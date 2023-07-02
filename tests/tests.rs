@@ -1250,6 +1250,7 @@ fn too_many_arguments() {
     });
 }
 
+#[cfg(not(rlua_luajit))] // LuaJIT doesn't prevent stack overflows
 #[test]
 fn too_many_recursions() {
     Lua::new().context(|lua| {
