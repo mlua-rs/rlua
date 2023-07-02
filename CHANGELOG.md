@@ -1,3 +1,6 @@
+## [0.19.7]
+- Cosmetic fixes to README.md
+
 ## [0.19.6]
 - Initial support for LuaJIT (thanks lazytiger)
 
