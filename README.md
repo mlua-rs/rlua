@@ -42,7 +42,7 @@ features.
 The available features are:
 
 | Cargo feature | Lua version | Notes |
-| ------------- | ----------- | |
+| ------------- | ----------- | ----- |
 | builtin-lua54 | Lua 5.4 (source included in package, default) | |
 | builtin-lua53 | Lua 5.3 (source included in package) | |
 | builtin-lua51 | Lua 5.1 (source included in package) | |
