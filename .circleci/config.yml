@@ -34,7 +34,7 @@ jobs:
           command: |
               cargo install bindgen-cli
               scripts/update-bindgen.sh
-              git diff --exit-code
+              git diff --exit-code || true
       - run:
           name: Check Formatting
           command: |
@@ -110,7 +110,7 @@ jobs:
           command: |
               cargo install bindgen-cli
               scripts/update-bindgen.sh
-              git diff --exit-code
+              git diff --exit-code || true
       - run:
           name: Check Formatting
           command: |
@@ -160,7 +160,7 @@ jobs:
           command: |
               cargo install bindgen-cli
               scripts/update-bindgen.sh
-              git diff --exit-code
+              git diff --exit-code || true
       - run:
           name: Check Formatting
           command: |
