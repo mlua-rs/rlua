@@ -41,7 +41,7 @@ features.
 
 The available features are:
 
-| Cargo feature | Lua version | Notes
+| Cargo feature | Lua version | Notes |
 | ------------- | ----------- |
 | builtin-lua54 | Lua 5.4 (source included in package, default) |
 | builtin-lua53 | Lua 5.3 (source included in package) |
@@ -49,7 +49,7 @@ The available features are:
 | system-lua54 | Lua 5.4 (installed on host system, found using pkg-config) |
 | system-lua53 | Lua 5.3 (installed on host system, found using pkg-config) |
 | system-lua51 | Lua 5.1 (installed on host system, found using pkg-config) |
-| system-luajit | LuaJIT 2.x (installed on host system, found using pkg-config) | Memory limits not available
+| system-luajit | LuaJIT 2.x (installed on host system, found using pkg-config) | Memory limits not available |
 
 ## Loading external C (or other compiled) modules
 
