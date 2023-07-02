@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use rlua::{Error, HookTriggers, Lua, Value};
 
-#[cfg(not(rlua_luajit))]  // LuaJIT gives different results
+#[cfg(not(rlua_luajit))] // LuaJIT gives different results
 #[test]
 fn line_counts() {
     let output = Arc::new(Mutex::new(Vec::new()));
