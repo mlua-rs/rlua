@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use rlua::{Error, Lua, Nil, UserData};
 
+#[cfg(not(rlua_luajit))] // Custom allocators for LuaJIT not available
 #[test]
 fn test_memory_limit() {
     let lua = Lua::new();

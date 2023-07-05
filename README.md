@@ -41,19 +41,15 @@ features.
 
 The available features are:
 
-| Cargo feature | Lua version |
-| ------------- | ----------- |
-| builtin-lua54 | Lua 5.4 (source included in package, default) |
-| builtin-lua53 | Lua 5.3 (source included in package) |
-| builtin-lua51 | Lua 5.1 (source included in package) |
-| system-lua54 | Lua 5.4 (installed on host system, found using pkg-config) |
-| system-lua53 | Lua 5.3 (installed on host system, found using pkg-config) |
-| system-lua51 | Lua 5.1 (installed on host system, found using pkg-config) |
-
-At current writing rlua has not been tested with alternative Lua
-implementations (such as Luajit) which share PUC-Rio Lua's C API, but it is
-expected that they can be made to work with little if any change to rlua, and
-support would be welcome.
+| Cargo feature | Lua version | Notes |
+| ------------- | ----------- | ----- |
+| builtin-lua54 | Lua 5.4 (source included in package, default) | |
+| builtin-lua53 | Lua 5.3 (source included in package) | |
+| builtin-lua51 | Lua 5.1 (source included in package) | |
+| system-lua54 | Lua 5.4 (installed on host system, found using pkg-config) | |
+| system-lua53 | Lua 5.3 (installed on host system, found using pkg-config) | |
+| system-lua51 | Lua 5.1 (installed on host system, found using pkg-config) | |
+| system-luajit | LuaJIT 2.x (installed on host system, found using pkg-config) | Memory limits not available |
 
 ## Loading external C (or other compiled) modules
 

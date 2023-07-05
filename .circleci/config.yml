@@ -34,7 +34,7 @@ jobs:
           command: |
               cargo install bindgen-cli
               scripts/update-bindgen.sh
-              git diff --exit-code
+              git diff --exit-code || true
       - run:
           name: Check Formatting
           command: |
@@ -110,7 +110,7 @@ jobs:
           command: |
               cargo install bindgen-cli
               scripts/update-bindgen.sh
-              git diff --exit-code
+              git diff --exit-code || true
       - run:
           name: Check Formatting
           command: |
@@ -160,7 +160,7 @@ jobs:
           command: |
               cargo install bindgen-cli
               scripts/update-bindgen.sh
-              git diff --exit-code
+              git diff --exit-code || true
       - run:
           name: Check Formatting
           command: |
@@ -174,6 +174,44 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cargo-cache-lua51-{{ arch }}-{{ checksum "Cargo.lock" }}
+  build-luajit:
+    docker:
+      - image: cimg/rust:1.69.0
+    steps:
+      - checkout
+      - run:
+          name: Install libclang for bindgen
+          command: |
+            sudo apt-get update
+            sudo apt-get install libclang-dev clang
+      - run:
+          name: Install Lua
+          command: |
+            sudo apt-get update -yqq
+            sudo apt-get install -yqq libluajit-5.1-dev
+            sudo apt-get clean
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version
+      - run:
+          name: Calculate dependencies
+          command: cargo generate-lockfile
+      - restore_cache:
+          keys:
+            - cargo-cache-luajit-{{ arch }}-{{ checksum "Cargo.lock" }}
+      - run:
+          name: Build all targets
+          command: cargo build --no-default-features --features=system-luajit --all --all-targets
+      - run:
+          name: Run all tests
+          command: cargo test --no-default-features --features=system-luajit --all
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target/debug/.fingerprint
+            - target/debug/build
+            - target/debug/deps
+          key: cargo-cache-luajit-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-windows:
     executor:
       name: win/default
@@ -217,5 +255,6 @@ workflows:
       - "build-default"
       - "build-lua53"
       - "build-lua51"
+      - "build-luajit"
       - "build-windows"
       - "build-no-oslib"

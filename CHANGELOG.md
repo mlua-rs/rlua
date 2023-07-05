@@ -1,3 +1,9 @@
+## [0.19.7]
+- Cosmetic fixes to README.md
+
+## [0.19.6]
+- Initial support for LuaJIT (thanks lazytiger)
+
 ## [0.19.5]
 - Update to Lua 5.4.6 (thanks @0x2ec)
 
