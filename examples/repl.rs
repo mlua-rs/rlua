@@ -9,17 +9,14 @@ fn main() {
         let rl_c = rustyline::DefaultEditor::new();
         match rl_c {
             Ok(mut editor) => {
-                
                 loop {
                     let mut prompt = "> ";
                     let mut line = String::new();
-                    
                     loop {
                         match editor.readline(prompt) {
                             Ok(input) => line.push_str(&input),
                             Err(_) => return,
                         }
-                        
                         match lua.load(&line).eval::<MultiValue>() {
                             Ok(values) => {
                                 editor.add_history_entry(line);
@@ -48,9 +45,8 @@ fn main() {
                         }
                     }
                 }
-                
-            },
-            Err(e) => eprintln!("error: {}", e)
+            }
+            Err(e) => eprintln!("error: {}", e),
         }
     });
 }
