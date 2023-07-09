@@ -5,7 +5,6 @@ use rustyline::DefaultEditor;
 
 fn main() {
     Lua::new().context(|lua| {
-        // let mut editor = Editor::<()>::new();
         let rl_c = rustyline::DefaultEditor::new();
         match rl_c {
             Ok(mut editor) => {
