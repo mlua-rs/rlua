@@ -22,6 +22,8 @@ fn main() {
             cc_config.define("LUA_USE_LINUX", None);
         } else if target_os == Ok("macos".to_string()) {
             cc_config.define("LUA_USE_MACOSX", None);
+        } else if target_os == Ok("ios".to_string()) {
+            cc_config.define("LUA_USE_IOS", None);
         } else if target_family == Ok("unix".to_string()) {
             cc_config.define("LUA_USE_POSIX", None);
         } else if target_family == Ok("windows".to_string()) {
