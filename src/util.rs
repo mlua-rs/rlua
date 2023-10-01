@@ -710,6 +710,7 @@ pub unsafe fn loadbufferx(
         match CStr::from_ptr(mode).to_str() {
             Ok(s) => s,
             Err(_) => {
+                ffi::lua_pushstring(state, cstr!("Invalid mode string"));
                 return ffi::LUA_ERRSYNTAX;
             }
         }
@@ -717,19 +718,21 @@ pub unsafe fn loadbufferx(
     let allow_text = mode.contains('t');
     let allow_binary = mode.contains('b');
 
-    // We want to assume at least one byte.
-    if size < 1 {
-        return ffi::LUA_ERRSYNTAX;
-    }
-    if !allow_binary {
-        // Compiled Lua starts with LUA_SIGNATURE ("\033Lua")
-        if ptr::read(buf) == 27 {
-            return ffi::LUA_ERRSYNTAX;
+    // Note that if the string is zero-size, then it's safe to pass it on
+    // to luaL_loadbuffer().
+    if size > 0 {
+        if !allow_binary {
+            // Compiled Lua starts with LUA_SIGNATURE ("\033Lua")
+            if ptr::read(buf) == 27 {
+                ffi::lua_pushstring(state, cstr!("Precompiled module blocked"));
+                return ffi::LUA_ERRSYNTAX;
+            }
         }
-    }
-    if !allow_text {
-        if ptr::read(buf) != 27 {
-            return ffi::LUA_ERRSYNTAX;
+        if !allow_text {
+            if ptr::read(buf) != 27 {
+                ffi::lua_pushstring(state, cstr!("Source module blocked"));
+                return ffi::LUA_ERRSYNTAX;
+            }
         }
     }
     // We've done a basic check, so now foward to luaL_loadbuffer.
