@@ -21,6 +21,13 @@ fn test_load() {
 }
 
 #[test]
+fn test_load_empty() {
+    Lua::new().context(|lua| {
+        assert!(lua.load(b"").exec().is_ok());
+    });
+}
+
+#[test]
 fn test_debug() {
     let lua = unsafe { Lua::new_with_debug() };
     lua.context(|lua| {
