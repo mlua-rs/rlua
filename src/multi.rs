@@ -157,12 +157,11 @@ impl<'lua, T: FromLua<'lua>> FromLuaMulti<'lua> for Variadic<T> {
         let result = values
             .into_iter()
             .map(|e| T::from_lua(e, lua))
-            .collect::<Result<Vec<T>>>()
-            .map(Variadic);
-        if let Ok(result) = &result {
-            *consumed += result.len();
-        }
-        result
+            .take_while(|it| it.is_ok())
+            .filter_map(|it| it.ok())
+            .collect::<Vec<T>>();
+        *consumed += result.len();
+        Ok(Variadic(result))
     }
 }
 
