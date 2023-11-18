@@ -33,8 +33,18 @@ impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for T {
 }
 
 impl<'lua, T: FromLua<'lua>> FromLuaMulti<'lua> for T {
-    fn from_lua_multi(mut values: MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
-        Ok(T::from_lua(values.pop_front().unwrap_or(Nil), lua)?)
+    fn from_lua_multi(
+        mut values: MultiValue<'lua>,
+        lua: Context<'lua>,
+        consumed: &mut usize,
+    ) -> Result<Self> {
+        match values.pop_front() {
+            Some(it) => {
+                *consumed += 1;
+                Ok(T::from_lua(it, lua)?)
+            }
+            None => Ok(T::from_lua(Nil, lua)?),
+        }
     }
 }
 
@@ -45,7 +55,12 @@ impl<'lua> ToLuaMulti<'lua> for MultiValue<'lua> {
 }
 
 impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
-    fn from_lua_multi(values: MultiValue<'lua>, _: Context<'lua>) -> Result<Self> {
+    fn from_lua_multi(
+        values: MultiValue<'lua>,
+        _: Context<'lua>,
+        consumed: &mut usize,
+    ) -> Result<Self> {
+        *consumed += values.len();
         Ok(values)
     }
 }
@@ -84,6 +99,11 @@ impl<T> Variadic<T> {
     /// Creates an empty `Variadic` wrapper containing no values.
     pub fn new() -> Variadic<T> {
         Variadic(Vec::new())
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -129,12 +149,20 @@ impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for Variadic<T> {
 }
 
 impl<'lua, T: FromLua<'lua>> FromLuaMulti<'lua> for Variadic<T> {
-    fn from_lua_multi(values: MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
-        values
+    fn from_lua_multi(
+        values: MultiValue<'lua>,
+        lua: Context<'lua>,
+        consumed: &mut usize,
+    ) -> Result<Self> {
+        let result = values
             .into_iter()
             .map(|e| T::from_lua(e, lua))
             .collect::<Result<Vec<T>>>()
-            .map(Variadic)
+            .map(Variadic);
+        if let Ok(result) = &result {
+            *consumed += result.len();
+        }
+        result
     }
 }
 
@@ -147,38 +175,48 @@ macro_rules! impl_tuple {
         }
 
         impl<'lua> FromLuaMulti<'lua> for () {
-            fn from_lua_multi(_: MultiValue, _: Context<'lua>) -> Result<Self> {
+            fn from_lua_multi(_: MultiValue, _: Context<'lua>, _: &mut usize) -> Result<Self> {
                 Ok(())
             }
         }
     );
 
-    ($last:ident $($name:ident)*) => (
-        impl<'lua, $($name,)* $last> ToLuaMulti<'lua> for ($($name,)* $last,)
-            where $($name: ToLua<'lua>,)*
-                  $last: ToLuaMulti<'lua>
+    ($($name:ident)+) => (
+        impl<'lua, $($name),*> ToLuaMulti<'lua> for ($($name,)*)
+            where $($name: ToLuaMulti<'lua>),*
         {
             #[allow(unused_mut)]
             #[allow(non_snake_case)]
             fn to_lua_multi(self, lua: Context<'lua>) -> Result<MultiValue<'lua>> {
-                let ($($name,)* $last,) = self;
+                let ($($name,)*) = self;
 
-                let mut results = $last.to_lua_multi(lua)?;
-                push_reverse!(results, $($name.to_lua(lua)?,)*);
+                let mut results = MultiValue::new();
+                push_reverse!(results, $($name.to_lua_multi(lua)?,)*);
                 Ok(results)
             }
         }
 
-        impl<'lua, $($name,)* $last> FromLuaMulti<'lua> for ($($name,)* $last,)
-            where $($name: FromLua<'lua>,)*
-                  $last: FromLuaMulti<'lua>
+        impl<'lua, $($name),*> FromLuaMulti<'lua> for ($($name,)*)
+            where $($name: FromLuaMulti<'lua>),*
         {
             #[allow(unused_mut)]
             #[allow(non_snake_case)]
-            fn from_lua_multi(mut values: MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
-                $(let $name = values.pop_front().unwrap_or(Nil);)*
-                let $last = FromLuaMulti::from_lua_multi(values, lua)?;
-                Ok(($(FromLua::from_lua($name, lua)?,)* $last,))
+            fn from_lua_multi(mut values: MultiValue<'lua>, lua: Context<'lua>, total: &mut usize) -> Result<Self> {
+                $(
+                    let $name = {
+                        let mut consumed = 0;
+                        let it = match FromLuaMulti::from_lua_multi(values.clone(), lua, &mut consumed) {
+                            Ok(it) => it,
+                            Err(err) => {
+                                return Err(err);
+                            }
+                        };
+                        *total += consumed;
+                        values.drop_front(consumed);
+                        it
+                    };
+                )*
+                Ok(($($name,)*))
             }
         }
     );
@@ -187,11 +225,11 @@ macro_rules! impl_tuple {
 macro_rules! push_reverse {
     ($multi_value:expr, $first:expr, $($rest:expr,)*) => (
         push_reverse!($multi_value, $($rest,)*);
-        $multi_value.push_front($first);
+        $multi_value.push_front_many($first);
     );
 
     ($multi_value:expr, $first:expr) => (
-        $multi_value.push_front($first);
+        $multi_value.push_front_many($first);
     );
 
     ($multi_value:expr,) => ();

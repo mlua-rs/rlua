@@ -142,8 +142,16 @@ impl<'lua> MultiValue<'lua> {
         self.0.push(value);
     }
 
+    pub(crate) fn push_front_many(&mut self, values: Self) {
+        self.0.extend(values.into_iter());
+    }
+
     pub(crate) fn pop_front(&mut self) -> Option<Value<'lua>> {
         self.0.pop()
+    }
+
+    pub(crate) fn drop_front(&mut self, count: usize) {
+        self.0.drain(self.0.len() - count..).count();
     }
 
     pub fn len(&self) -> usize {
@@ -179,5 +187,9 @@ pub trait FromLuaMulti<'lua>: Sized {
     /// values should be ignored. This reflects the semantics of Lua when calling a function or
     /// assigning values. Similarly, if not enough values are given, conversions should assume that
     /// any missing values are nil.
-    fn from_lua_multi(values: MultiValue<'lua>, lua: Context<'lua>) -> Result<Self>;
+    fn from_lua_multi(
+        values: MultiValue<'lua>,
+        lua: Context<'lua>,
+        consumed: &mut usize,
+    ) -> Result<Self>;
 }

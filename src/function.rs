@@ -88,7 +88,8 @@ impl<'lua> Function<'lua> {
             ffi::lua_pop(lua.state, 1);
             results
         };
-        R::from_lua_multi(results, lua)
+        let mut consumed = 0;
+        R::from_lua_multi(results, lua, &mut consumed)
     }
 
     /// Returns a function that, when called, calls `self`, passing `args` as the first set of
