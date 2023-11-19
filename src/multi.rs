@@ -148,19 +148,20 @@ impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for Variadic<T> {
     }
 }
 
-impl<'lua, T: FromLua<'lua>> FromLuaMulti<'lua> for Variadic<T> {
+impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Variadic<T> {
     fn from_lua_multi(
-        values: MultiValue<'lua>,
+        mut values: MultiValue<'lua>,
         lua: Context<'lua>,
-        consumed: &mut usize,
+        total: &mut usize,
     ) -> Result<Self> {
-        let result = values
-            .into_iter()
-            .map(|e| T::from_lua(e, lua))
-            .take_while(|it| it.is_ok())
-            .filter_map(|it| it.ok())
-            .collect::<Vec<T>>();
-        *consumed += result.len();
+        let mut consumed = 0;
+        let mut result = Vec::new();
+        while let Ok(it) = T::from_lua_multi(values.clone(), lua, &mut consumed) {
+            result.push(it);
+            values.drop_front(consumed);
+            *total += consumed;
+            consumed = 0;
+        }
         Ok(Variadic(result))
     }
 }
