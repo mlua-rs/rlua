@@ -16,6 +16,7 @@ use crate::thread::Thread;
 use crate::types::{LightUserData, Number};
 use crate::userdata::{AnyUserData, UserData};
 use crate::value::{FromLua, Nil, ToLua, Value};
+use crate::FromLuaMulti;
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: Context<'lua>) -> Result<Value<'lua>> {
@@ -507,11 +508,15 @@ impl<'lua, T: ToLua<'lua>> ToLua<'lua> for Option<T> {
     }
 }
 
-impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Option<T> {
-    fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<Self> {
-        match value {
-            Nil => Ok(None),
-            value => Ok(Some(T::from_lua(value, lua)?)),
+impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Option<T> {
+    fn from_lua_multi(
+        values: crate::MultiValue<'lua>,
+        lua: Context<'lua>,
+        consumed: &mut usize,
+    ) -> Result<Self> {
+        match T::from_lua_multi(values, lua, consumed) {
+            Ok(it) => Ok(Some(it)),
+            Err(_) => Ok(None),
         }
     }
 }
