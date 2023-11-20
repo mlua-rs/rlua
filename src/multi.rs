@@ -170,24 +170,11 @@ impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Variadic<T> {
 }
 
 macro_rules! impl_tuple {
-    () => (
-        impl<'lua> ToLuaMulti<'lua> for () {
-            fn to_lua_multi(self, _: Context<'lua>) -> Result<MultiValue<'lua>> {
-                Ok(MultiValue::new())
-            }
-        }
-
-        impl<'lua> FromLuaMulti<'lua> for () {
-            fn from_lua_multi(_: MultiValue, _: Context<'lua>, _: &mut usize) -> Result<Self> {
-                Ok(())
-            }
-        }
-    );
-
-    ($($name:ident)+) => (
+    ($($name:ident)*) => (
         impl<'lua, $($name),*> ToLuaMulti<'lua> for ($($name,)*)
             where $($name: ToLuaMulti<'lua>),*
         {
+            #[allow(unused_variables)]
             #[allow(unused_mut)]
             #[allow(non_snake_case)]
             fn to_lua_multi(self, lua: Context<'lua>) -> Result<MultiValue<'lua>> {
@@ -202,6 +189,7 @@ macro_rules! impl_tuple {
         impl<'lua, $($name),*> FromLuaMulti<'lua> for ($($name,)*)
             where $($name: FromLuaMulti<'lua>),*
         {
+            #[allow(unused_variables)]
             #[allow(unused_mut)]
             #[allow(non_snake_case)]
             fn from_lua_multi(mut values: MultiValue<'lua>, lua: Context<'lua>, total: &mut usize) -> Result<Self> {
