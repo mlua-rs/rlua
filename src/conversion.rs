@@ -451,8 +451,8 @@ impl<'lua, T: FromLuaMulti<'lua>> FromLua<'lua> for Vec<T> {
                     .collect(),
             );
             let mut result = Vec::new();
-            let mut consumed = 0;
             while values.len() > 0 {
+                let mut consumed = 0;
                 match T::from_lua_multi(values.clone(), lua, &mut consumed) {
                     Ok(it) => {
                         result.push(it);

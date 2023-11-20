@@ -154,13 +154,16 @@ impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Variadic<T> {
         lua: Context<'lua>,
         total: &mut usize,
     ) -> Result<Self> {
-        let mut consumed = 0;
         let mut result = Vec::new();
-        while let Ok(it) = T::from_lua_multi(values.clone(), lua, &mut consumed) {
-            result.push(it);
-            values.drop_front(consumed);
-            *total += consumed;
-            consumed = 0;
+        while values.len() > 0 {
+            let mut consumed = 0;
+            if let Ok(it) = T::from_lua_multi(values.clone(), lua, &mut consumed) {
+                result.push(it);
+                values.drop_front(consumed);
+                *total += consumed;
+            } else {
+                break;
+            }
         }
         Ok(Variadic(result))
     }
