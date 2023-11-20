@@ -151,7 +151,7 @@ impl<'lua> MultiValue<'lua> {
     }
 
     pub(crate) fn drop_front(&mut self, count: usize) {
-        self.0.drain(self.0.len() - count..).count();
+        self.0.drain(self.0.len().saturating_sub(count)..).count();
     }
 
     pub fn len(&self) -> usize {
