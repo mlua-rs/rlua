@@ -83,7 +83,7 @@ pub trait FromLua<'lua>: Sized {
 
 /// Multiple Lua values used for both argument passing and also for multiple return values.
 #[derive(Debug, Clone)]
-pub struct MultiValue<'lua>(Vec<Value<'lua>>);
+pub struct MultiValue<'lua>(pub(crate) Vec<Value<'lua>>);
 
 impl<'lua> MultiValue<'lua> {
     /// Creates an empty `MultiValue` containing no values.

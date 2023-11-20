@@ -16,7 +16,7 @@ use crate::thread::Thread;
 use crate::types::{LightUserData, Number};
 use crate::userdata::{AnyUserData, UserData};
 use crate::value::{FromLua, Nil, ToLua, Value};
-use crate::FromLuaMulti;
+use crate::{FromLuaMulti, MultiValue};
 
 impl<'lua> ToLua<'lua> for Value<'lua> {
     fn to_lua(self, _: Context<'lua>) -> Result<Value<'lua>> {
@@ -441,10 +441,27 @@ impl<'lua, T: ToLua<'lua>> ToLua<'lua> for Vec<T> {
     }
 }
 
-impl<'lua, T: FromLua<'lua>> FromLua<'lua> for Vec<T> {
-    fn from_lua(value: Value<'lua>, _: Context<'lua>) -> Result<Self> {
+impl<'lua, T: FromLuaMulti<'lua>> FromLua<'lua> for Vec<T> {
+    fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<Self> {
         if let Value::Table(table) = value {
-            table.sequence_values().collect()
+            let mut values: MultiValue = MultiValue(
+                table
+                    .sequence_values::<Value>()
+                    .filter_map(Result::ok) // Every value in Table is always a Value
+                    .collect(),
+            );
+            let mut result = Vec::new();
+            let mut consumed = 0;
+            while values.len() > 0 {
+                match T::from_lua_multi(values.clone(), lua, &mut consumed) {
+                    Ok(it) => {
+                        result.push(it);
+                        values.drop_front(consumed);
+                    }
+                    Err(err) => return Err(err),
+                }
+            }
+            Ok(result)
         } else {
             Err(Error::FromLuaConversionError {
                 from: value.type_name(),
