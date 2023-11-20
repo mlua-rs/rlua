@@ -187,6 +187,15 @@ pub trait FromLuaMulti<'lua>: Sized {
     /// values should be ignored. This reflects the semantics of Lua when calling a function or
     /// assigning values. Similarly, if not enough values are given, conversions should assume that
     /// any missing values are nil.
+    ///
+    /// The `consumed` reference should be updated accordingly to notify the outer scope
+    /// about the number of values that were used to perform the conversion. Failing to
+    /// do so will make the outer scope try and use the same sequence of `values` for
+    /// multiple consecutive conversions.
+    /// In case of an error, the `consumed` counter value should be kept the same to allow
+    /// wrappers such as [`Variadic`] to conservatively capture values.
+    ///
+    /// [`Variadic`]: struct.Variadic.html
     fn from_lua_multi(
         values: MultiValue<'lua>,
         lua: Context<'lua>,
