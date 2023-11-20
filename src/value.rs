@@ -83,7 +83,7 @@ pub trait FromLua<'lua>: Sized {
 
 /// Multiple Lua values used for both argument passing and also for multiple return values.
 #[derive(Debug, Clone)]
-pub struct MultiValue<'lua>(pub(crate) Vec<Value<'lua>>);
+pub struct MultiValue<'lua>(Vec<Value<'lua>>);
 
 impl<'lua> MultiValue<'lua> {
     /// Creates an empty `MultiValue` containing no values.
@@ -143,7 +143,7 @@ impl<'lua> MultiValue<'lua> {
     }
 
     pub(crate) fn push_front_many(&mut self, values: Self) {
-        self.0.extend(values.into_iter());
+        self.0.extend(values.0.into_iter());
     }
 
     pub(crate) fn pop_front(&mut self) -> Option<Value<'lua>> {

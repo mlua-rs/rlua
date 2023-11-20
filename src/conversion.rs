@@ -444,7 +444,7 @@ impl<'lua, T: ToLua<'lua>> ToLua<'lua> for Vec<T> {
 impl<'lua, T: FromLuaMulti<'lua>> FromLua<'lua> for Vec<T> {
     fn from_lua(value: Value<'lua>, lua: Context<'lua>) -> Result<Self> {
         if let Value::Table(table) = value {
-            let mut values: MultiValue = MultiValue(
+            let mut values: MultiValue = MultiValue::from_vec(
                 table
                     .sequence_values::<Value>()
                     .filter_map(Result::ok) // Every value in Table is always a Value
