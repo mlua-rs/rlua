@@ -228,11 +228,11 @@ macro_rules! impl_tuple {
 macro_rules! push_reverse {
     ($multi_value:expr, $first:expr, $($rest:expr,)*) => (
         push_reverse!($multi_value, $($rest,)*);
-        $multi_value.push_front_many($first);
+        $multi_value.append($first);
     );
 
     ($multi_value:expr, $first:expr) => (
-        $multi_value.push_front_many($first);
+        $multi_value.append($first);
     );
 
     ($multi_value:expr,) => ();

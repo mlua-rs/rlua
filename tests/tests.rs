@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::{error, f32, f64, fmt};
 
 use rlua::{
-    Error, ExternalError, Function, InitFlags, Lua, Nil, Result, StdLib, String, Table, UserData,
-    Value, Variadic,
+    Error, ExternalError, Function, InitFlags, Lua, MultiValue, Nil, Result, StdLib, String, Table,
+    ToLua, ToLuaMulti, UserData, Value, Variadic,
 };
 
 #[test]
@@ -134,6 +134,41 @@ fn test_lua_multi() {
         let (a, b, v) = mreturn.call::<_, (u64, u64, Variadic<u64>)>(()).unwrap();
         assert_eq!((a, b), (1, 2));
         assert_eq!(v[..], [3, 4, 5, 6]);
+    });
+}
+
+#[test]
+fn test_lua_multi_concat() {
+    Lua::new().context(|lua| {
+        let globals = lua.globals();
+        lua.load(
+            r#"
+                function pass_through(arg1, arg2, arg3, arg4)
+                    return arg1, arg2, arg3, arg4
+                end
+            "#,
+        )
+        .exec()
+        .unwrap();
+
+        struct Point(u64, u64);
+
+        impl<'lua> ToLuaMulti<'lua> for Point {
+            fn to_lua_multi(
+                self,
+                lua: rlua::prelude::LuaContext<'lua>,
+            ) -> Result<rlua::prelude::LuaMultiValue<'lua>> {
+                Ok(MultiValue::from_iter(
+                    [self.0, self.1].map(|it| it.to_lua(lua).unwrap()),
+                ))
+            }
+        }
+
+        let pass_through = globals.get::<_, Function>("pass_through").unwrap();
+        let (a, b, c, d) = pass_through
+            .call::<_, (u64, u64, u64, u64)>((Point(1, 2), Point(3, 4)))
+            .unwrap();
+        assert_eq!((a, b, c, d), (1, 2, 3, 4));
     });
 }
 

@@ -142,7 +142,7 @@ impl<'lua> MultiValue<'lua> {
         self.0.push(value);
     }
 
-    pub(crate) fn push_front_many(&mut self, values: Self) {
+    pub(crate) fn append(&mut self, values: Self) {
         self.0.extend(values.0.into_iter());
     }
 
