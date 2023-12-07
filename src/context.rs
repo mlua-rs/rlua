@@ -365,12 +365,8 @@ impl<'lua> Context<'lua> {
     }
 
     /// Converts a `MultiValue` instance into a value that implements `FromLuaMulti`.
-    pub fn unpack_multi<T: FromLuaMulti<'lua>>(
-        self,
-        value: MultiValue<'lua>,
-        consumed: &mut usize,
-    ) -> Result<T> {
-        T::from_counted_multi(value, self, consumed)
+    pub fn unpack_multi<T: FromLuaMulti<'lua>>(self, value: MultiValue<'lua>) -> Result<T> {
+        T::from_lua_multi(value, self)
     }
 
     /// Set a value in the Lua registry based on a string name.

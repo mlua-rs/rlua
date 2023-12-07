@@ -197,7 +197,7 @@ pub trait FromLuaMulti<'lua>: Sized {
     /// if not enough values are given, conversions should assume that any
     /// missing values are nil.
     fn from_lua_multi(values: MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
-        Self::from_lua_multi(values, lua)
+        Self::from_counted_multi(values, lua, &mut 0)
     }
 
     /// Same as `from_lua_multi`, additionally allowing specification of number
