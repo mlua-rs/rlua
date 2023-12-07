@@ -33,7 +33,7 @@ impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for T {
 }
 
 impl<'lua, T: FromLua<'lua>> FromLuaMulti<'lua> for T {
-    fn from_lua_multi(
+    fn from_counted_multi(
         mut values: MultiValue<'lua>,
         lua: Context<'lua>,
         consumed: &mut usize,
@@ -55,7 +55,7 @@ impl<'lua> ToLuaMulti<'lua> for MultiValue<'lua> {
 }
 
 impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
-    fn from_lua_multi(
+    fn from_counted_multi(
         values: MultiValue<'lua>,
         _: Context<'lua>,
         consumed: &mut usize,
@@ -149,7 +149,7 @@ impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for Variadic<T> {
 }
 
 impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Variadic<T> {
-    fn from_lua_multi(
+    fn from_counted_multi(
         mut values: MultiValue<'lua>,
         lua: Context<'lua>,
         total: &mut usize,
@@ -157,7 +157,7 @@ impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Variadic<T> {
         let mut result = Vec::new();
         while values.len() > 0 {
             let mut consumed = 0;
-            if let Ok(it) = T::from_lua_multi(values.clone(), lua, &mut consumed) {
+            if let Ok(it) = T::from_counted_multi(values.clone(), lua, &mut consumed) {
                 result.push(it);
                 values.drop_front(consumed);
                 *total += consumed;
@@ -242,12 +242,12 @@ impl<T> DerefMut for Fallible<T> {
 }
 
 impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Fallible<T> {
-    fn from_lua_multi(
+    fn from_counted_multi(
         values: MultiValue<'lua>,
         lua: Context<'lua>,
         consumed: &mut usize,
     ) -> Result<Self> {
-        match T::from_lua_multi(values, lua, consumed) {
+        match T::from_counted_multi(values, lua, consumed) {
             Ok(it) => {
                 *consumed += 1;
                 Ok(Fallible(Some(it)))
@@ -280,11 +280,11 @@ macro_rules! impl_tuple {
             #[allow(unused_variables)]
             #[allow(unused_mut)]
             #[allow(non_snake_case)]
-            fn from_lua_multi(mut values: MultiValue<'lua>, lua: Context<'lua>, total: &mut usize) -> Result<Self> {
+            fn from_counted_multi(mut values: MultiValue<'lua>, lua: Context<'lua>, total: &mut usize) -> Result<Self> {
                 $(
                     let $name = {
                         let mut consumed = 0;
-                        let it = match FromLuaMulti::from_lua_multi(values.clone(), lua, &mut consumed) {
+                        let it = match FromLuaMulti::from_counted_multi(values.clone(), lua, &mut consumed) {
                             Ok(it) => it,
                             Err(err) => {
                                 return Err(err);

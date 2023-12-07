@@ -64,7 +64,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
         // scope, and owned inside the callback itself.
         unsafe {
             self.create_callback(Box::new(move |lua, args| {
-                func(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+                func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             }))
         }
     }
@@ -381,7 +381,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         self.methods.push((
             name.as_ref().to_vec(),
             NonStaticMethod::Method(Box::new(move |lua, ud, args| {
-                method(lua, ud, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+                method(lua, ud, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
         ));
     }
@@ -396,7 +396,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         self.methods.push((
             name.as_ref().to_vec(),
             NonStaticMethod::MethodMut(Box::new(move |lua, ud, args| {
-                method(lua, ud, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+                method(lua, ud, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
         ));
     }
@@ -411,7 +411,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         self.methods.push((
             name.as_ref().to_vec(),
             NonStaticMethod::Function(Box::new(move |lua, args| {
-                function(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+                function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
         ));
     }
@@ -426,7 +426,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         self.methods.push((
             name.as_ref().to_vec(),
             NonStaticMethod::FunctionMut(Box::new(move |lua, args| {
-                function(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+                function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
         ));
     }
@@ -440,7 +440,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         self.meta_methods.push((
             meta,
             NonStaticMethod::Method(Box::new(move |lua, ud, args| {
-                method(lua, ud, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+                method(lua, ud, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
         ));
     }
@@ -454,7 +454,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         self.meta_methods.push((
             meta,
             NonStaticMethod::MethodMut(Box::new(move |lua, ud, args| {
-                method(lua, ud, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+                method(lua, ud, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
         ));
     }
@@ -468,7 +468,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         self.meta_methods.push((
             meta,
             NonStaticMethod::Function(Box::new(move |lua, args| {
-                function(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+                function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
         ));
     }
@@ -482,7 +482,7 @@ impl<'lua, T: UserData> UserDataMethods<'lua, T> for NonStaticUserDataMethods<'l
         self.meta_methods.push((
             meta,
             NonStaticMethod::FunctionMut(Box::new(move |lua, args| {
-                function(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+                function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             })),
         ));
     }

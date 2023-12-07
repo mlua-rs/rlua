@@ -453,7 +453,7 @@ impl<'lua, T: FromLuaMulti<'lua>> FromLua<'lua> for Vec<T> {
             let mut result = Vec::new();
             while values.len() > 0 {
                 let mut consumed = 0;
-                match T::from_lua_multi(values.clone(), lua, &mut consumed) {
+                match T::from_counted_multi(values.clone(), lua, &mut consumed) {
                     Ok(it) => {
                         result.push(it);
                         values.drop_front(consumed);
@@ -526,7 +526,7 @@ impl<'lua, T: ToLua<'lua>> ToLua<'lua> for Option<T> {
 }
 
 impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Option<T> {
-    fn from_lua_multi(
+    fn from_counted_multi(
         values: crate::MultiValue<'lua>,
         lua: Context<'lua>,
         consumed: &mut usize,
@@ -535,7 +535,7 @@ impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Option<T> {
         if front.is_none() || front.map(|it| matches!(it, Nil)).unwrap_or_default() {
             return Ok(None);
         }
-        match T::from_lua_multi(values, lua, consumed) {
+        match T::from_counted_multi(values, lua, consumed) {
             Ok(it) => Ok(Some(it)),
             Err(err) => Err(err),
         }

@@ -182,27 +182,45 @@ pub trait ToLuaMulti<'lua> {
 
 /// Trait for types that can be created from an arbitrary number of Lua values.
 ///
-/// This is a generalization of `FromLua`, allowing an arbitrary number of Lua values to participate
-/// in the conversion. Any type that implements `FromLua` will automatically implement this trait.
+/// This is a generalization of `FromLua`, allowing an arbitrary number of Lua
+/// values to participate in the conversion. Any type that implements `FromLua`
+/// will automatically implement this trait.
+///
+/// Implementing either `from_lua_multi` or `from_counted_multi` is required as
+/// the default implementations recursively call each other.
 pub trait FromLuaMulti<'lua>: Sized {
     /// Performs the conversion.
     ///
-    /// In case `values` contains more values than needed to perform the conversion, the excess
-    /// values should be ignored. This reflects the semantics of Lua when calling a function or
-    /// assigning values. Similarly, if not enough values are given, conversions should assume that
-    /// any missing values are nil.
+    /// In case `values` contains more values than needed to perform the
+    /// conversion, the excess values should be ignored. This reflects the
+    /// semantics of Lua when calling a function or assigning values. Similarly,
+    /// if not enough values are given, conversions should assume that any
+    /// missing values are nil.
+    fn from_lua_multi(values: MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
+        Self::from_lua_multi(values, lua)
+    }
+
+    /// Same as `from_lua_multi`, additionally allowing specification of number
+    /// of arguments that were consumed by incrementing the `consumed`
+    /// reference.
     ///
-    /// The `consumed` reference should be updated accordingly to notify the outer scope
-    /// about the number of values that were used to perform the conversion. Failing to
-    /// do so will make the outer scope try and use the same sequence of `values` for
-    /// multiple consecutive conversions.
-    /// In case of an error, the `consumed` counter value should be kept the same to allow
-    /// wrappers such as [`Variadic`] to conservatively capture values.
+    /// This allows the outer scope to know the number of values that were used
+    /// to perform the conversion.
+    ///
+    /// Failing to do so will make the outer scope try and use the same sequence
+    /// of `values` for multiple consecutive conversions. In case of an error,
+    /// the `consumed` counter value should be kept the same to allow wrappers
+    /// such as [`Variadic`] to conservatively capture values.
     ///
     /// [`Variadic`]: struct.Variadic.html
-    fn from_lua_multi(
+    fn from_counted_multi(
         values: MultiValue<'lua>,
         lua: Context<'lua>,
         consumed: &mut usize,
-    ) -> Result<Self>;
+    ) -> Result<Self> {
+        let count = values.len();
+        let result = Self::from_lua_multi(values, lua);
+        *consumed += count;
+        result
+    }
 }

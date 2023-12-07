@@ -179,7 +179,7 @@ impl<'lua> Context<'lua> {
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
         self.create_callback(Box::new(move |lua, args| {
-            func(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+            func(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
         }))
     }
 
@@ -370,7 +370,7 @@ impl<'lua> Context<'lua> {
         value: MultiValue<'lua>,
         consumed: &mut usize,
     ) -> Result<T> {
-        T::from_lua_multi(value, self, consumed)
+        T::from_counted_multi(value, self, consumed)
     }
 
     /// Set a value in the Lua registry based on a string name.
@@ -1135,8 +1135,7 @@ impl<'lua, T: 'static + UserData> StaticUserDataMethods<'lua, T> {
             if let Some(front) = args.pop_front() {
                 let userdata = AnyUserData::from_lua(front, lua)?;
                 let userdata = userdata.borrow::<T>()?;
-                method(lua, &userdata, A::from_lua_multi(args, lua, &mut 0)?)?
-                    .to_lua_multi(lua)
+                method(lua, &userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             } else {
                 Err(Error::FromLuaConversionError {
                     from: "missing argument",
@@ -1161,12 +1160,7 @@ impl<'lua, T: 'static + UserData> StaticUserDataMethods<'lua, T> {
                 let mut method = method
                     .try_borrow_mut()
                     .map_err(|_| Error::RecursiveMutCallback)?;
-                (&mut *method)(
-                    lua,
-                    &mut userdata,
-                    A::from_lua_multi(args, lua, &mut 0)?,
-                )?
-                .to_lua_multi(lua)
+                (&mut *method)(lua, &mut userdata, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
             } else {
                 Err(Error::FromLuaConversionError {
                     from: "missing argument",
@@ -1183,9 +1177,7 @@ impl<'lua, T: 'static + UserData> StaticUserDataMethods<'lua, T> {
         R: ToLuaMulti<'lua>,
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
-        Box::new(move |lua, args| {
-            function(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
-        })
+        Box::new(move |lua, args| function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua))
     }
 
     fn box_function_mut<A, R, F>(function: F) -> Callback<'lua, 'static>
@@ -1199,7 +1191,7 @@ impl<'lua, T: 'static + UserData> StaticUserDataMethods<'lua, T> {
             let function = &mut *function
                 .try_borrow_mut()
                 .map_err(|_| Error::RecursiveMutCallback)?;
-            function(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
+            function(lua, A::from_lua_multi(args, lua)?)?.to_lua_multi(lua)
         })
     }
 }
