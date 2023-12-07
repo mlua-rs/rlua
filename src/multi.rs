@@ -169,6 +169,94 @@ impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Variadic<T> {
     }
 }
 
+/// Wrapper for arguments that allowed to fail during conversion.
+///
+/// Note that failing includes recieving a `nil` value if the type isn't
+/// convertible from `nil`. That is, this wrapper allows _skipping_ arguments in
+/// called functions. Capturing nil for skippable arguments can be done through
+/// `Fallible<Option<T>>` as it will have a value of `Some(None)` when
+/// converting from `nil`.
+///
+/// In case where `nil` argument is expected (must be specified from the
+/// script), `Option` should be used instead of `Fallible`.
+///
+/// If conversion is successful, the value will be `Some(T)`.
+///
+/// Conversely, if conversion fails, the value will be `None`, and `consumed`
+/// argument counter will stay unchanged.
+pub struct Fallible<T>(Option<T>);
+
+impl<T> Fallible<T> {
+    /// Returns inner `Option<T>`.
+    pub fn into_option(self) -> Option<T> {
+        self.0
+    }
+
+    /// Maps fallible type using provided `mapping` function into another
+    /// `Option`.
+    pub fn map<R, F: Fn(T) -> R>(self, mapping: F) -> Option<R> {
+        self.0.map(mapping)
+    }
+
+    /// Unwraps fallible type or panics if conversion failed.
+    pub fn unwrap(self) -> T {
+        self.0.unwrap()
+    }
+    /// Unwraps fallible type or returns `value` if conversion failed.
+    pub fn unwrap_or(self, value: T) -> T {
+        self.0.unwrap_or(value)
+    }
+    /// Unwraps fallible type or returns a return value of `init` if conversion
+    /// failed.
+    pub fn unwrap_or_else<F: Fn() -> T>(self, f: F) -> T {
+        self.0.unwrap_or_else(f)
+    }
+    /// Unwraps fallible type or returns the default value if conversion failed.
+    pub fn unwrap_or_default(self) -> T
+    where
+        T: Default,
+    {
+        self.0.unwrap_or_else(T::default)
+    }
+    /// Retuns `other` `Option` if this argument conversion failed.
+    pub fn or(self, other: Option<T>) -> Option<T> {
+        self.0.or(other)
+    }
+    /// Retuns `Option` value returned by `f` if this argument conversion
+    /// failed.
+    pub fn or_else<F: Fn() -> Option<T>>(self, f: F) -> Option<T> {
+        self.0.or_else(f)
+    }
+}
+
+impl<T> Deref for Fallible<T> {
+    type Target = Option<T>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<T> DerefMut for Fallible<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Fallible<T> {
+    fn from_lua_multi(
+        values: MultiValue<'lua>,
+        lua: Context<'lua>,
+        consumed: &mut usize,
+    ) -> Result<Self> {
+        match T::from_lua_multi(values, lua, consumed) {
+            Ok(it) => {
+                *consumed += 1;
+                Ok(Fallible(Some(it)))
+            }
+            Err(_) => Ok(Fallible(None)),
+        }
+    }
+}
+
 macro_rules! impl_tuple {
     ($($name:ident)*) => (
         impl<'lua, $($name),*> ToLuaMulti<'lua> for ($($name,)*)

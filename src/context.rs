@@ -179,8 +179,7 @@ impl<'lua> Context<'lua> {
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
         self.create_callback(Box::new(move |lua, args| {
-            let mut consumed = 0;
-            func(lua, A::from_lua_multi(args, lua, &mut consumed)?)?.to_lua_multi(lua)
+            func(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
         }))
     }
 
@@ -1136,8 +1135,7 @@ impl<'lua, T: 'static + UserData> StaticUserDataMethods<'lua, T> {
             if let Some(front) = args.pop_front() {
                 let userdata = AnyUserData::from_lua(front, lua)?;
                 let userdata = userdata.borrow::<T>()?;
-                let mut consumed = 0;
-                method(lua, &userdata, A::from_lua_multi(args, lua, &mut consumed)?)?
+                method(lua, &userdata, A::from_lua_multi(args, lua, &mut 0)?)?
                     .to_lua_multi(lua)
             } else {
                 Err(Error::FromLuaConversionError {
@@ -1163,11 +1161,10 @@ impl<'lua, T: 'static + UserData> StaticUserDataMethods<'lua, T> {
                 let mut method = method
                     .try_borrow_mut()
                     .map_err(|_| Error::RecursiveMutCallback)?;
-                let mut consumed = 0;
                 (&mut *method)(
                     lua,
                     &mut userdata,
-                    A::from_lua_multi(args, lua, &mut consumed)?,
+                    A::from_lua_multi(args, lua, &mut 0)?,
                 )?
                 .to_lua_multi(lua)
             } else {
@@ -1187,8 +1184,7 @@ impl<'lua, T: 'static + UserData> StaticUserDataMethods<'lua, T> {
         F: 'static + Send + Fn(Context<'lua>, A) -> Result<R>,
     {
         Box::new(move |lua, args| {
-            let mut consumed = 0;
-            function(lua, A::from_lua_multi(args, lua, &mut consumed)?)?.to_lua_multi(lua)
+            function(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
         })
     }
 
@@ -1203,8 +1199,7 @@ impl<'lua, T: 'static + UserData> StaticUserDataMethods<'lua, T> {
             let function = &mut *function
                 .try_borrow_mut()
                 .map_err(|_| Error::RecursiveMutCallback)?;
-            let mut consumed = 0;
-            function(lua, A::from_lua_multi(args, lua, &mut consumed)?)?.to_lua_multi(lua)
+            function(lua, A::from_lua_multi(args, lua, &mut 0)?)?.to_lua_multi(lua)
         })
     }
 }

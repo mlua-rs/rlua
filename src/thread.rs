@@ -119,8 +119,7 @@ impl<'lua> Thread<'lua> {
             }
             results
         };
-        let mut consumed = 0;
-        R::from_lua_multi(results, lua, &mut consumed)
+        R::from_lua_multi(results, lua, &mut 0)
     }
 
     /// Gets the status of the thread.

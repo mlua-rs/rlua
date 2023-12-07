@@ -150,6 +150,10 @@ impl<'lua> MultiValue<'lua> {
         self.0.pop()
     }
 
+    pub(crate) fn peek_front(&self) -> Option<&Value<'lua>> {
+        self.0.last()
+    }
+
     pub(crate) fn drop_front(&mut self, count: usize) {
         self.0.drain(self.0.len().saturating_sub(count)..).count();
     }

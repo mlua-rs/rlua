@@ -531,9 +531,13 @@ impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Option<T> {
         lua: Context<'lua>,
         consumed: &mut usize,
     ) -> Result<Self> {
+        let front = values.peek_front();
+        if front.is_none() || front.map(|it| matches!(it, Nil)).unwrap_or_default() {
+            return Ok(None);
+        }
         match T::from_lua_multi(values, lua, consumed) {
             Ok(it) => Ok(Some(it)),
-            Err(_) => Ok(None),
+            Err(err) => Err(err),
         }
     }
 }
