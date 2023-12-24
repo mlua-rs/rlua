@@ -33,16 +33,9 @@ impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for T {
 }
 
 impl<'lua, T: FromLua<'lua>> FromLuaMulti<'lua> for T {
-    fn from_counted_multi(
-        mut values: MultiValue<'lua>,
-        lua: Context<'lua>,
-        consumed: &mut usize,
-    ) -> Result<Self> {
+    fn from_lua_multi(values: &mut MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
         match values.pop_front() {
-            Some(it) => {
-                *consumed += 1;
-                Ok(T::from_lua(it, lua)?)
-            }
+            Some(it) => Ok(T::from_lua(it, lua)?),
             None => Ok(T::from_lua(Nil, lua)?),
         }
     }
@@ -55,13 +48,10 @@ impl<'lua> ToLuaMulti<'lua> for MultiValue<'lua> {
 }
 
 impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
-    fn from_counted_multi(
-        values: MultiValue<'lua>,
-        _: Context<'lua>,
-        consumed: &mut usize,
-    ) -> Result<Self> {
-        *consumed += values.len();
-        Ok(values)
+    fn from_lua_multi(values: &mut MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
+        let mut result = MultiValue::new();
+        result.append(values);
+        Ok(result)
     }
 }
 
@@ -149,18 +139,11 @@ impl<'lua, T: ToLua<'lua>> ToLuaMulti<'lua> for Variadic<T> {
 }
 
 impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Variadic<T> {
-    fn from_counted_multi(
-        mut values: MultiValue<'lua>,
-        lua: Context<'lua>,
-        total: &mut usize,
-    ) -> Result<Self> {
+    fn from_lua_multi(values: &mut MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
         let mut result = Vec::new();
         while values.len() > 0 {
-            let mut consumed = 0;
-            if let Ok(it) = T::from_counted_multi(values.clone(), lua, &mut consumed) {
+            if let Ok(it) = T::from_lua_multi(values, lua) {
                 result.push(it);
-                values.drop_front(consumed);
-                *total += consumed;
             } else {
                 break;
             }
@@ -242,16 +225,9 @@ impl<T> DerefMut for Fallible<T> {
 }
 
 impl<'lua, T: FromLuaMulti<'lua>> FromLuaMulti<'lua> for Fallible<T> {
-    fn from_counted_multi(
-        values: MultiValue<'lua>,
-        lua: Context<'lua>,
-        consumed: &mut usize,
-    ) -> Result<Self> {
-        match T::from_counted_multi(values, lua, consumed) {
-            Ok(it) => {
-                *consumed += 1;
-                Ok(Fallible(Some(it)))
-            }
+    fn from_lua_multi(values: &mut MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
+        match T::from_lua_multi(values, lua) {
+            Ok(it) => Ok(Fallible(Some(it))),
             Err(_) => Ok(Fallible(None)),
         }
     }
@@ -269,7 +245,7 @@ macro_rules! impl_tuple {
                 let ($($name,)*) = self;
 
                 let mut results = MultiValue::new();
-                push_reverse!(results, $($name.to_lua_multi(lua)?,)*);
+                push_reverse!(results, $(&mut $name.to_lua_multi(lua)?,)*);
                 Ok(results)
             }
         }
@@ -280,19 +256,13 @@ macro_rules! impl_tuple {
             #[allow(unused_variables)]
             #[allow(unused_mut)]
             #[allow(non_snake_case)]
-            fn from_counted_multi(mut values: MultiValue<'lua>, lua: Context<'lua>, total: &mut usize) -> Result<Self> {
+            fn from_lua_multi(values: &mut MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
                 $(
-                    let $name = {
-                        let mut consumed = 0;
-                        let it = match FromLuaMulti::from_counted_multi(values.clone(), lua, &mut consumed) {
-                            Ok(it) => it,
-                            Err(err) => {
-                                return Err(err);
-                            }
-                        };
-                        *total += consumed;
-                        values.drop_front(consumed);
-                        it
+                    let $name = match FromLuaMulti::from_lua_multi(values, lua) {
+                        Ok(it) => it,
+                        Err(err) => {
+                            return Err(err);
+                        }
                     };
                 )*
                 Ok(($($name,)*))

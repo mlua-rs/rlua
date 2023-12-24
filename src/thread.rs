@@ -77,7 +77,7 @@ impl<'lua> Thread<'lua> {
     {
         let lua = self.0.lua;
         let args = args.to_lua_multi(lua)?;
-        let results = unsafe {
+        let mut results = unsafe {
             let _sg = StackGuard::new(lua.state);
             assert_stack(lua.state, 3);
 
@@ -119,7 +119,7 @@ impl<'lua> Thread<'lua> {
             }
             results
         };
-        R::from_lua_multi(results, lua)
+        R::from_lua_multi(&mut results, lua)
     }
 
     /// Gets the status of the thread.

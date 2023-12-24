@@ -138,24 +138,28 @@ impl<'lua> MultiValue<'lua> {
         self.0.reserve(size);
     }
 
-    pub(crate) fn push_front(&mut self, value: Value<'lua>) {
+    pub fn push_front(&mut self, value: Value<'lua>) {
         self.0.push(value);
     }
 
-    pub(crate) fn append(&mut self, values: Self) {
-        self.0.extend(values.0.into_iter());
+    pub(crate) fn append(&mut self, values: &mut Self) {
+        self.0.append(&mut values.0);
     }
 
-    pub(crate) fn pop_front(&mut self) -> Option<Value<'lua>> {
+    pub fn pop_front(&mut self) -> Option<Value<'lua>> {
         self.0.pop()
     }
 
-    pub(crate) fn peek_front(&self) -> Option<&Value<'lua>> {
+    pub fn pop_front_n(&mut self, count: usize) -> impl Iterator<Item = Value<'lua>> + '_ {
+        self.0.drain((self.0.len() - count)..).rev()
+    }
+
+    pub fn peek_front(&self) -> Option<&Value<'lua>> {
         self.0.last()
     }
 
-    pub(crate) fn drop_front(&mut self, count: usize) {
-        self.0.drain(self.0.len().saturating_sub(count)..).count();
+    pub fn peek_front_n(&self, count: usize) -> impl Iterator<Item = &Value<'lua>> + '_ {
+        self.0.iter().rev().take(count)
     }
 
     pub fn len(&self) -> usize {
@@ -191,36 +195,10 @@ pub trait ToLuaMulti<'lua> {
 pub trait FromLuaMulti<'lua>: Sized {
     /// Performs the conversion.
     ///
-    /// In case `values` contains more values than needed to perform the
-    /// conversion, the excess values should be ignored. This reflects the
-    /// semantics of Lua when calling a function or assigning values. Similarly,
-    /// if not enough values are given, conversions should assume that any
-    /// missing values are nil.
-    fn from_lua_multi(values: MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
-        Self::from_counted_multi(values, lua, &mut 0)
-    }
-
-    /// Same as `from_lua_multi`, additionally allowing specification of number
-    /// of arguments that were consumed by incrementing the `consumed`
-    /// reference.
-    ///
-    /// This allows the outer scope to know the number of values that were used
-    /// to perform the conversion.
-    ///
-    /// Failing to do so will make the outer scope try and use the same sequence
-    /// of `values` for multiple consecutive conversions. In case of an error,
-    /// the `consumed` counter value should be kept the same to allow wrappers
-    /// such as [`Variadic`] to conservatively capture values.
-    ///
-    /// [`Variadic`]: struct.Variadic.html
-    fn from_counted_multi(
-        values: MultiValue<'lua>,
-        lua: Context<'lua>,
-        consumed: &mut usize,
-    ) -> Result<Self> {
-        let count = values.len();
-        let result = Self::from_lua_multi(values, lua);
-        *consumed += count;
-        result
-    }
+    /// Implementation should pop needed `values` and leave the rest intact. In
+    /// case a value wasn't needed for the conversion, it should be pushed back
+    /// so the latter conversions can use it. If not enough values are given,
+    /// conversions should assume that any missing values are nil to reflect Lua
+    /// semantics.
+    fn from_lua_multi(values: &mut MultiValue<'lua>, lua: Context<'lua>) -> Result<Self>;
 }
