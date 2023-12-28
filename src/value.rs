@@ -189,16 +189,13 @@ pub trait ToLuaMulti<'lua> {
 /// This is a generalization of `FromLua`, allowing an arbitrary number of Lua
 /// values to participate in the conversion. Any type that implements `FromLua`
 /// will automatically implement this trait.
-///
-/// Implementing either `from_lua_multi` or `from_counted_multi` is required as
-/// the default implementations recursively call each other.
 pub trait FromLuaMulti<'lua>: Sized {
     /// Performs the conversion.
     ///
     /// Implementation should pop needed `values` and leave the rest intact. In
     /// case a value wasn't needed for the conversion, it should be pushed back
     /// so the latter conversions can use it. If not enough values are given,
-    /// conversions should assume that any missing values are nil to reflect Lua
-    /// semantics.
+    /// implementation should assume that any missing values are nil to reflect
+    /// Lua semantics.
     fn from_lua_multi(values: &mut MultiValue<'lua>, lua: Context<'lua>) -> Result<Self>;
 }

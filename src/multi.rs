@@ -48,7 +48,7 @@ impl<'lua> ToLuaMulti<'lua> for MultiValue<'lua> {
 }
 
 impl<'lua> FromLuaMulti<'lua> for MultiValue<'lua> {
-    fn from_lua_multi(values: &mut MultiValue<'lua>, lua: Context<'lua>) -> Result<Self> {
+    fn from_lua_multi(values: &mut MultiValue<'lua>, _: Context<'lua>) -> Result<Self> {
         let mut result = MultiValue::new();
         result.append(values);
         Ok(result)
