@@ -9,6 +9,7 @@ documentation = "https://docs.rs/rlua"
 readme = "README.md"
 keywords = ["lua"]
 license = "MIT"
+categories = [ "api-bindings", "development-tools::ffi" ]
 
 [badges]
 circle-ci = { repository = "amethyst/rlua", branch = "master" }
