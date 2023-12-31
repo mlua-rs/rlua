@@ -34,8 +34,8 @@ lua-compat-mathlib = []
 [dependencies]
 libc = { version = "0.2" }
 num-traits = { version = "0.2.14" }
-bitflags = { version = "1.0.4" }
-bstr = {version = "0.2", features = ["std"], default_features = false }
+bitflags = { version = "2.4" }
+bstr = {version = "1.9", features = ["std"], default_features = false }
 rlua-lua54-sys = { version = "0.1.6", optional = true }
 rlua-lua53-sys = { version = "0.1.6", optional = true }
 rlua-lua51-sys = { version = "0.1.6", optional = true }
