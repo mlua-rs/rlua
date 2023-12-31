@@ -25,6 +25,7 @@ use crate::util::{
 
 bitflags! {
     /// Flags describing the set of lua modules to load.
+    #[derive(Copy, Clone)]
     pub struct StdLib: u32 {
         const BASE = 0x1;
         const COROUTINE = 0x2;
@@ -37,39 +38,40 @@ bitflags! {
         const PACKAGE = 0x100;
         const DEBUG = 0x200;
 
-        const ALL = StdLib::BASE.bits
-            | StdLib::COROUTINE.bits
-            | StdLib::TABLE.bits
-            | StdLib::IO.bits
-            | StdLib::OS.bits
-            | StdLib::STRING.bits
-            | StdLib::UTF8.bits
-            | StdLib::MATH.bits
-            | StdLib::PACKAGE.bits
-            | StdLib::DEBUG.bits;
+        const ALL = StdLib::BASE.bits()
+            | StdLib::COROUTINE.bits()
+            | StdLib::TABLE.bits()
+            | StdLib::IO.bits()
+            | StdLib::OS.bits()
+            | StdLib::STRING.bits()
+            | StdLib::UTF8.bits()
+            | StdLib::MATH.bits()
+            | StdLib::PACKAGE.bits()
+            | StdLib::DEBUG.bits();
 
-        const ALL_NO_DEBUG = StdLib::BASE.bits
-            | StdLib::COROUTINE.bits
-            | StdLib::TABLE.bits
-            | StdLib::IO.bits
-            | StdLib::OS.bits
-            | StdLib::STRING.bits
-            | StdLib::UTF8.bits
-            | StdLib::MATH.bits
-            | StdLib::PACKAGE.bits;
+        const ALL_NO_DEBUG = StdLib::BASE.bits()
+            | StdLib::COROUTINE.bits()
+            | StdLib::TABLE.bits()
+            | StdLib::IO.bits()
+            | StdLib::OS.bits()
+            | StdLib::STRING.bits()
+            | StdLib::UTF8.bits()
+            | StdLib::MATH.bits()
+            | StdLib::PACKAGE.bits();
     }
 }
 
 bitflags! {
     /// Flags describing the set of lua modules to load.
+    #[derive(Copy, Clone)]
     pub struct InitFlags: u32 {
         const PCALL_WRAPPERS = 0x1;
         const LOAD_WRAPPERS = 0x2;
         const REMOVE_LOADLIB = 0x4;
 
-        const DEFAULT = InitFlags::PCALL_WRAPPERS.bits |
-                        InitFlags::LOAD_WRAPPERS.bits |
-                        InitFlags::REMOVE_LOADLIB.bits;
+        const DEFAULT = InitFlags::PCALL_WRAPPERS.bits() |
+                        InitFlags::LOAD_WRAPPERS.bits() |
+                        InitFlags::REMOVE_LOADLIB.bits();
         const NONE = 0;
     }
 }

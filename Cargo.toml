@@ -9,6 +9,7 @@ documentation = "https://docs.rs/rlua"
 readme = "README.md"
 keywords = ["lua"]
 license = "MIT"
+categories = [ "api-bindings", "development-tools::ffi" ]
 
 [badges]
 circle-ci = { repository = "amethyst/rlua", branch = "master" }
@@ -34,17 +35,17 @@ lua-compat-mathlib = []
 [dependencies]
 libc = { version = "0.2" }
 num-traits = { version = "0.2.14" }
-bitflags = { version = "1.0.4" }
-bstr = {version = "0.2", features = ["std"], default_features = false }
+bitflags = { version = "2.4" }
+bstr = {version = "1.9", features = ["std"], default_features = false }
 rlua-lua54-sys = { version = "0.1.6", optional = true }
 rlua-lua53-sys = { version = "0.1.6", optional = true }
 rlua-lua51-sys = { version = "0.1.6", optional = true }
 
 
 [dev-dependencies]
-rustyline = "12.0"
-criterion = "0.3.0"
-compiletest_rs = { version = "0.4", features = ["stable"] }
+rustyline = "13.0"
+criterion = "0.5.1"
+compiletest_rs = { version = "0.10.2", features = ["stable"] }
 
 [[bench]]
 name = "benchmark"
