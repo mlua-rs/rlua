@@ -42,8 +42,8 @@ rlua-lua51-sys = { version = "0.1.6", optional = true }
 
 
 [dev-dependencies]
-rustyline = "12.0"
-criterion = "0.3.0"
+rustyline = "13.0"
+criterion = "0.5.1"
 compiletest_rs = { version = "0.4", features = ["stable"] }
 
 [[bench]]
