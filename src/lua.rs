@@ -103,6 +103,11 @@ impl Drop for Lua {
                 "reference leak detected"
             );
             *rlua_expect!((*extra).registry_unref_list.lock(), "unref list poisoned") = None;
+            if cfg!(rlua_luajit) {
+                // Restore the old allocator so that luajit will clean up
+                // properly.
+                ffi::lua_setallocf(self.main_state, (*extra).uf, (*extra).ud.unwrap());
+            }
             ffi::lua_close(self.main_state);
             let _ = Box::from_raw(extra);
         }
@@ -550,15 +555,17 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
 
     let state = if cfg!(rlua_luajit) {
         let state = ffi::luaL_newstate();
-        let mut ud = std::ptr::null_mut();
-        let alloc = ffi::lua_getallocf(state, &mut ud as _);
-        extra.ud = Some(ud);
-        extra.uf = alloc;
-        ffi::lua_setallocf(
-            state,
-            Some(allocator),
-            &mut *extra as *mut ExtraData as *mut c_void,
-        );
+        if state != ptr::null_mut() {
+            let mut ud = std::ptr::null_mut();
+            let alloc = ffi::lua_getallocf(state, &mut ud as _);
+            extra.ud = Some(ud);
+            extra.uf = alloc;
+            ffi::lua_setallocf(
+                state,
+                Some(allocator),
+                &mut *extra as *mut ExtraData as *mut c_void,
+            );
+        };
         state
     } else {
         let state = ffi::lua_newstate(
@@ -567,6 +574,8 @@ unsafe fn create_lua(lua_mod_to_load: StdLib, init_flags: InitFlags) -> Lua {
         );
         state
     };
+
+    assert!(state != ptr::null_mut(), "Unable to create Lua state.");
 
     #[cfg(rlua_lua54)]
     ffi::lua_setcstacklimit(state, SAFE_CSTACK_SIZE);
