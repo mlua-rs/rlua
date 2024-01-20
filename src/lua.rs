@@ -106,12 +106,7 @@ impl Drop for Lua {
             if cfg!(rlua_luajit) {
                 // Restore the old allocator so that luajit will clean up
                 // properly.
-                ffi::lua_setallocf(
-                    self.main_state,
-                    (*extra).uf,
-                    (*extra).ud.unwrap(),
-                );
-
+                ffi::lua_setallocf(self.main_state, (*extra).uf, (*extra).ud.unwrap());
             }
             ffi::lua_close(self.main_state);
             let _ = Box::from_raw(extra);
