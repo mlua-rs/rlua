@@ -1,3 +1,11 @@
+## [0.19.8]
+- Update rustyline dev-dependency (thanks @salexan2001)
+- Fix builds for iOS (thanks @w-ensink)
+- Add an example changing `package.path` (thanks @paulfrische)
+- Fix crash on empty source with LuaJIT
+- Update some dependencies
+- Fix a leak when destroying `Lua` object with `LuaJIT`.
+
 ## [0.19.7]
 - Cosmetic fixes to README.md
 
