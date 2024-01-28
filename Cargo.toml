@@ -1,10 +1,10 @@
 [package]
 name = "rlua"
-version = "0.19.8"
+version = "0.20.0"
 authors = ["kyren <kerriganw@gmail.com>"]
 edition = "2018"
 description = "High level bindings to Lua 5.x"
-repository = "https://github.com/amethyst/rlua"
+repository = "https://github.com/mlua-rs/rlua"
 documentation = "https://docs.rs/rlua"
 readme = "README.md"
 keywords = ["lua"]
@@ -12,41 +12,31 @@ license = "MIT"
 categories = [ "api-bindings", "development-tools::ffi" ]
 
 [badges]
-circle-ci = { repository = "amethyst/rlua", branch = "master" }
+circle-ci = { repository = "mlua-rs/rlua", branch = "master" }
+
+[dependencies]
+mlua = { version = "0.9.5" }
 
 [features]
 default=["builtin-lua54"]
-builtin-lua54=["rlua-lua54-sys"]
-builtin-lua53=["rlua-lua53-sys"]
-builtin-lua51=["rlua-lua51-sys"]
+builtin-lua54=["mlua/lua54", "mlua/vendored"]
+builtin-lua53=["mlua/lua53", "mlua/vendored"]
+builtin-lua51=["mlua/lua51", "mlua/vendored"]
 
-system-lua54=["rlua-lua54-sys", "rlua-lua54-sys/lua54-pkg-config"]
-system-lua53=["rlua-lua53-sys", "rlua-lua53-sys/lua53-pkg-config"]
-system-lua51=["rlua-lua51-sys", "rlua-lua51-sys/lua51-pkg-config"]
-system-luajit=["rlua-lua51-sys", "rlua-lua51-sys/luajit-pkg-config"]
+system-lua54=["mlua/lua54"]
+system-lua53=["mlua/lua53"]
+system-lua51=["mlua/lua51"]
+system-luajit=["mlua/luajit"]
 
 # Remove Lua's os lib
-lua-no-oslib=["rlua-lua54-sys/lua-no-oslib","rlua-lua53-sys/lua-no-oslib","rlua-lua51-sys/lua-no-oslib"]
+#lua-no-oslib=["rlua-lua54-sys/lua-no-oslib","rlua-lua53-sys/lua-no-oslib","rlua-lua51-sys/lua-no-oslib"]
 
 # Enabled functions from the math module that have been deprecated
-lua-compat-mathlib = []
+#lua-compat-mathlib = []
 
-
-[dependencies]
-libc = { version = "0.2" }
-num-traits = { version = "0.2.14" }
-bitflags = { version = "2.4" }
-bstr = {version = "1.9", features = ["std"], default_features = false }
-rlua-lua54-sys = { version = "0.1.6", optional = true }
-rlua-lua53-sys = { version = "0.1.6", optional = true }
-rlua-lua51-sys = { version = "0.1.6", optional = true }
 
 
 [dev-dependencies]
 rustyline = "13.0"
 criterion = "0.5.1"
 compiletest_rs = { version = "0.10.2", features = ["stable"] }
-
-[[bench]]
-name = "benchmark"
-harness = false
