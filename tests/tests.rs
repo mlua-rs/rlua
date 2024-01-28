@@ -5,8 +5,9 @@ use std::sync::Arc;
 use std::{error, f32, f64, fmt};
 
 use rlua::{
-    Error, ExternalError, Function, InitFlags, Lua, Nil, Result, StdLib, String, Table, UserData,
+    Error, ExternalError, Function, LuaOptions, Lua, Nil, Result, StdLib, String, Table, UserData,
     Value, Variadic,
+    RluaCompat
 };
 
 #[test]
@@ -23,13 +24,13 @@ fn test_load() {
 #[test]
 fn test_load_empty() {
     Lua::new().context(|lua| {
-        assert!(lua.load(b"").exec().is_ok());
+        assert!(lua.load(b"".as_slice()).exec().is_ok());
     });
 }
 
 #[test]
 fn test_debug() {
-    let lua = unsafe { Lua::new_with_debug() };
+    let lua = unsafe { Lua::unsafe_new() };
     lua.context(|lua| {
         match lua.load("debug").eval().unwrap() {
             Value::Table(_) => {}
@@ -46,7 +47,7 @@ fn test_debug() {
 #[test]
 #[should_panic]
 fn test_new_with_debug_panic() {
-    let _lua = Lua::new_with(StdLib::DEBUG);
+    let _lua = Lua::new_with(StdLib::DEBUG, LuaOptions::default()).unwrap();
 }
 
 #[test]
@@ -235,7 +236,7 @@ fn test_error() {
         .unwrap();
 
         let rust_error_function = lua
-            .create_function(|_, ()| -> Result<()> { Err(TestError.to_lua_err()) })
+            .create_function(|_, ()| -> Result<()> { Err(TestError.into_lua_err()) })
             .unwrap();
         globals
             .set("rust_error_function", rust_error_function)
@@ -293,14 +294,16 @@ fn test_error() {
         assert!(understand_recursion.call::<_, ()>(()).is_err());
     });
 
-    match catch_unwind(|| -> Result<()> {
+    match catch_unwind(|| -> Result<usize> {
         Lua::new().context(|lua| {
             let globals = lua.globals();
 
             lua.load(
                 r#"
                     function rust_panic()
-                        pcall(function () rust_panic_function() end)
+                        ok, err = pcall(function () rust_panic_function() end)
+                        print(tostring(ok), tostring(err))
+                        return 17
                     end
                 "#,
             )
@@ -312,7 +315,7 @@ fn test_error() {
 
             let rust_panic = globals.get::<_, Function>("rust_panic")?;
 
-            rust_panic.call::<_, ()>(())
+            dbg!(rust_panic.call::<_, usize>(()))
         })
     }) {
         Ok(Ok(_)) => panic!("no panic was detected, pcall caught it!"),
@@ -477,9 +480,9 @@ fn test_load_wrappers() {
 #[test]
 fn test_no_load_wrappers() {
     unsafe {
-        Lua::unsafe_new_with_flags(
-            StdLib::ALL_NO_DEBUG,
-            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        Lua::unsafe_new_with(
+            StdLib::ALL,
+            LuaOptions::default()
         )
         .context(|lua| {
             let globals = lua.globals();
@@ -596,9 +599,9 @@ fn test_no_loadfile_wrappers() {
     tmppath2.push("test_no_loadfile_wrappers2.lua");
 
     unsafe {
-        Lua::unsafe_new_with_flags(
-            StdLib::ALL_NO_DEBUG,
-            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        Lua::unsafe_new_with(
+            StdLib::ALL,
+            LuaOptions::default()
         )
         .context(|lua| {
             let globals = lua.globals();
@@ -712,9 +715,9 @@ fn test_no_dofile_wrappers() {
     tmppath.push("test_no_dofile_wrappers.lua");
 
     unsafe {
-        Lua::unsafe_new_with_flags(
-            StdLib::ALL_NO_DEBUG,
-            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        Lua::unsafe_new_with(
+            StdLib::ALL,
+            LuaOptions::default()
         )
         .context(|lua| {
             let globals = lua.globals();
@@ -822,9 +825,9 @@ fn test_loadstring_wrappers() {
 #[test]
 fn test_no_loadstring_wrappers() {
     unsafe {
-        Lua::unsafe_new_with_flags(
-            StdLib::ALL_NO_DEBUG,
-            InitFlags::DEFAULT - InitFlags::LOAD_WRAPPERS,
+        Lua::unsafe_new_with(
+            StdLib::ALL,
+            LuaOptions::default()
         )
         .context(|lua| {
             let globals = lua.globals();
@@ -893,9 +896,9 @@ fn test_default_loadlib() {
 #[test]
 fn test_no_remove_loadlib() {
     unsafe {
-        Lua::unsafe_new_with_flags(
-            StdLib::ALL_NO_DEBUG,
-            InitFlags::DEFAULT - InitFlags::REMOVE_LOADLIB,
+        Lua::unsafe_new_with(
+            StdLib::ALL,
+            LuaOptions::default()
         )
         .context(|lua| {
             let globals = lua.globals();
@@ -921,7 +924,7 @@ fn test_result_conversions() {
         let err = lua
             .create_function(|_, ()| {
                 Ok(Err::<String, _>(
-                    "only through failure can we succeed".to_lua_err(),
+                    "only through failure can we succeed".into_lua_err(),
                 ))
             })
             .unwrap();
@@ -1146,10 +1149,10 @@ fn test_set_metatable_nil() {
 #[test]
 fn test_named_registry_value() {
     Lua::new().context(|lua| {
-        lua.set_named_registry_value::<_, i32>("test", 42).unwrap();
+        lua.set_named_registry_value::<i32>("test", 42).unwrap();
         let f = lua
             .create_function(move |lua, ()| {
-                assert_eq!(lua.named_registry_value::<_, i32>("test")?, 42);
+                assert_eq!(lua.named_registry_value::<i32>("test")?, 42);
                 Ok(())
             })
             .unwrap();
@@ -1371,7 +1374,6 @@ fn chunk_env() {
             "#,
         )
         .set_environment(env1.clone())
-        .unwrap()
         .exec()
         .unwrap();
 
@@ -1382,14 +1384,12 @@ fn chunk_env() {
             "#,
         )
         .set_environment(env2.clone())
-        .unwrap()
         .exec()
         .unwrap();
 
         assert_eq!(
             lua.load("test_var")
                 .set_environment(env1)
-                .unwrap()
                 .eval::<i32>()
                 .unwrap(),
             1
@@ -1398,7 +1398,6 @@ fn chunk_env() {
         assert_eq!(
             lua.load("test_var")
                 .set_environment(env2)
-                .unwrap()
                 .eval::<i32>()
                 .unwrap(),
             2
