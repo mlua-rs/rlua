@@ -1,6 +1,6 @@
 use std::os::raw::c_void;
 
-use rlua::{Function, LightUserData, Lua};
+use rlua::{Function, LightUserData, Lua, RluaCompat};
 
 #[test]
 fn test_lightuserdata() {

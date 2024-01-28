@@ -15,7 +15,7 @@ categories = [ "api-bindings", "development-tools::ffi" ]
 circle-ci = { repository = "mlua-rs/rlua", branch = "master" }
 
 [dependencies]
-mlua = { version = "0.9.5" }
+mlua = { version = "0.9.5", features = ["macros"] }
 
 [features]
 default=["builtin-lua54"]
@@ -34,9 +34,8 @@ system-luajit=["mlua/luajit"]
 # Enabled functions from the math module that have been deprecated
 #lua-compat-mathlib = []
 
-
-
 [dev-dependencies]
 rustyline = "13.0"
-criterion = "0.5.1"
-compiletest_rs = { version = "0.10.2", features = ["stable"] }
+#criterion = "0.5.1"
+#compiletest_rs = { version = "0.10.2", features = ["stable"] }
+bstr = "1.9.0"

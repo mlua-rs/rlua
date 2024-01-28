@@ -1,6 +1,6 @@
 //! This example shows a simple read-evaluate-print-loop (REPL).
 
-use rlua::{Error, Lua, MultiValue};
+use rlua::{Error, Lua, MultiValue, RluaCompat};
 
 fn main() {
     Lua::new().context(|lua| {

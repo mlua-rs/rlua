@@ -1,4 +1,4 @@
-use rlua::{Function, Lua, String};
+use rlua::{Function, Lua, String, RluaCompat};
 
 #[test]
 fn test_function() {

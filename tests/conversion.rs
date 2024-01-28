@@ -1,4 +1,4 @@
-use rlua::{Integer, Lua, Result, String, Table, ToLua, Value};
+use rlua::{Integer, Lua, Result, String, Table, Value, RluaCompat, ToLuaCompat};
 
 fn valid_float(verify: Result<Value>, expected: f64) {
     let verify_unwrap = verify.unwrap();

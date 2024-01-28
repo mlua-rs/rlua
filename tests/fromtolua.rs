@@ -1,4 +1,4 @@
-use rlua::Lua;
+use rlua::{Lua, RluaCompat};
 
 #[test]
 fn test_to_array() {

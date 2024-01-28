@@ -1,9 +1,8 @@
 use std::cell::RefCell;
 use std::ops::Deref;
-use std::str;
 use std::sync::{Arc, Mutex};
 
-use rlua::{Error, HookTriggers, Lua, Value};
+use rlua::{Error, HookTriggers, Lua, Value, RluaCompat};
 
 #[cfg(not(rlua_luajit))] // LuaJIT gives different results
 #[test]
@@ -52,8 +51,8 @@ fn function_calls() {
         move |_lua, debug| {
             let names = debug.names();
             let source = debug.source();
-            let name = names.name.map(|s| str::from_utf8(s).unwrap().to_owned());
-            let what = source.what.map(|s| str::from_utf8(s).unwrap().to_owned());
+            let name = names.name.map(|s| s.to_string());
+            let what = source.what;
             hook_output.lock().unwrap().push((name, what));
             Ok(())
         },
@@ -73,8 +72,8 @@ fn function_calls() {
     assert_eq!(
         *output,
         vec![
-            (None, Some("main".to_string())),
-            (Some("len".to_string()), Some("C".to_string()))
+            (None, "main"),
+            (Some("len".to_string()), "C")
         ]
     );
     #[cfg(rlua_luajit)]
@@ -119,7 +118,8 @@ fn error_within_hook() {
 #[test]
 fn limit_execution_instructions() {
     let lua = Lua::new();
-    let mut max_instructions = 10000;
+    let max_instructions = Arc::new(Mutex::new(10000));
+    let max_int = Arc::clone(&max_instructions);
 
     lua.set_hook(
         HookTriggers {
@@ -127,8 +127,9 @@ fn limit_execution_instructions() {
             ..Default::default()
         },
         move |_lua, _debug| {
-            max_instructions -= 30;
-            if max_instructions < 0 {
+            let mut max_instructions = max_int.lock().unwrap();
+            (*max_instructions) -= 30;
+            if (*max_instructions) < 0 {
                 Err(Error::RuntimeError("time's up".to_string()))
             } else {
                 Ok(())

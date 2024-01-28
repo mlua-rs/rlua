@@ -1,5 +1,5 @@
 use bstr::{BStr, BString};
-use rlua::Lua;
+use rlua::{Lua, RluaCompat};
 
 // Lua 5.1 doesn't have hex escapes
 #[cfg(not(rlua_lua51))]
