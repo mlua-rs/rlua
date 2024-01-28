@@ -1,6 +1,6 @@
 extern crate rlua;
 
-use rlua::{Lua, UserData};
+use rlua::{Lua, UserData, RluaCompat};
 
 fn main() {
     struct MyUserData<'a>(&'a mut i32);

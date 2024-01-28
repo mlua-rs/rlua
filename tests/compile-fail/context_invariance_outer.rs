@@ -1,6 +1,6 @@
 extern crate rlua;
 
-use rlua::Lua;
+use rlua::{Lua, RluaCompat};
 
 fn main() {
     Lua::new().context(|lua1| {

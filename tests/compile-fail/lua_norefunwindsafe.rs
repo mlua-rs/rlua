@@ -2,7 +2,7 @@ extern crate rlua;
 
 use std::panic::catch_unwind;
 
-use rlua::Lua;
+use rlua::{Lua, RluaCompat};
 
 fn main() {
     let lua = Lua::new();

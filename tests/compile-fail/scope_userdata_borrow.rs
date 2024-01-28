@@ -1,6 +1,6 @@
 extern crate rlua;
 
-use rlua::{Lua, UserData};
+use rlua::{Lua, UserData, RluaCompat};
 
 fn main() {
     // Should not allow userdata borrow to outlive lifetime of AnyUserData handle

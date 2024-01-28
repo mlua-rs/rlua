@@ -1,6 +1,6 @@
 extern crate rlua;
 
-use rlua::{AnyUserData, Lua, Table, UserData};
+use rlua::{AnyUserData, Lua, Table, UserData, RluaCompat};
 
 fn main() {
     Lua::new().context(|lua| {

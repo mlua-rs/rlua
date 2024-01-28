@@ -2,7 +2,7 @@ extern crate rlua;
 
 use std::cell::RefCell;
 
-use rlua::{Lua, Table};
+use rlua::{Lua, Table, RluaCompat};
 
 fn main() {
     thread_local! {
