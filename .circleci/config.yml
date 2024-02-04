@@ -10,11 +10,6 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
-      - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
       - run:
@@ -29,12 +24,6 @@ jobs:
       - run:
           name: Run all tests
           command: cargo test --all
-      - run:
-          name: Check bindgen
-          command: |
-              cargo install bindgen-cli
-              scripts/update-bindgen.sh
-              git diff --exit-code || true
       - run:
           name: Check Formatting
           command: |
@@ -53,11 +42,6 @@ jobs:
       - image: cimg/rust:1.75.0
     steps:
       - checkout
-      - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
@@ -86,11 +70,6 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
-      - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
       - run:
@@ -105,12 +84,6 @@ jobs:
       - run:
           name: Run all tests
           command: cargo test --no-default-features --features=builtin-lua53 --all
-      - run:
-          name: Check bindgen
-          command: |
-              cargo install bindgen-cli
-              scripts/update-bindgen.sh
-              git diff --exit-code || true
       - run:
           name: Check Formatting
           command: |
@@ -129,11 +102,6 @@ jobs:
       - image: cimg/rust:1.75.0
     steps:
       - checkout
-      - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
       - run:
           name: Install Lua
           command: |
@@ -156,12 +124,6 @@ jobs:
           name: Run all tests
           command: cargo test --no-default-features --features=system-lua51 --all
       - run:
-          name: Check bindgen
-          command: |
-              cargo install bindgen-cli
-              scripts/update-bindgen.sh
-              git diff --exit-code || true
-      - run:
           name: Check Formatting
           command: |
               rustup component add rustfmt
@@ -179,11 +141,6 @@ jobs:
       - image: cimg/rust:1.75.0
     steps:
       - checkout
-      - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
       - run:
           name: Install Lua
           command: |
