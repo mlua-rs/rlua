@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
-use rlua::{Error, HookTriggers, Lua, Value, RluaCompat};
+use rlua::{Error, HookTriggers, Lua, RluaCompat, Value};
 
 #[cfg(not(rlua_luajit))] // LuaJIT gives different results
 #[test]
@@ -71,10 +71,7 @@ fn function_calls() {
     #[cfg(not(rlua_luajit))]
     assert_eq!(
         *output,
-        vec![
-            (None, "main"),
-            (Some("len".to_string()), "C")
-        ]
+        vec![(None, "main"), (Some("len".to_string()), "C")]
     );
     #[cfg(rlua_luajit)]
     assert_eq!(

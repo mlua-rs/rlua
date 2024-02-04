@@ -1,7 +1,7 @@
 use std::f32;
 use std::iter::FromIterator;
 
-use rlua::{Function, Lua, MetaMethod, Result, UserData, UserDataMethods, Variadic, RluaCompat};
+use rlua::{Function, Lua, MetaMethod, Result, RluaCompat, UserData, UserDataMethods, Variadic};
 
 fn main() -> Result<()> {
     // You can create a new Lua state with `Lua::new()`.  This loads the default Lua std library

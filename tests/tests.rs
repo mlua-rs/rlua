@@ -5,9 +5,8 @@ use std::sync::Arc;
 use std::{error, f32, f64, fmt};
 
 use rlua::{
-    Error, ExternalError, Function, LuaOptions, Lua, Nil, Result, StdLib, String, Table, UserData,
-    Value, Variadic,
-    RluaCompat
+    Error, ExternalError, Function, Lua, LuaOptions, Nil, Result, RluaCompat, StdLib, String,
+    Table, UserData, Value, Variadic,
 };
 
 #[test]
@@ -295,7 +294,12 @@ fn test_error() {
     });
 
     match catch_unwind(|| -> Result<usize> {
-        Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default().catch_rust_panics(false)).unwrap().context(|lua| {
+        Lua::new_with(
+            StdLib::ALL_SAFE,
+            LuaOptions::default().catch_rust_panics(false),
+        )
+        .unwrap()
+        .context(|lua| {
             let globals = lua.globals();
 
             lua.load(
@@ -324,7 +328,12 @@ fn test_error() {
     };
 
     match catch_unwind(|| -> Result<()> {
-        Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default().catch_rust_panics(false)).unwrap().context(|lua| {
+        Lua::new_with(
+            StdLib::ALL_SAFE,
+            LuaOptions::default().catch_rust_panics(false),
+        )
+        .unwrap()
+        .context(|lua| {
             let globals = lua.globals();
 
             lua.load(
@@ -485,11 +494,7 @@ fn test_load_wrappers() {
 #[test]
 fn test_no_load_wrappers() {
     unsafe {
-        Lua::unsafe_new_with(
-            StdLib::ALL,
-            LuaOptions::default()
-        )
-        .context(|lua| {
+        Lua::unsafe_new_with(StdLib::ALL, LuaOptions::default()).context(|lua| {
             let globals = lua.globals();
             lua.load(
                 r#"
@@ -608,11 +613,7 @@ fn test_no_loadfile_wrappers() {
     tmppath2.push("test_no_loadfile_wrappers2.lua");
 
     unsafe {
-        Lua::unsafe_new_with(
-            StdLib::ALL,
-            LuaOptions::default()
-        )
-        .context(|lua| {
+        Lua::unsafe_new_with(StdLib::ALL, LuaOptions::default()).context(|lua| {
             let globals = lua.globals();
             globals.set("filename", tmppath.to_str().unwrap()).unwrap();
             globals
@@ -729,11 +730,7 @@ fn test_no_dofile_wrappers() {
     tmppath.push("test_no_dofile_wrappers.lua");
 
     unsafe {
-        Lua::unsafe_new_with(
-            StdLib::ALL,
-            LuaOptions::default()
-        )
-        .context(|lua| {
+        Lua::unsafe_new_with(StdLib::ALL, LuaOptions::default()).context(|lua| {
             let globals = lua.globals();
             globals.set("filename", tmppath.to_str().unwrap()).unwrap();
             lua.load(
@@ -839,11 +836,7 @@ fn test_loadstring_wrappers() {
 #[test]
 fn test_no_loadstring_wrappers() {
     unsafe {
-        Lua::unsafe_new_with(
-            StdLib::ALL,
-            LuaOptions::default()
-        )
-        .context(|lua| {
+        Lua::unsafe_new_with(StdLib::ALL, LuaOptions::default()).context(|lua| {
             let globals = lua.globals();
             if globals.get::<_, Function>("loadstring").is_err() {
                 // Loadstring is not present in Lua 5.4, and only with a
@@ -914,11 +907,7 @@ fn test_default_loadlib() {
 #[test]
 fn test_no_remove_loadlib() {
     unsafe {
-        Lua::unsafe_new_with(
-            StdLib::ALL,
-            LuaOptions::default()
-        )
-        .context(|lua| {
+        Lua::unsafe_new_with(StdLib::ALL, LuaOptions::default()).context(|lua| {
             let globals = lua.globals();
             let package = globals.get::<_, Table>("package").unwrap();
             let _loadlib = package.get::<_, Function>("loadlib").unwrap();
@@ -1031,8 +1020,10 @@ fn test_num_conversion() {
             lua.unpack::<f64>(lua.pack(f32::MAX).unwrap()).unwrap(),
             f32::MAX as f64
         );
-        assert_eq!(lua.unpack::<f32>(lua.pack(f64::MAX).unwrap()).unwrap(),
-                   f32::INFINITY);
+        assert_eq!(
+            lua.unpack::<f32>(lua.pack(f64::MAX).unwrap()).unwrap(),
+            f32::INFINITY
+        );
 
         assert_eq!(
             lua.unpack::<i128>(lua.pack(1i128 << 64).unwrap()).unwrap(),

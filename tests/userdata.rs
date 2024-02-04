@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use rlua::{
-    AnyUserData, ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods, RluaCompat
+    AnyUserData, ExternalError, Function, Lua, MetaMethod, RluaCompat, String, UserData,
+    UserDataMethods,
 };
 
 #[test]
@@ -179,7 +180,6 @@ fn detroys_userdata() {
     assert_eq!(Arc::strong_count(&rc), 1);
 }
 
-#[cfg(rlua_lua54)]
 #[test]
 fn user_value() {
     struct MyUserData;
@@ -206,26 +206,6 @@ fn user_value() {
     });
 }
 
-#[cfg(rlua_lua53)]
-#[test]
-fn user_value() {
-    struct MyUserData;
-    impl UserData for MyUserData {}
-
-    Lua::new().context(|lua| {
-        let ud = lua.create_userdata(MyUserData).unwrap();
-        ud.set_nth_user_value(1, "hello").unwrap();
-        assert!(ud.set_nth_user_value(2, "world").is_err());
-        assert_eq!(ud.nth_user_value::<String>(1).unwrap(), "hello");
-        assert!(ud.nth_user_value::<String>(2).is_err());
-        assert!(ud.nth_user_value::<u32>(1).is_err());
-        assert!(ud.nth_user_value::<u32>(2).is_err());
-        assert!(ud.nth_user_value::<String>(0).is_err());
-        assert!(ud.nth_user_value::<String>(3).is_err());
-        assert!(ud.nth_user_value::<u32>(0).is_err());
-        assert!(ud.nth_user_value::<u32>(3).is_err());
-    });
-}
 #[test]
 fn test_functions() {
     struct MyUserData(i64);

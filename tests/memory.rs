@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rlua::{Error, Lua, Nil, UserData, RluaCompat};
+use rlua::{Error, Lua, Nil, RluaCompat, UserData};
 
 #[cfg(not(rlua_luajit))] // Custom allocators for LuaJIT not available
 #[test]

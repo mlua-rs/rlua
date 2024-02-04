@@ -1,4 +1,4 @@
-use rlua::{Lua, Nil, Result, Table, Value, RluaCompat};
+use rlua::{Lua, Nil, Result, RluaCompat, Table, Value};
 
 #[test]
 fn test_set_get() {

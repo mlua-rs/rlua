@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use rlua::{Error, Function, Lua, MetaMethod, String, UserData, UserDataMethods, RluaCompat};
+use rlua::{Error, Function, Lua, MetaMethod, RluaCompat, String, UserData, UserDataMethods};
 
 #[test]
 fn scope_func() {
@@ -19,7 +19,8 @@ fn scope_func() {
             f.call::<_, ()>(()).unwrap();
             assert_eq!(Rc::strong_count(&rc), 2);
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(rc.get(), 42);
         assert_eq!(Rc::strong_count(&rc), 1);
 
@@ -51,14 +52,13 @@ fn scope_drop() {
             lua.globals()
                 .set(
                     "test",
-                    scope
-                        .create_userdata(MyUserdata(rc.clone()))
-                        .unwrap(),
+                    scope.create_userdata(MyUserdata(rc.clone())).unwrap(),
                 )
                 .unwrap();
             assert_eq!(Rc::strong_count(&rc), 2);
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(Rc::strong_count(&rc), 1);
 
         match lua.load("test:method()").exec() {
@@ -82,7 +82,8 @@ fn scope_capture() {
                 })
                 .unwrap()
                 .call::<_, ()>(())
-        }).unwrap();
+        })
+        .unwrap();
     });
     assert_eq!(i, 42);
 }
@@ -99,7 +100,8 @@ fn outer_lua_access() {
                 })
                 .unwrap()
                 .call::<_, ()>(())
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(table.get::<_, String>("a").unwrap(), "b");
     });
 }
@@ -142,7 +144,8 @@ fn scope_userdata_methods() {
 
         lua.scope(|scope| {
             f.call::<_, ()>(scope.create_nonstatic_userdata(MyUserData(&i)).unwrap())
-        }).unwrap();
+        })
+        .unwrap();
     });
 
     assert_eq!(i.get(), 44);
@@ -185,7 +188,8 @@ fn scope_userdata_functions() {
 
         lua.scope(|scope| {
             f.call::<_, ()>(scope.create_nonstatic_userdata(MyUserData(&dummy)).unwrap())
-        }).unwrap();
+        })
+        .unwrap();
 
         assert_eq!(lua.globals().get::<_, i64>("i").unwrap(), 3);
     });
@@ -239,6 +243,7 @@ fn scope_userdata_mismatch() {
                 Ok(_) => panic!("incorrectly returned Ok"),
             }
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }
