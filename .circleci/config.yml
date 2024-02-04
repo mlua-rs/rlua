@@ -6,7 +6,7 @@ orbs:
 jobs:
   build-default:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
       - run:
@@ -50,7 +50,7 @@ jobs:
           key: cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-no-oslib:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
       - run:
@@ -82,7 +82,7 @@ jobs:
           key: cargo-cache-no-oslib-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-lua53:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
       - run:
@@ -126,7 +126,7 @@ jobs:
           key: cargo-cache-lua53-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-lua51:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
       - run:
@@ -176,7 +176,7 @@ jobs:
           key: cargo-cache-lua51-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-luajit:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
       - run:

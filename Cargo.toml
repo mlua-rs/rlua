@@ -10,6 +10,7 @@ readme = "README.md"
 keywords = ["lua"]
 license = "MIT"
 categories = [ "api-bindings", "development-tools::ffi" ]
+rust-version = "1.75"
 
 [badges]
 circle-ci = { repository = "mlua-rs/rlua", branch = "master" }
