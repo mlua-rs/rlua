@@ -295,7 +295,7 @@ fn test_error() {
     });
 
     match catch_unwind(|| -> Result<usize> {
-        Lua::new().context(|lua| {
+        Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default().catch_rust_panics(false)).unwrap().context(|lua| {
             let globals = lua.globals();
 
             lua.load(
@@ -324,7 +324,7 @@ fn test_error() {
     };
 
     match catch_unwind(|| -> Result<()> {
-        Lua::new().context(|lua| {
+        Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default().catch_rust_panics(false)).unwrap().context(|lua| {
             let globals = lua.globals();
 
             lua.load(
@@ -417,6 +417,10 @@ fn test_error_nopcall_wrap() {
 }
 */
 
+// The following tests are no longer relevant now that `rlua` is backed by `mlua`
+// which takes slightly different decisions on loading unsafe code; it is up to
+// the user to prevent loading of Lua bytecode if required.
+/*
 #[test]
 fn test_load_wrappers() {
     Lua::new().context(|lua| {
@@ -476,6 +480,7 @@ fn test_load_wrappers() {
         assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
     });
 }
+*/
 
 #[test]
 fn test_no_load_wrappers() {
@@ -537,6 +542,9 @@ fn test_no_load_wrappers() {
     };
 }
 
+// The following tests are no longer relevant now that `rlua` is backed by `mlua`
+// which takes slightly different decisions on loading unsafe code.
+/*
 #[test]
 fn test_loadfile_wrappers() {
     let mut tmppath = std::env::temp_dir();
@@ -590,6 +598,7 @@ fn test_loadfile_wrappers() {
         assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
     });
 }
+*/
 
 #[test]
 fn test_no_loadfile_wrappers() {
@@ -655,6 +664,10 @@ fn test_no_loadfile_wrappers() {
     };
 }
 
+// The following tests are no longer relevant now that `rlua` is backed by `mlua`
+// which takes slightly different decisions on loading unsafe code; it is up to
+// the user to prevent loading of Lua bytecode if required.
+/*
 #[test]
 fn test_dofile_wrappers() {
     let mut tmppath = std::env::temp_dir();
@@ -708,6 +721,7 @@ fn test_dofile_wrappers() {
         assert_eq!(globals.get::<_, u32>("x").unwrap(), 5);
     });
 }
+*/
 
 #[test]
 fn test_no_dofile_wrappers() {
@@ -875,6 +889,9 @@ fn test_no_loadstring_wrappers() {
     };
 }
 
+// The following tests are no longer relevant now that `rlua` is backed by `mlua`
+// which takes slightly different decisions on loading unsafe code.
+/*
 #[test]
 fn test_default_loadlib() {
     Lua::new().context(|lua| {
@@ -892,6 +909,7 @@ fn test_default_loadlib() {
         .unwrap();
     });
 }
+*/
 
 #[test]
 fn test_no_remove_loadlib() {
@@ -1013,7 +1031,8 @@ fn test_num_conversion() {
             lua.unpack::<f64>(lua.pack(f32::MAX).unwrap()).unwrap(),
             f32::MAX as f64
         );
-        assert!(lua.unpack::<f32>(lua.pack(f64::MAX).unwrap()).is_err());
+        assert_eq!(lua.unpack::<f32>(lua.pack(f64::MAX).unwrap()).unwrap(),
+                   f32::INFINITY);
 
         assert_eq!(
             lua.unpack::<i128>(lua.pack(1i128 << 64).unwrap()).unwrap(),
