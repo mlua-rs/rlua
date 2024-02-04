@@ -77,8 +77,8 @@ fn function_calls() {
     assert_eq!(
         *output,
         vec![
-            (None, Some("main".to_string())),
-            (Some("len".to_string()), Some("Lua".to_string()))
+            (None, "main"),
+            (Some("len".to_string()), "Lua")
         ]
     );
 }
