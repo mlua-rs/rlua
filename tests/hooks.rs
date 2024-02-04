@@ -76,10 +76,7 @@ fn function_calls() {
     #[cfg(rlua_luajit)]
     assert_eq!(
         *output,
-        vec![
-            (None, "main"),
-            (Some("len".to_string()), "Lua")
-        ]
+        vec![(None, "main"), (Some("len".to_string()), "Lua")]
     );
 }
 
