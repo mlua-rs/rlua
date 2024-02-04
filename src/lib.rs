@@ -14,6 +14,7 @@ pub trait RluaCompat {
 }
 
 impl RluaCompat for Lua {
+    #[deprecated = "Context is no longer needed; call methods on Lua directly."]
     fn context<R, F>(&self, f: F) -> R
     where F: FnOnce(&Lua) -> R {
         f(self)
@@ -27,6 +28,7 @@ pub trait ToLuaCompat<'lua> {
 }
 
 impl<'lua, T:IntoLua<'lua>> ToLuaCompat<'lua> for T {
+    #[deprecated = "ToLua::to_lua has become IntoLua::into_lua"]
     fn to_lua(self, context: &'lua Lua) -> mlua::Result<Value<'lua>> {
         self.into_lua(context)
     }
