@@ -36,6 +36,4 @@ system-luajit=["mlua/luajit"]
 
 [dev-dependencies]
 rustyline = "13.0"
-#criterion = "0.5.1"
-compiletest_rs = { version = "0.10.2", features = ["stable"] }
 bstr = "1.9.0"
