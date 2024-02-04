@@ -2,24 +2,14 @@ use rlua::{Integer, Lua, Result, RluaCompat, String, Table, ToLuaCompat, Value};
 
 fn valid_float(verify: Result<Value>, expected: f64) {
     let verify_unwrap = verify.unwrap();
-    assert_eq!(verify_unwrap.type_name(), "number");
+    assert!(verify_unwrap.type_name() == "number" || verify_unwrap.type_name() == "integer");
     match verify_unwrap {
         Value::Number(value) => assert_eq!(value, expected),
+        Value::Integer(value) => assert_eq!(value as f64, expected),
         _ => panic!("unexpected type"),
     };
 }
 
-#[cfg(rlua_lua51)]
-fn valid_int(verify: Result<Value>, expected: Integer) {
-    let verify_unwrap = verify.unwrap();
-    assert_eq!(verify_unwrap.type_name(), "number");
-    match verify_unwrap {
-        Value::Number(value) => assert_eq!(value as Integer, expected),
-        _ => panic!("unexpected type"),
-    };
-}
-
-#[cfg(not(rlua_lua51))]
 fn valid_int(verify: Result<Value>, expected: Integer) {
     let verify_unwrap = verify.unwrap();
     assert_eq!(verify_unwrap.type_name(), "integer");

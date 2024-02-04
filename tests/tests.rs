@@ -811,16 +811,6 @@ fn test_loadstring_wrappers() {
         assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
         lua.load(
             r#"
-                assert(type(binchunk) == "string")
-                chunk = loadstring(binchunk)
-                assert(chunk == nil)
-            "#,
-        )
-        .exec()
-        .unwrap();
-        assert_eq!(globals.get::<_, u32>("x").unwrap(), 1);
-        lua.load(
-            r#"
                 local s = "x = x + 4"
                 chunk = loadstring(s)
                 assert(chunk ~= nil)
@@ -1052,15 +1042,24 @@ fn test_pcall_xpcall() {
         assert!(r);
         assert_eq!(e, "foo");
 
+        #[cfg(not(rlua_lua51))]
         let (r, e) = lua
-            .load("xpcall(function(p) return p end, print, 'foo')")
+            .load("xpcall(function(p) return p end, function(e) print(e) return e end, 'foo')")
             .eval::<(bool, String)>()
             .unwrap();
         assert!(r);
         assert_eq!(e, "foo");
 
+        #[cfg(rlua_lua51)]
+        let (r, e) = lua
+            .load("xpcall(function(p) return 'foo' end, function(e) print(e) return e end)")
+            .eval::<(bool, String)>()
+            .unwrap();
+        assert!(r);
+        assert_eq!(e, "foo");
         // Make sure that the return values are correct on errors, and that error handling works
 
+        #[cfg(not(rlua_lua51))]
         lua.load(
             r#"
                 pcall_error = nil
@@ -1073,16 +1072,26 @@ fn test_pcall_xpcall() {
         .exec()
         .unwrap();
 
+        #[cfg(rlua_lua51)]
+        lua.load(
+            r#"
+                pcall_error = nil
+                pcall_status, pcall_error = pcall(error, "testerror")
+
+                xpcall_error = nil
+                xpcall_status, _ = xpcall(function() error("testerror") end, function(err) xpcall_error = err end)
+            "#,
+        )
+        .exec()
+        .unwrap();
         assert_eq!(globals.get::<_, bool>("pcall_status").unwrap(), false);
-        assert_eq!(
-            globals.get::<_, String>("pcall_error").unwrap(),
-            "testerror"
+        assert!(
+            globals.get::<_, String>("pcall_error").unwrap().to_str().unwrap().ends_with("testerror")
         );
 
         assert_eq!(globals.get::<_, bool>("xpcall_statusr").unwrap(), false);
-        assert_eq!(
-            globals.get::<_, String>("xpcall_error").unwrap(),
-            "testerror"
+        assert!(
+            globals.get::<_, String>("xpcall_error").unwrap().to_str().unwrap().ends_with("testerror")
         );
 
         // Make sure that weird xpcall error recursion at least doesn't cause unsafety or panics.

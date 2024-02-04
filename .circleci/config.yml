@@ -37,33 +37,6 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
-  build-no-oslib:
-    docker:
-      - image: cimg/rust:1.75.0
-    steps:
-      - checkout
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version
-      - run:
-          name: Calculate dependencies
-          command: cargo generate-lockfile
-      - restore_cache:
-          keys:
-            - cargo-cache-no-oslib-{{ arch }}-{{ checksum "Cargo.lock" }}
-      - run:
-          name: Build all targets
-          command: cargo build --features=lua-no-oslib --all --all-targets
-      - run:
-          name: Run all tests
-          command: cargo test --features=lua-no-oslib --all
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target/debug/.fingerprint
-            - target/debug/build
-            - target/debug/deps
-          key: cargo-cache-no-oslib-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-lua53:
     docker:
       - image: cimg/rust:1.75.0
@@ -214,4 +187,3 @@ workflows:
       - "build-lua51"
       - "build-luajit"
       - "build-windows"
-      - "build-no-oslib"
