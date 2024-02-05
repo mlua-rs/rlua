@@ -112,6 +112,11 @@ fn error_within_hook() {
 #[test]
 fn limit_execution_instructions() {
     let lua = Lua::new();
+
+    // For LuaJIT disable JIT, as compiled code does not trigger hooks
+    #[cfg(rlua_luajit)] // LuaJIT gives different results
+    lua.load("jit.off()").exec().unwrap();
+
     let max_instructions = Arc::new(Mutex::new(10000));
     let max_int = Arc::clone(&max_instructions);
 
