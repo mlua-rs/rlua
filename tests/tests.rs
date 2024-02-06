@@ -306,7 +306,6 @@ fn test_error() {
                 r#"
                     function rust_panic()
                         ok, err = pcall(function () rust_panic_function() end)
-                        print(tostring(ok), tostring(err))
                         return 17
                     end
                 "#,
@@ -319,7 +318,7 @@ fn test_error() {
 
             let rust_panic = globals.get::<_, Function>("rust_panic")?;
 
-            dbg!(rust_panic.call::<_, usize>(()))
+            rust_panic.call::<_, usize>(())
         })
     }) {
         Ok(Ok(_)) => panic!("no panic was detected, pcall caught it!"),
