@@ -6,14 +6,9 @@ orbs:
 jobs:
   build-default:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
-      - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
@@ -30,12 +25,6 @@ jobs:
           name: Run all tests
           command: cargo test --all
       - run:
-          name: Check bindgen
-          command: |
-              cargo install bindgen-cli
-              scripts/update-bindgen.sh
-              git diff --exit-code || true
-      - run:
           name: Check Formatting
           command: |
               rustup component add rustfmt
@@ -48,48 +37,11 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
-  build-no-oslib:
-    docker:
-      - image: cimg/rust:1.70.0
-    steps:
-      - checkout
-      - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version
-      - run:
-          name: Calculate dependencies
-          command: cargo generate-lockfile
-      - restore_cache:
-          keys:
-            - cargo-cache-no-oslib-{{ arch }}-{{ checksum "Cargo.lock" }}
-      - run:
-          name: Build all targets
-          command: cargo build --features=lua-no-oslib --all --all-targets
-      - run:
-          name: Run all tests
-          command: cargo test --features=lua-no-oslib --all
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target/debug/.fingerprint
-            - target/debug/build
-            - target/debug/deps
-          key: cargo-cache-no-oslib-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-lua53:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
-      - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
@@ -106,12 +58,6 @@ jobs:
           name: Run all tests
           command: cargo test --no-default-features --features=builtin-lua53 --all
       - run:
-          name: Check bindgen
-          command: |
-              cargo install bindgen-cli
-              scripts/update-bindgen.sh
-              git diff --exit-code || true
-      - run:
           name: Check Formatting
           command: |
               rustup component add rustfmt
@@ -126,14 +72,9 @@ jobs:
           key: cargo-cache-lua53-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-lua51:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
-      - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
       - run:
           name: Install Lua
           command: |
@@ -156,12 +97,6 @@ jobs:
           name: Run all tests
           command: cargo test --no-default-features --features=system-lua51 --all
       - run:
-          name: Check bindgen
-          command: |
-              cargo install bindgen-cli
-              scripts/update-bindgen.sh
-              git diff --exit-code || true
-      - run:
           name: Check Formatting
           command: |
               rustup component add rustfmt
@@ -176,14 +111,9 @@ jobs:
           key: cargo-cache-lua51-{{ arch }}-{{ checksum "Cargo.lock" }}
   build-luajit:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
-      - run:
-          name: Install libclang for bindgen
-          command: |
-            sudo apt-get update
-            sudo apt-get install libclang-dev clang
       - run:
           name: Install Lua
           command: |
@@ -257,4 +187,3 @@ workflows:
       - "build-lua51"
       - "build-luajit"
       - "build-windows"
-      - "build-no-oslib"

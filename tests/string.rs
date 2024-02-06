@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rlua::{Lua, String, Table};
+use rlua::{Lua, RluaCompat, String, Table};
 
 fn with_str<F>(s: &str, f: F)
 where

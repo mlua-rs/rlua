@@ -1,7 +1,7 @@
 use std::f32;
 use std::iter::FromIterator;
 
-use rlua::{Function, Lua, MetaMethod, Result, UserData, UserDataMethods, Variadic};
+use rlua::{Function, Lua, MetaMethod, Result, RluaCompat, UserData, UserDataMethods, Variadic};
 
 fn main() -> Result<()> {
     // You can create a new Lua state with `Lua::new()`.  This loads the default Lua std library
@@ -22,7 +22,7 @@ fn main() -> Result<()> {
         globals.set("string_var", "hello")?;
         globals.set("int_var", 42)?;
 
-        Ok(())
+        Ok::<_, rlua::Error>(())
     })?;
 
     lua.context(|lua_ctx| {
@@ -35,7 +35,7 @@ fn main() -> Result<()> {
         assert_eq!(globals.get::<_, String>("string_var")?, "hello");
         assert_eq!(globals.get::<_, i64>("int_var")?, 42);
 
-        Ok(())
+        Ok::<_, rlua::Error>(())
     })?;
 
     lua.context(|lua_ctx| {
@@ -52,7 +52,7 @@ fn main() -> Result<()> {
                 global = 'foo'..'bar'
             "#,
             )
-            .set_name("example code")?
+            .set_name("example code")
             .exec()?;
         assert_eq!(globals.get::<_, String>("global")?, "foobar");
 
@@ -167,7 +167,7 @@ fn main() -> Result<()> {
         // Here's a worked example that shows many of the features of this API
         // together
 
-        #[derive(Copy, Clone)]
+        #[derive(Copy, Clone, mlua::FromLua)]
         struct Vec2(f32, f32);
 
         impl UserData for Vec2 {

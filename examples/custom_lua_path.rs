@@ -1,4 +1,4 @@
-use rlua::{Lua, Result};
+use rlua::{Lua, Result, RluaCompat};
 
 fn main() -> Result<()> {
     let lua = Lua::new();
@@ -11,7 +11,7 @@ fn main() -> Result<()> {
         // require a module located in the newly added directory
         lua_ctx.load("require'new_module'").exec()?;
 
-        Ok(())
+        Ok::<_, rlua::Error>(())
     })?;
 
     Ok(())

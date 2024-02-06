@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rlua::{Error, Lua, Nil, UserData};
+use rlua::{Error, Lua, Nil, RluaCompat, UserData};
 
 #[cfg(not(rlua_luajit))] // Custom allocators for LuaJIT not available
 #[test]
@@ -24,13 +24,13 @@ fn test_memory_limit() {
         // function otherwise.
         lua.gc_collect().expect("should collect garbage");
 
-        lua.set_memory_limit(Some(initial_memory + 10000));
+        lua.set_memory_limit(initial_memory + 10000).unwrap();
         match f.call::<_, ()>(()) {
             Err(Error::MemoryError(_)) => {}
             something_else => panic!("did not trigger memory error: {:?}", something_else),
         }
 
-        lua.set_memory_limit(None);
+        lua.set_memory_limit(usize::MAX).unwrap();
         f.call::<_, ()>(()).expect("should trigger no memory limit");
     });
 }

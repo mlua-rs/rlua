@@ -1,9 +1,8 @@
-#[cfg(rlua_lua54)]
-use std::os::raw::c_int;
 use std::sync::Arc;
 
 use rlua::{
-    AnyUserData, ExternalError, Function, Lua, MetaMethod, String, UserData, UserDataMethods,
+    AnyUserData, ExternalError, Function, Lua, MetaMethod, RluaCompat, String, UserData,
+    UserDataMethods,
 };
 
 #[test]
@@ -30,6 +29,7 @@ fn test_user_data() {
 
 #[test]
 fn test_methods() {
+    #[derive(Clone, mlua::FromLua)]
     struct MyUserData(i64);
 
     impl UserData for MyUserData {
@@ -71,7 +71,7 @@ fn test_methods() {
 
 #[test]
 fn test_metamethods() {
-    #[derive(Copy, Clone)]
+    #[derive(Copy, Clone, mlua::FromLua)]
     struct MyUserData(i64);
 
     impl UserData for MyUserData {
@@ -89,7 +89,7 @@ fn test_metamethods() {
                 if index.to_str()? == "inner" {
                     Ok(data.0)
                 } else {
-                    Err("no such custom index".to_lua_err())
+                    Err("no such custom index".into_lua_err())
                 }
             });
         }
@@ -180,51 +180,32 @@ fn detroys_userdata() {
     assert_eq!(Arc::strong_count(&rc), 1);
 }
 
-#[cfg(rlua_lua54)]
 #[test]
 fn user_value() {
     struct MyUserData;
     impl UserData for MyUserData {
+        /*
         fn get_uvalues_count(&self) -> c_int {
             2
         }
+        */
     }
 
     Lua::new().context(|lua| {
         let ud = lua.create_userdata(MyUserData).unwrap();
-        ud.set_i_user_value("hello", 1).unwrap();
-        ud.set_i_user_value("world", 2).unwrap();
-        assert_eq!(ud.get_i_user_value::<String>(1).unwrap(), "hello");
-        assert_eq!(ud.get_i_user_value::<String>(2).unwrap(), "world");
-        assert!(ud.get_i_user_value::<u32>(1).is_err());
-        assert!(ud.get_i_user_value::<u32>(2).is_err());
-        assert!(ud.get_i_user_value::<String>(0).is_err());
-        assert!(ud.get_i_user_value::<String>(3).is_err());
-        assert!(ud.get_i_user_value::<u32>(0).is_err());
-        assert!(ud.get_i_user_value::<u32>(3).is_err());
+        ud.set_nth_user_value(1, "hello").unwrap();
+        ud.set_nth_user_value(2, "world").unwrap();
+        assert_eq!(ud.nth_user_value::<String>(1).unwrap(), "hello");
+        assert_eq!(ud.nth_user_value::<String>(2).unwrap(), "world");
+        assert!(ud.nth_user_value::<u32>(1).is_err());
+        assert!(ud.nth_user_value::<u32>(2).is_err());
+        assert!(ud.nth_user_value::<String>(0).is_err());
+        assert!(ud.nth_user_value::<String>(3).is_err());
+        assert!(ud.nth_user_value::<u32>(0).is_err());
+        assert!(ud.nth_user_value::<u32>(3).is_err());
     });
 }
 
-#[cfg(rlua_lua53)]
-#[test]
-fn user_value() {
-    struct MyUserData;
-    impl UserData for MyUserData {}
-
-    Lua::new().context(|lua| {
-        let ud = lua.create_userdata(MyUserData).unwrap();
-        ud.set_i_user_value("hello", 1).unwrap();
-        assert!(ud.set_i_user_value("world", 2).is_err());
-        assert_eq!(ud.get_i_user_value::<String>(1).unwrap(), "hello");
-        assert!(ud.get_i_user_value::<String>(2).is_err());
-        assert!(ud.get_i_user_value::<u32>(1).is_err());
-        assert!(ud.get_i_user_value::<u32>(2).is_err());
-        assert!(ud.get_i_user_value::<String>(0).is_err());
-        assert!(ud.get_i_user_value::<String>(3).is_err());
-        assert!(ud.get_i_user_value::<u32>(0).is_err());
-        assert!(ud.get_i_user_value::<u32>(3).is_err());
-    });
-}
 #[test]
 fn test_functions() {
     struct MyUserData(i64);
@@ -277,7 +258,7 @@ fn test_functions() {
 
 #[test]
 fn test_align() {
-    #[derive(Clone)]
+    #[derive(Clone, mlua::FromLua)]
     #[repr(align(32))]
     struct MyUserData(u8);
 
