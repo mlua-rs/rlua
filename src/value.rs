@@ -69,6 +69,58 @@ impl<'lua> Value<'lua> {
     }
 }
 
+impl<'lua> From<bool> for Value<'lua> {
+    fn from(value: bool) -> Self {
+        Value::Boolean(value)
+    }
+}
+impl<'lua> From<LightUserData> for Value<'lua> {
+    fn from(value: LightUserData) -> Self {
+        Value::LightUserData(value)
+    }
+}
+#[cfg(any(rlua_lua53, rlua_lua54))]
+impl<'lua> From<Integer> for Value<'lua> {
+    fn from(value: Integer) -> Self {
+        Value::Integer(value)
+    }
+}
+impl<'lua> From<Number> for Value<'lua> {
+    fn from(value: Number) -> Self {
+        Value::Number(value)
+    }
+}
+impl<'lua> From<String<'lua>> for Value<'lua> {
+    fn from(value: String<'lua>) -> Self {
+        Value::String(value)
+    }
+}
+impl<'lua> From<Table<'lua>> for Value<'lua> {
+    fn from(value: Table<'lua>) -> Self {
+        Value::Table(value)
+    }
+}
+impl<'lua> From<Function<'lua>> for Value<'lua> {
+    fn from(value: Function<'lua>) -> Self {
+        Value::Function(value)
+    }
+}
+impl<'lua> From<Thread<'lua>> for Value<'lua> {
+    fn from(value: Thread<'lua>) -> Self {
+        Value::Thread(value)
+    }
+}
+impl<'lua> From<AnyUserData<'lua>> for Value<'lua> {
+    fn from(value: AnyUserData<'lua>) -> Self {
+        Value::UserData(value)
+    }
+}
+impl<'lua> From<Error> for Value<'lua> {
+    fn from(value: Error) -> Self {
+        Value::Error(value)
+    }
+}
+
 /// Trait for types convertible to `Value`.
 pub trait ToLua<'lua> {
     /// Performs the conversion.
@@ -118,7 +170,7 @@ impl<'a, 'lua> IntoIterator for &'a MultiValue<'lua> {
     type IntoIter = iter::Rev<slice::Iter<'a, Value<'lua>>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        (&self.0).into_iter().rev()
+        self.0.iter().rev()
     }
 }
 
@@ -138,8 +190,8 @@ impl<'lua> MultiValue<'lua> {
         self.0.reserve(size);
     }
 
-    pub fn push_front(&mut self, value: Value<'lua>) {
-        self.0.push(value);
+    pub fn push_front(&mut self, value: impl Into<Value<'lua>>) {
+        self.0.push(value.into());
     }
 
     pub(crate) fn append(&mut self, values: &mut Self) {
