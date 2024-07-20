@@ -1,3 +1,9 @@
+## [0.20.1]
+- Add "deprecated" badge
+
+## [0.20.0]
+- Switch to being a wrapper around mlua
+
 ## [0.19.8]
 - Update rustyline dev-dependency (thanks @salexan2001)
 - Fix builds for iOS (thanks @w-ensink)

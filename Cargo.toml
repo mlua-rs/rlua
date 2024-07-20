@@ -1,6 +1,6 @@
 [package]
 name = "rlua"
-version = "0.20.0"
+version = "0.20.1"
 authors = ["kyren <kerriganw@gmail.com>"]
 edition = "2018"
 description = "High level bindings to Lua 5.x"
@@ -14,6 +14,9 @@ rust-version = "1.75"
 
 [badges]
 circle-ci = { repository = "mlua-rs/rlua", branch = "master" }
+
+[badges.maintenance]
+status = "deprecated"
 
 [dependencies]
 mlua = { version = "0.9.5", features = ["macros"] }
