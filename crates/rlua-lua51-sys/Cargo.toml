@@ -1,6 +1,6 @@
 [package]
 name = "rlua-lua51-sys"
-version = "0.1.6"
+version = "0.1.7"
 keywords = ["bindings", "lua"]
 categories = ["external-ffi-bindings"]
 description = "Bindings to lua's C API"
@@ -24,3 +24,6 @@ luajit-pkg-config = []
 lua51-pkg-config = []
 static = []
 lua-no-oslib = []
+
+[badges.maintenance]
+status = "deprecated"

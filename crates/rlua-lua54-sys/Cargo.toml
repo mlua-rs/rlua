@@ -1,6 +1,6 @@
 [package]
 name = "rlua-lua54-sys"
-version = "0.1.6"
+version = "0.1.7"
 keywords = ["bindings", "lua"]
 categories = ["external-ffi-bindings"]
 description = "Bindings to lua's C API"
@@ -23,3 +23,6 @@ default = []
 lua54-pkg-config = []
 static = []
 lua-no-oslib = []
+
+[badges.maintenance]
+status = "deprecated"
